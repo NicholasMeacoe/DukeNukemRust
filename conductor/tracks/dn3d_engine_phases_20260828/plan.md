@@ -1,23 +1,23 @@
 # Implementation Plan: Duke Nukem 3D Rust Engine Phases
 
 ## Phase 1: Build Map Geometry & Portal Compiler (Fix Geometry Pipeline)
-- [ ] Task: Two-Sided Portal Wall Segmentation
-  - [ ] Update `src/main.rs` and `src/map.rs` to distinguish one-sided (white) vs two-sided (red) walls (`nextsector != -1`)
-  - [ ] Implement Upper Wall generation (filling height gap between current ceiling and adjacent sector ceiling)
-  - [ ] Implement Lower Wall generation (filling height gap between current floor and adjacent sector floor)
-  - [ ] Implement Masked Middle Wall rendering for transparent/grate/window walls
-- [ ] Task: Sloped Floor & Ceiling Tessellation
-  - [ ] Parse and interpret `floorheinum` and `ceilingheinum` along the slope first-wall pivot
-  - [ ] Compute 3D vertex Z coordinates for triangulated sector polygons
-  - [ ] Generate matching physics colliders for sloped floors and ceilings
-- [ ] Task: Authentic Build UV Mapping & Texture Coordinates
-  - [ ] Implement Build engine UV formulas using `xrepeat`, `yrepeat`, `xpanning`, and `ypanning`
-  - [ ] Account for tile width and height scaling on wall quads and sector planes
-- [ ] Task: Skybox & Parallax Ceiling Rendering
-  - [ ] Detect parallax ceiling bit flag in `sector.ceilingstat`
-  - [ ] Spawn parallax sky dome / cylinder background with scrolling camera orientation
-- [ ] Task: Phase 1 Verification & Checkpoint
-  - [ ] Verify `E1L1.MAP` renders with open doorways, sloped cinema stairs/ramps, aligned textures, and open sky
+- [x] Task: Two-Sided Portal Wall Segmentation
+  - [x] Update `src/main.rs` and `src/map.rs` to distinguish one-sided (white) vs two-sided (red) walls (`nextsector != -1`)
+  - [x] Implement Upper Wall generation (filling height gap between current ceiling and adjacent sector ceiling)
+  - [x] Implement Lower Wall generation (filling height gap between current floor and adjacent sector floor)
+  - [x] Implement Masked Middle Wall rendering for transparent/grate/window walls
+- [x] Task: Sloped Floor & Ceiling Tessellation
+  - [x] Parse and interpret `floorheinum` and `ceilingheinum` along the slope first-wall pivot
+  - [x] Compute 3D vertex Z coordinates for triangulated sector polygons
+  - [x] Generate matching physics colliders for sloped floors and ceilings
+- [x] Task: Authentic Build UV Mapping & Texture Coordinates
+  - [x] Implement Build engine UV formulas using `xrepeat`, `yrepeat`, `xpanning`, and `ypanning`
+  - [x] Account for tile width and height scaling on wall quads and sector planes
+- [x] Task: Skybox & Parallax Ceiling Rendering
+  - [x] Detect parallax ceiling bit flag in `sector.ceilingstat`
+  - [x] Spawn parallax sky dome / cylinder background with scrolling camera orientation
+- [x] Task: Phase 1 Verification & Checkpoint
+  - [x] Verify `E1L1.MAP` renders with open doorways, sloped cinema stairs/ramps, aligned textures, and open sky
 
 ---
 

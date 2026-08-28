@@ -3,6 +3,8 @@ mod art;
 mod palette;
 mod map;
 mod kwv;
+mod builder;
+mod sky;
 
 use bevy::prelude::*;
 use bevy::render::render_asset::RenderAssetUsages;
@@ -14,12 +16,8 @@ use art::Art;
 use palette::Palette;
 use map::Map;
 use kwv::Kwv;
-use std::fs;
 use bevy_rapier3d::prelude::*;
-use lyon_tessellation::math::{point};
-use lyon_tessellation::{
-    BuffersBuilder, FillOptions, FillTessellator, FillVertex, VertexBuffers,
-};
+use builder::MapMeshBuilder;
 
 fn main() {
     App::new()
@@ -41,7 +39,8 @@ fn main() {
             cursor_grab, 
             update_billboards, 
             play_random_sound,
-            update_weapon
+            update_weapon,
+            sky::update_skybox,
         ))
         .run();
 }
@@ -95,6 +94,7 @@ fn setup(
 ) {
     let grp_path = "dukenukem3d/duke3d.grp";
     let mut tile_textures = std::collections::HashMap::new();
+    let mut tile_sizes = std::collections::HashMap::new();
 
     println!("Attempting to load assets from {}", grp_path);
     if let Ok(grp) = Grp::open(grp_path) {
@@ -123,6 +123,7 @@ fn setup(
                                             );
                                             image.sampler = ImageSampler::Descriptor(ImageSamplerDescriptor::nearest());
                                             tile_textures.insert(tile_idx as i16, images.add(image));
+                                            tile_sizes.insert(tile_idx as i16, (w, h));
                                         }
                                     }
                                 }
@@ -162,263 +163,39 @@ fn setup(
     let map_name = "E1L1.MAP";
     println!("Attempting to load map {} from GRP", map_name);
     
-    // We need to re-open or borrow the grp to get the map. 
-    // Since we consumed the OK(grp) above, let's just open it again or we can refactor.
-    // For simplicity, just open it again.
     if let Ok(grp) = Grp::open(grp_path) {
         if let Ok(map_data) = grp.read_file(map_name) {
             if let Ok(map) = Map::from_bytes(&map_data) {
                 println!("Map loaded successfully: {} sectors, {} walls, {} sprites", map.sectors.len(), map.walls.len(), map.sprites.len());
             
-            // Build units to meters: 1024 units ~= 1 meter (approx)
-            // Build Z units are 16x smaller
-            start_pos = Vec3::new(
-                map.posx as f32 / 1024.0,
-                -(map.posz as f32) / (1024.0 * 16.0),
-                map.posy as f32 / 1024.0,
-            );
-            start_yaw = -(map.ang as f32 / 2048.0) * std::f32::consts::TAU + std::f32::consts::FRAC_PI_2;
-            println!("Player start position: {:?}", start_pos);
+                // Build units to meters: 1024 units ~= 1 meter (approx)
+                // Build Z units are 16x smaller
+                start_pos = Vec3::new(
+                    map.posx as f32 / 1024.0,
+                    -(map.posz as f32) / (1024.0 * 16.0),
+                    map.posy as f32 / 1024.0,
+                );
+                start_yaw = -(map.ang as f32 / 2048.0) * std::f32::consts::TAU + std::f32::consts::FRAC_PI_2;
+                println!("Player start position: {:?}", start_pos);
 
-            let default_material = materials.add(Color::srgb(0.5, 0.5, 0.6));
+                // Build map geometry with Phase 1 portal compiler and slope tessellation
+                let mesh_builder = MapMeshBuilder::new(
+                    &map,
+                    &tile_textures,
+                    &tile_sizes,
+                    default_material.clone(),
+                );
+                mesh_builder.build(&mut commands, &mut meshes, &mut materials);
 
-            for sector in &map.sectors {
-                let floor_y = -(sector.floorz as f32) / (1024.0 * 16.0);
-                let ceil_y = -(sector.ceilingz as f32) / (1024.0 * 16.0);
-                
-                let mut loops = Vec::new();
-                let mut current_loop = Vec::new();
-                let mut visited_walls = std::collections::HashSet::new();
-
-                for i in 0..sector.wallnum {
-                    let wall_idx = (sector.wallptr + i) as usize;
-                    if visited_walls.contains(&wall_idx) { continue; }
-
-                    let mut w = wall_idx;
-                    loop {
-                        if visited_walls.contains(&w) { break; }
-                        visited_walls.insert(w);
-                        let wall = &map.walls[w];
-                        current_loop.push(Vec2::new(wall.x as f32 / 1024.0, wall.y as f32 / 1024.0));
-                        w = wall.point2 as usize;
-                        if w == wall_idx { break; }
-                        if w < sector.wallptr as usize || w >= (sector.wallptr + sector.wallnum) as usize {
-                            break;
-                        }
-                    }
-                    if !current_loop.is_empty() {
-                        loops.push(std::mem::take(&mut current_loop));
-                    }
-                }
-
-                if !loops.is_empty() {
-                    let mut tessellator = FillTessellator::new();
-                    let mut buffers: VertexBuffers<[f32; 2], u32> = VertexBuffers::new();
-                    
-                    let mut path_builder = lyon_tessellation::path::Path::builder();
-                    for poly_points in &loops {
-                        if poly_points.len() < 3 { continue; }
-                        path_builder.begin(point(poly_points[0].x, poly_points[0].y));
-                        for p in poly_points.iter().skip(1) {
-                            path_builder.line_to(point(p.x, p.y));
-                        }
-                        path_builder.end(true);
-                    }
-                    let path = path_builder.build();
-
-                    if let Ok(_) = tessellator.tessellate_path(
-                        &path,
-                        &FillOptions::default(),
-                        &mut BuffersBuilder::new(&mut buffers, |vertex: FillVertex| {
-                            [vertex.position().x, vertex.position().y]
-                        }),
-                    ) {
-                        let vertices: Vec<[f32; 3]> = buffers.vertices
-                            .iter()
-                            .map(|v| [v[0], 0.0, v[1]])
-                            .collect();
-                        let uvs: Vec<[f32; 2]> = buffers.vertices
-                            .iter()
-                            // Divide by a larger factor so repeating is less dense
-                            .map(|v| [v[0] / 4.0, v[1] / 4.0])
-                            .collect();
-                        let indices = buffers.indices;
-                        
-                        let floor_mat = if let Some(handle) = tile_textures.get(&sector.floorpicnum) {
-                            materials.add(StandardMaterial {
-                                base_color_texture: Some(handle.clone()),
-                                unlit: true,
-                                ..default()
-                            })
-                        } else {
-                            default_material.clone()
-                        };
-
-                        let mut floor_mesh = Mesh::new(bevy::render::mesh::PrimitiveTopology::TriangleList, RenderAssetUsages::default());
-                        floor_mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, vertices.clone());
-                        floor_mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs.clone());
-                        floor_mesh.insert_indices(bevy::render::mesh::Indices::U32(indices.clone()));
-                        floor_mesh.duplicate_vertices();
-                        floor_mesh.compute_flat_normals();
-
-                        let floor_collider_vertices: Vec<Vect> = vertices.iter().map(|v| Vect::new(v[0], v[1], v[2])).collect();
-                        let floor_collider_indices: Vec<[u32; 3]> = indices.chunks(3).map(|c| [c[0], c[1], c[2]]).collect();
-
-                        if !floor_collider_indices.is_empty() {
-                            commands.spawn((
-                                PbrBundle {
-                                    mesh: meshes.add(floor_mesh),
-                                    material: floor_mat,
-                                    transform: Transform::from_xyz(0.0, floor_y, 0.0),
-                                    ..default()
-                                },
-                                RigidBody::Fixed,
-                                Collider::trimesh(floor_collider_vertices, floor_collider_indices),
-                            ));
-                        }
-
-                        let ceil_mat = if let Some(handle) = tile_textures.get(&sector.ceilingpicnum) {
-                            materials.add(StandardMaterial {
-                                base_color_texture: Some(handle.clone()),
-                                unlit: true,
-                                ..default()
-                            })
-                        } else {
-                            default_material.clone()
-                        };
-
-                        let mut ceil_mesh = Mesh::new(bevy::render::mesh::PrimitiveTopology::TriangleList, RenderAssetUsages::default());
-                        ceil_mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, vertices.clone());
-                        ceil_mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
-                        ceil_mesh.insert_indices(bevy::render::mesh::Indices::U32(indices.clone()));
-                        ceil_mesh.duplicate_vertices();
-                        ceil_mesh.compute_flat_normals();
-
-                        let ceil_collider_vertices: Vec<Vect> = vertices.iter().map(|v| Vect::new(v[0], v[1], v[2])).collect();
-                        let ceil_collider_indices: Vec<[u32; 3]> = indices.chunks(3).map(|c| [c[0], c[1], c[2]]).collect();
-
-                        if !ceil_collider_indices.is_empty() {
-                            commands.spawn((
-                                PbrBundle {
-                                    mesh: meshes.add(ceil_mesh),
-                                    material: ceil_mat,
-                                    transform: Transform::from_xyz(0.0, ceil_y, 0.0).with_rotation(Quat::from_rotation_x(std::f32::consts::PI)),
-                                    ..default()
-                                },
-                                RigidBody::Fixed,
-                                Collider::trimesh(ceil_collider_vertices, ceil_collider_indices),
-                            ));
-                        }
-                    }
-                }
-
-                for i in 0..sector.wallnum {
-                    let wall_idx = (sector.wallptr + i) as usize;
-                    if wall_idx >= map.walls.len() { continue; }
-                    let wall = &map.walls[wall_idx];
-                    let next_wall_idx = wall.point2 as usize;
-                    if next_wall_idx >= map.walls.len() { continue; }
-                    let next_wall = &map.walls[next_wall_idx];
-
-                    let p1 = Vec2::new(wall.x as f32 / 1024.0, wall.y as f32 / 1024.0);
-                    let p2 = Vec2::new(next_wall.x as f32 / 1024.0, next_wall.y as f32 / 1024.0);
-
-                    let mid_point = (p1 + p2) / 2.0;
-                    let diff = p2 - p1;
-                    let length = diff.length();
-                    let angle = f32::atan2(diff.y, diff.x);
-                    let height = (ceil_y - floor_y).abs();
-
-                    if length > 0.01 && height > 0.01 {
-                        let material = if let Some(handle) = tile_textures.get(&wall.picnum) {
-                            materials.add(StandardMaterial {
-                                base_color_texture: Some(handle.clone()),
-                                alpha_mode: AlphaMode::Mask(0.5),
-                                unlit: true,
-                                double_sided: true,
-                                ..default()
-                            })
-                        } else {
-                            default_material.clone()
-                        };
-
-                        // Fix UVs for the quad so textures tile instead of stretching massively
-                        let mut wall_mesh = Mesh::new(bevy::render::mesh::PrimitiveTopology::TriangleList, RenderAssetUsages::default());
-                        wall_mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, vec![
-                            [-length/2.0, -height/2.0, 0.0],
-                            [length/2.0, -height/2.0, 0.0],
-                            [length/2.0, height/2.0, 0.0],
-                            [-length/2.0, height/2.0, 0.0],
-                        ]);
-                        wall_mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, vec![
-                            [0.0, 0.0, 1.0],
-                            [0.0, 0.0, 1.0],
-                            [0.0, 0.0, 1.0],
-                            [0.0, 0.0, 1.0],
-                        ]);
-                        wall_mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, vec![
-                            [0.0, height / 2.0],
-                            [length / 2.0, height / 2.0],
-                            [length / 2.0, 0.0],
-                            [0.0, 0.0],
-                        ]);
-                        wall_mesh.insert_indices(bevy::render::mesh::Indices::U32(vec![0, 1, 2, 0, 2, 3]));
-
-
-                        commands.spawn((
-                            PbrBundle {
-                                mesh: meshes.add(wall_mesh),
-                                material,
-                                transform: Transform::from_xyz(mid_point.x, (ceil_y + floor_y) / 2.0, mid_point.y)
-                                    .with_rotation(Quat::from_rotation_y(-angle)),
-                                ..default()
-                            },
-                            RigidBody::Fixed,
-                            Collider::cuboid(length / 2.0, height / 2.0, 0.025),
-                        ));
-                    }
-                }
-            }
-
-            for sprite in &map.sprites {
-                if let Some(handle) = tile_textures.get(&sprite.picnum) {
-                    let pos = Vec3::new(
-                        sprite.x as f32 / 1024.0,
-                        -(sprite.z as f32) / (1024.0 * 16.0),
-                        sprite.y as f32 / 1024.0,
-                    );
-                    
-                    let scale_x = (sprite.xrepeat as f32 / 64.0) * 3.0;
-                    let scale_y = (sprite.yrepeat as f32 / 64.0) * 3.0;
-                    
-                    let is_enemy = sprite.picnum == 2000; // PIGCOP
-
-                    commands.spawn((
-                        PbrBundle {
-                            mesh: meshes.add(Rectangle::new(scale_x, scale_y)),
-                            material: materials.add(StandardMaterial {
-                                base_color_texture: Some(handle.clone()),
-                                alpha_mode: AlphaMode::Mask(0.5),
-                                unlit: true,
-                                double_sided: true,
-                                ..default()
-                            }),
-                            transform: Transform::from_translation(pos),
-                            ..default()
-                        },
-                        SpriteBillboard,
-                        RigidBody::Fixed,
-                        Collider::cuboid(scale_x / 2.0, scale_y / 2.0, 0.1),
-                        Destructible {
-                            health: if is_enemy { 100 } else { 10 },
-                            _picnum: sprite.picnum,
-                        }
-                    ));
+                // Check for parallax sky
+                let has_sky = map.sectors.iter().any(|s| s.is_ceiling_parallax());
+                if has_sky {
+                    // Tile 80 is MOONSKY1 (Episode 1 Hollywood Holocaust sky)
+                    sky::spawn_skybox(&mut commands, &mut meshes, &mut materials, &tile_textures, 80);
                 }
             }
         }
     }
-} // Closes `if let Ok(grp) = Grp::open(grp_path)`
 
     commands.spawn(PointLightBundle {
         point_light: PointLight {
@@ -517,13 +294,13 @@ fn setup(
 }
 
 #[derive(Component)]
-struct Destructible {
-    health: i32,
-    _picnum: i16,
+pub struct Destructible {
+    pub health: i32,
+    pub _picnum: i16,
 }
 
 #[derive(Component)]
-struct SpriteBillboard;
+pub struct SpriteBillboard;
 
 fn update_billboards(
     mut query: Query<&mut Transform, With<SpriteBillboard>>,
