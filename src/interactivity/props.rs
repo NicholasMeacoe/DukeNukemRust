@@ -22,10 +22,10 @@ pub fn handle_player_interactions(
         // 1. Check nearby switches with facing angle check
         for (trans, mut switch) in switches.iter_mut() {
             let to_obj = trans.translation - player_pos;
-            let dist = to_obj.length();
-            if dist < 2.8 {
-                let facing = if dist > 0.1 {
-                    player_dir.dot(to_obj / dist)
+            let dist_sq = to_obj.length_squared();
+            if dist_sq < 7.84 { // 2.8 * 2.8
+                let facing = if dist_sq > 0.01 {
+                    player_dir.dot(to_obj.normalize_or_zero())
                 } else {
                     1.0
                 };
@@ -57,8 +57,8 @@ pub fn handle_player_interactions(
         // 2. Check drinking fountains
         for (trans, mut fountain) in fountains.iter_mut() {
             let to_obj = trans.translation - player_pos;
-            let dist = to_obj.length();
-            if dist < 2.2 && !fountain.is_broken && fountain.uses_left > 0 {
+            let dist_sq = to_obj.length_squared();
+            if dist_sq < 4.84 && !fountain.is_broken && fountain.uses_left > 0 { // 2.2 * 2.2
                 fountain.uses_left -= 1;
                 heal_events.send(PlayerHealEvent { amount: 1 });
             }
@@ -67,8 +67,8 @@ pub fn handle_player_interactions(
         // 3. Check toilets & stalls
         for (trans, mut toilet) in toilets.iter_mut() {
             let to_obj = trans.translation - player_pos;
-            let dist = to_obj.length();
-            if dist < 2.2 && !toilet.is_broken {
+            let dist_sq = to_obj.length_squared();
+            if dist_sq < 4.84 && !toilet.is_broken { // 2.2 * 2.2
                 if toilet.last_used_time <= 0.0 {
                     toilet.last_used_time = 10.0;
                     heal_events.send(PlayerHealEvent { amount: 10 });
@@ -76,13 +76,21 @@ pub fn handle_player_interactions(
             }
         }
 
-        // 4. Check Nuke Buttons (Level Exit)
+        // 4. Check Nuke Buttons (Level Exit) with facing check
         for (trans, mut nuke) in nuke_switches.iter_mut() {
             let to_obj = trans.translation - player_pos;
-            let dist = to_obj.length();
-            if dist < 2.8 && !nuke.is_activated {
-                nuke.is_activated = true;
-                level_completed_events.send(crate::game_flow::LevelCompletedEvent);
+            let dist_sq = to_obj.length_squared();
+            if dist_sq < 7.84 && !nuke.is_activated { // 2.8 * 2.8
+                let facing = if dist_sq > 0.01 {
+                    player_dir.dot(to_obj.normalize_or_zero())
+                } else {
+                    1.0
+                };
+
+                if facing > 0.1 {
+                    nuke.is_activated = true;
+                    level_completed_events.send(crate::game_flow::LevelCompletedEvent);
+                }
             }
         }
     }
@@ -97,8 +105,9 @@ pub fn handle_touchplates(
     let p_pos = player_trans.translation;
 
     for (trans, mut touchplate) in touchplates.iter_mut() {
-        let dist = trans.translation.distance(p_pos);
-        if dist <= touchplate.radius {
+        let dist_sq = trans.translation.distance_squared(p_pos);
+        let rad_sq = touchplate.radius * touchplate.radius;
+        if dist_sq <= rad_sq {
             if !touchplate.triggered {
                 touchplate.triggered = true;
                 if touchplate.lotag != 0 {

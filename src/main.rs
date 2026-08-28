@@ -198,10 +198,13 @@ fn setup(
         default_material.clone()
     };
 
+    let spark_mesh = meshes.add(Rectangle::new(0.3, 0.3));
+
     commands.insert_resource(GameAssets {
         tile_textures: tile_textures.clone(),
         default_material: default_material.clone(),
         spark_material,
+        spark_mesh,
     });
 
     let mut start_pos = Vec3::new(0.0, 1.5, 5.0);
@@ -423,6 +426,7 @@ pub struct GameAssets {
     pub tile_textures: std::collections::HashMap<i16, Handle<Image>>,
     pub default_material: Handle<StandardMaterial>,
     pub spark_material: Handle<StandardMaterial>,
+    pub spark_mesh: Handle<Mesh>,
 }
 
 fn update_weapon(
@@ -438,7 +442,6 @@ fn update_weapon(
     mut commands: Commands,
     rapier_context: Res<RapierContext>,
     assets: Res<GameAssets>,
-    mut meshes: ResMut<Assets<Mesh>>,
 ) {
     let is_moving = if let Ok(output) = player_query.get_single() {
         output.effective_translation.xz().length_squared() > 0.001
@@ -535,7 +538,7 @@ fn update_weapon(
 
                 commands.spawn((
                     PbrBundle {
-                        mesh: meshes.add(Rectangle::new(0.3, 0.3)),
+                        mesh: assets.spark_mesh.clone(),
                         material: spark_mat,
                         transform: Transform::from_translation(decal_pos),
                         ..default()

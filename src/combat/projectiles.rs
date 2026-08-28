@@ -51,7 +51,7 @@ pub fn update_projectiles(
                 if dist_sq < 0.64 { // 0.8 * 0.8
                     damage_events.send(EntityDamageEvent {
                         target: e_entity,
-                        amount: 100,
+                        amount: 1000,
                         source: DamageSource::PlayerWeapon(ProjectileType::MightyBoot),
                         hit_origin: enemy_trans.translation,
                     });
@@ -150,6 +150,10 @@ pub fn apply_damage_events(
 ) {
     for ev in damage_events.read() {
         if let Ok((enemy_trans, mut enemy)) = enemies.get_mut(ev.target) {
+            if enemy.state == EnemyAiState::Gibbed {
+                continue;
+            }
+
             if enemy.state == EnemyAiState::Frozen {
                 enemy.health = -50;
                 enemy.state = EnemyAiState::Gibbed;
