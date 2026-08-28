@@ -95,8 +95,10 @@ impl ConVm {
                     ctx.registers.frame_offset += inc_val;
                 }
 
-                if (ctx.registers.frame_offset).abs() >= (num_frames * inc_val).abs() {
-                    ctx.registers.frame_offset = 0;
+                if num_frames > 0 && inc_val != 0 {
+                    if (ctx.registers.frame_offset).abs() >= (num_frames * inc_val).abs() {
+                        ctx.registers.frame_offset = 0;
+                    }
                 }
             }
         }
@@ -106,8 +108,15 @@ impl ConVm {
         ctx.killit_flag = false;
 
         let mut call_stack: Vec<usize> = Vec::with_capacity(8);
+        let mut instruction_count = 0usize;
+        const MAX_INSTRUCTIONS_PER_TICK: usize = 10_000;
 
         while ip < self.bytecode.len() {
+            instruction_count += 1;
+            if instruction_count > MAX_INSTRUCTIONS_PER_TICK {
+                break;
+            }
+
             let opcode = Opcode::from(self.bytecode[ip]);
 
             match opcode {
@@ -848,5 +857,71 @@ mod tests {
 
         // Break prevented sound 999
         assert_eq!(ctx.sound_events.len(), 0);
+    }
+
+    #[test]
+    fn test_vm_instruction_limit_guard() {
+        // Construct a circular subroutine state loop: state loop -> loop -> ...
+        let script = r#"
+            define TESTACTOR 2700
+            state infiniteloop
+                state infiniteloop
+            ends
+            actor TESTACTOR 100
+                state infiniteloop
+            enda
+        "#;
+        let mut compiler = Compiler::new();
+        let compiled = compiler.compile(script).unwrap();
+        let vm = ConVm::new(compiled.bytecode, compiled.actor_script_ptrs, compiled.actor_types);
+
+        let mut reg = ActorRegisters::default();
+        let mut x = 0; let mut y = 0; let mut z = 0;
+        let mut ang = 0; let mut xvel = 0; let mut zvel = 0;
+        let mut extra = 100;
+        let mut picnum = 2700;
+        let mut sectnum = 0;
+        let mut cstat = 0; let mut pal = 0;
+        let mut xrepeat = 64; let mut yrepeat = 64;
+        let mut clipdist = 32; let mut lotag = 0; let mut hitag = 0;
+
+        let mut ctx = VmActorContext {
+            sprite_idx: 0,
+            player_idx: 0,
+            dist_to_player: 500,
+            can_see_player: true,
+            hit_by_weapon: false,
+            registers: &mut reg,
+            sprite_x: &mut x,
+            sprite_y: &mut y,
+            sprite_z: &mut z,
+            sprite_ang: &mut ang,
+            sprite_xvel: &mut xvel,
+            sprite_zvel: &mut zvel,
+            sprite_extra: &mut extra,
+            sprite_picnum: &mut picnum,
+            sprite_sectnum: &mut sectnum,
+            sprite_cstat: &mut cstat,
+            sprite_pal: &mut pal,
+            sprite_xrepeat: &mut xrepeat,
+            sprite_yrepeat: &mut yrepeat,
+            sprite_clipdist: &mut clipdist,
+            sprite_lotag: &mut lotag,
+            sprite_hitag: &mut hitag,
+            killit_flag: false,
+            spawned_sprites: Vec::new(),
+            sound_events: Vec::new(),
+            quotes_displayed: Vec::new(),
+            pal_flashes: Vec::new(),
+            player_health_delta: 0,
+            player_ammo_deltas: Vec::new(),
+            player_inventory_deltas: Vec::new(),
+            debris_events: Vec::new(),
+            hitradius_events: Vec::new(),
+        };
+
+        // VM terminates safely without hanging the process
+        vm.execute(&mut ctx);
+        assert_eq!(*ctx.sprite_picnum, 2700);
     }
 }

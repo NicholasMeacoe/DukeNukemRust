@@ -76,11 +76,23 @@ impl<'a> PhysicsContext<'a> {
             let target_zvel = (m.vvel << 4) as i16;
 
             let div = if (flags & move_flags::GET_H) != 0 { 2 } else { 5 };
-            *self.sprite_xvel += (target_hvel - *self.sprite_xvel) / div;
+            let diff_h = target_hvel - *self.sprite_xvel;
+            let step_h = diff_h / div;
+            if step_h == 0 && diff_h != 0 {
+                *self.sprite_xvel += diff_h.signum();
+            } else {
+                *self.sprite_xvel += step_h;
+            }
 
             if *self.sprite_zvel < 648 {
                 let div_z = if (flags & move_flags::GET_V) != 0 { 2 } else { 5 };
-                *self.sprite_zvel += (target_zvel - *self.sprite_zvel) / div_z;
+                let diff_z = target_zvel - *self.sprite_zvel;
+                let step_z = diff_z / div_z;
+                if step_z == 0 && diff_z != 0 {
+                    *self.sprite_zvel += diff_z.signum();
+                } else {
+                    *self.sprite_zvel += step_z;
+                }
             }
         }
 
@@ -169,5 +181,34 @@ mod tests {
         assert!(*pctx.sprite_xvel > 0);
         // x should advance east
         assert!(*pctx.sprite_x > 0);
+    }
+
+    #[test]
+    fn test_physics_step_signum_convergence() {
+        let trig = TrigTables::new();
+        let mut reg = ActorRegisters::default();
+        let mut x = 0; let mut y = 0; let mut z = 0;
+        let mut ang = 0;
+        let mut xvel = 99; // target is 100, diff is 1
+        let mut zvel = 0;
+
+        let mut pctx = PhysicsContext {
+            sprite_x: &mut x,
+            sprite_y: &mut y,
+            sprite_z: &mut z,
+            sprite_ang: &mut ang,
+            sprite_xvel: &mut xvel,
+            sprite_zvel: &mut zvel,
+            hitag_flags: 0,
+            registers: &mut reg,
+            player_x: 0,
+            player_y: 0,
+        };
+
+        let move_def = MoveDef { hvel: 100, vvel: 0 };
+        pctx.apply_movement(Some(&move_def), &trig);
+
+        // Even though diff is 1 (1 / 5 == 0 in integer math), signum step ensures reaching 100
+        assert_eq!(*pctx.sprite_xvel, 100);
     }
 }

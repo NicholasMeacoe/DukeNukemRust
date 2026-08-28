@@ -71,7 +71,8 @@ impl<'a> MapMeshBuilder<'a> {
     }
 
     fn get_tile_size(&self, picnum: i16) -> (u32, u32) {
-        self.tile_sizes.get(&picnum).copied().unwrap_or((64, 64))
+        let (w, h) = self.tile_sizes.get(&picnum).copied().unwrap_or((64, 64));
+        (w.max(1), h.max(1))
     }
 
     pub fn build(

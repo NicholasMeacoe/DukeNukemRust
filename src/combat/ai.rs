@@ -47,17 +47,20 @@ pub fn update_enemy_ai(
             trans.look_to(look_dir, Vec3::Y);
         }
 
-        // Line of sight raycast check
-        let mut has_los = true;
-        if let Some(ref rapier) = rapier_context {
-            let ray_origin = trans.translation + Vec3::Y * 0.5;
-            let ray_dir = dir_to_player;
-            let max_toi = dist_to_player;
-            let filter = QueryFilter::exclude_kinematic();
+        // Line of sight raycast check (only executed when player is within perception radius)
+        let mut has_los = false;
+        if dist_to_player <= enemy.sight_radius * 1.5 {
+            has_los = true;
+            if let Some(ref rapier) = rapier_context {
+                let ray_origin = trans.translation + Vec3::Y * 0.5;
+                let ray_dir = dir_to_player;
+                let max_toi = dist_to_player;
+                let filter = QueryFilter::exclude_kinematic();
 
-            if let Some((_entity, toi)) = rapier.cast_ray(ray_origin, ray_dir, max_toi, true, filter) {
-                if toi < dist_to_player - 0.5 {
-                    has_los = false; // Solid wall blocks line of sight
+                if let Some((_entity, toi)) = rapier.cast_ray(ray_origin, ray_dir, max_toi, true, filter) {
+                    if toi < dist_to_player - 0.5 {
+                        has_los = false; // Solid wall blocks line of sight
+                    }
                 }
             }
         }

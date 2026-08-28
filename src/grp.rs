@@ -71,7 +71,8 @@ impl Grp {
             .ok_or_else(|| format!("File not found in GRP: {}", name))?;
         
         let start = entry.offset as usize;
-        let end = start + entry.size as usize;
+        let end = start.checked_add(entry.size as usize)
+            .ok_or_else(|| format!("GRP entry {} offset overflow", name))?;
         if end > self.data.len() {
             return Err(format!("GRP entry {} exceeds file bounds", name));
         }

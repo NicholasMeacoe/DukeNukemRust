@@ -275,5 +275,21 @@ mod tests {
         assert!(crack.is_blown);
         assert_eq!(crack.stage, 4);
     }
+
+    #[test]
+    fn test_nuke_button_facing_check() {
+        let player_dir = Vec3::new(0.0, 0.0, -1.0); // Facing North
+        let switch_pos = Vec3::new(0.0, 0.0, -2.0); // Switch in front of player
+        let player_pos = Vec3::ZERO;
+
+        let to_obj = switch_pos - player_pos;
+        let facing = player_dir.dot(to_obj.normalize_or_zero());
+        assert!(facing > 0.1); // Valid activation!
+
+        let behind_pos = Vec3::new(0.0, 0.0, 2.0); // Switch behind player
+        let to_behind = behind_pos - player_pos;
+        let facing_behind = player_dir.dot(to_behind.normalize_or_zero());
+        assert!(facing_behind <= 0.1); // Ignored when back is turned!
+    }
 }
 

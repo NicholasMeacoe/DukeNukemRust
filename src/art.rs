@@ -90,10 +90,17 @@ impl Art {
             // Original is version 1
         }
 
-        let num_local_tiles = (local_tile_end - local_tile_start + 1) as usize;
-        let mut tiles = Vec::with_capacity(num_local_tiles);
+        if local_tile_end < local_tile_start {
+            return Err("Invalid tile range in Art header".to_string());
+        }
 
+        let num_local_tiles = (local_tile_end - local_tile_start + 1) as usize;
         let mut offset = 16;
+        if offset + num_local_tiles * 8 > data.len() {
+            return Err("Art header truncated".to_string());
+        }
+
+        let mut tiles = Vec::with_capacity(num_local_tiles);
 
         // Headers first
         let mut tile_headers = Vec::with_capacity(num_local_tiles);
@@ -243,5 +250,20 @@ mod tests {
         assert_eq!(anm.get_frame_offset(2), 2);
         assert_eq!(anm.get_frame_offset(3), 1);
         assert_eq!(anm.get_frame_offset(4), 0);
+    }
+
+    #[test]
+    fn test_art_invalid_header_bounds() {
+        // Truncated buffer
+        let short_data = vec![1, 0, 0, 0];
+        assert!(Art::from_bytes(&short_data).is_err());
+
+        // Inverted local_tile_start > local_tile_end
+        let mut bad_range = Vec::new();
+        bad_range.extend_from_slice(&1u32.to_le_bytes()); // Version 1
+        bad_range.extend_from_slice(&10u32.to_le_bytes()); // num_tiles
+        bad_range.extend_from_slice(&100u32.to_le_bytes()); // start = 100
+        bad_range.extend_from_slice(&50u32.to_le_bytes()); // end = 50
+        assert!(Art::from_bytes(&bad_range).is_err());
     }
 }

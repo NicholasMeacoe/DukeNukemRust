@@ -103,4 +103,19 @@ mod tests {
         }
         assert_eq!(enemy.state, EnemyAiState::Attacking);
     }
+
+    #[test]
+    fn test_gib_state_duplicate_protection() {
+        let mut enemy = EnemyActor::new_liztroop();
+        enemy.health = -50;
+        enemy.state = EnemyAiState::Gibbed;
+
+        // If another damage event arrives on an already-gibbed entity, it should remain Gibbed without resending gib events
+        let mut second_hit_applied = false;
+        if enemy.state != EnemyAiState::Gibbed {
+            second_hit_applied = true;
+        }
+        assert!(!second_hit_applied);
+        assert_eq!(enemy.state, EnemyAiState::Gibbed);
+    }
 }

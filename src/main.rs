@@ -362,7 +362,9 @@ fn update_billboards(
         for mut transform in query.iter_mut() {
             let mut target = camera_transform.translation;
             target.y = transform.translation.y; 
-            transform.look_at(target, Vec3::Y);
+            if target.xz().distance_squared(transform.translation.xz()) > 0.001 {
+                transform.look_at(target, Vec3::Y);
+            }
         }
     }
 }

@@ -43,6 +43,10 @@ pub fn update_tile_animations(
     mut query: Query<&mut AnimatedTileMaterial>,
     assets: Res<crate::GameAssets>,
 ) {
+    if !clock.is_changed() {
+        return;
+    }
+
     for mut anim in query.iter_mut() {
         let offset = anim.picanm.get_frame_offset(clock.total_clock_120hz);
         if offset != anim.current_offset {

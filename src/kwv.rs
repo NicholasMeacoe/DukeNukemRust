@@ -75,6 +75,9 @@ impl Kwv {
 
         let mut waves = Vec::with_capacity(num_waves as usize);
         for (name, length) in headers {
+            if length > 50_000_000 {
+                return Err("KWV wave length exceeds safety limit".to_string());
+            }
             let mut wave_data = vec![0u8; length as usize];
             reader.read_exact(&mut wave_data).map_err(|e| e.to_string())?;
             
@@ -116,5 +119,14 @@ mod tests {
 
         let kwv = Kwv::from_bytes(&data).unwrap();
         assert_eq!(kwv.waves.len(), 0);
+    }
+
+    #[test]
+    fn test_kwv_num_waves_safety_limit() {
+        let mut data = Vec::new();
+        data.extend_from_slice(&0u32.to_le_bytes()); // Version 0
+        data.extend_from_slice(&20_000u32.to_le_bytes()); // 20,000 waves (exceeds 10,000 limit)
+
+        assert!(Kwv::from_bytes(&data).is_err());
     }
 }

@@ -48,7 +48,7 @@ pub fn spawn_skybox(
 }
 
 pub fn update_skybox(
-    camera_query: Query<&Transform, (With<Camera>, Without<SkyboxDome>)>,
+    camera_query: Query<&Transform, (With<Camera>, Without<SkyboxDome>, Changed<Transform>)>,
     mut sky_query: Query<&mut Transform, With<SkyboxDome>>,
 ) {
     if let Ok(cam_trans) = camera_query.get_single() {
