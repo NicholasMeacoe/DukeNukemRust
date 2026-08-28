@@ -70,20 +70,20 @@
 ---
 
 ## Phase 5: Complete Player Controller, Weapons & Enemy AI
-- [ ] Task: Advanced Player State Machine
-  - [ ] Implement crouching, swimming, diving, air depletion/suffocation
-  - [ ] Implement inventory items: Jetpack, Steroids, Nightvision, Holoduke, Scuba Gear, Medkit
-  - [ ] Implement status effects: Shrink/Squish, Freeze/Shatter
-- [ ] Task: Full 10-Weapon Arsenal
-  - [ ] Implement Mighty Boot (melee kick)
-  - [ ] Implement Shotgun, Chaingun, and RPG (with projectile rocket physics)
-  - [ ] Implement Pipebombs (throw, physics bounce, remote detonator)
-  - [ ] Implement Shrinker, Devastator, Tripbombs (wall placement & laser trigger), Freezethrower
-- [ ] Task: Enemy AI Behaviors & Combat
-  - [ ] Connect CON actor VM to enemy entities (Pig Cops, Octabrains, Liztroops, Enforcers)
-  - [ ] Implement enemy pathfinding, sound detection, line-of-sight attacks, and death/gib animations
-- [ ] Task: Phase 5 Verification & Checkpoint
-  - [ ] Verify complete combat loop in `E1L1` with all weapons, inventory items, and responsive enemies
+- [x] Task: Advanced Player State Machine
+  - [x] Implement crouching, swimming, diving, air depletion/suffocation
+  - [x] Implement inventory items: Jetpack, Steroids, Nightvision, Holoduke, Scuba Gear, Medkit
+  - [x] Implement status effects: Shrink/Squish, Freeze/Shatter
+- [x] Task: Full 10-Weapon Arsenal
+  - [x] Implement Mighty Boot (melee kick)
+  - [x] Implement Shotgun, Chaingun, and RPG (with projectile rocket physics)
+  - [x] Implement Pipebombs (throw, physics bounce, remote detonator)
+  - [x] Implement Shrinker, Devastator, Tripbombs (wall placement & laser trigger), Freezethrower
+- [x] Task: Enemy AI Behaviors & Combat
+  - [x] Connect CON actor VM to enemy entities (Pig Cops, Octabrains, Liztroops, Enforcers)
+  - [x] Implement enemy pathfinding, sound detection, line-of-sight attacks, and death/gib animations
+- [x] Task: Phase 5 Verification & Checkpoint
+  - [x] Verify complete combat loop in `E1L1` with all weapons, inventory items, and responsive enemies
 
 ---
 

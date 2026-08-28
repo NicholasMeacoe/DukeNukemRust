@@ -691,6 +691,19 @@ impl<'a> MapMeshBuilder<'a> {
                             sector_idx: Some(sprite.sectnum as usize),
                         });
                     }
+                    // ENEMIES
+                    2000 => {
+                        entity_cmds.insert(crate::combat::EnemyActor::new_pigcop());
+                    }
+                    1680 => {
+                        entity_cmds.insert(crate::combat::EnemyActor::new_liztroop());
+                    }
+                    1820 => {
+                        entity_cmds.insert(crate::combat::EnemyActor::new_octabrain());
+                    }
+                    2120 => {
+                        entity_cmds.insert(crate::combat::EnemyActor::new_enforcer());
+                    }
                     _ => {}
                 }
 

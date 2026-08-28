@@ -8,6 +8,10 @@ mod sky;
 mod animation;
 mod scripting;
 mod interactivity;
+pub mod player;
+pub mod combat;
+
+pub type Player = player::PlayerController;
 
 use bevy::prelude::*;
 use bevy::render::render_asset::RenderAssetUsages;
@@ -36,12 +40,13 @@ fn main() {
         }))
         .add_plugins(RapierPhysicsPlugin::<NoUserData>::default())
         .add_plugins(interactivity::InteractivityPlugin)
+        .add_plugins(player::PlayerPlugin)
+        .add_plugins(combat::CombatPlugin)
         .insert_resource(DukeSounds::default())
         .add_systems(Startup, setup)
         .add_systems(Update, (
             animation::update_engine_clock,
             animation::update_tile_animations,
-            player_move, 
             player_look, 
             cursor_grab, 
             emit_player_interaction,
@@ -75,15 +80,6 @@ fn play_random_sound(
             }
         }
     }
-}
-
-#[derive(Component)]
-pub struct Player {
-    pub speed: f32,
-    pub pitch: f32,
-    pub yaw: f32,
-    pub velocity_y: f32,
-    pub health: i32,
 }
 
 #[derive(Component)]
@@ -246,12 +242,9 @@ fn setup(
     });
 
     let player_entity = commands.spawn((
-        Player {
-            speed: 10.0,
-            pitch: 0.0,
+        player::PlayerController {
             yaw: start_yaw,
-            velocity_y: 0.0,
-            health: 100,
+            ..default()
         },
         TransformBundle::from_transform(Transform::from_translation(start_pos + Vec3::Y * 0.5)),
         RigidBody::KinematicPositionBased,
@@ -335,58 +328,6 @@ fn update_billboards(
             target.y = transform.translation.y; 
             transform.look_at(target, Vec3::Y);
         }
-    }
-}
-
-fn player_move(
-    keys: Res<ButtonInput<KeyCode>>,
-    time: Res<Time>,
-    mut query: Query<(&mut Player, &mut KinematicCharacterController, Option<&KinematicCharacterControllerOutput>)>,
-    camera_query: Query<&Transform, (With<Camera>, Without<FirstPersonWeapon>)>,
-) {
-    let Ok(camera_transform) = camera_query.get_single() else { return; };
-
-    for (mut player, mut controller, output) in query.iter_mut() {
-        let is_grounded = output.map_or(false, |out| out.grounded);
-        let mut direction = Vec3::ZERO;
-        
-        // Use Bevy's built-in directions, extracting the yaw rotation from the camera
-        let forward = camera_transform.forward().with_y(0.0).normalize_or_zero();
-        let right = camera_transform.right().with_y(0.0).normalize_or_zero();
-
-        if keys.pressed(KeyCode::KeyW) {
-            direction += forward;
-        }
-        if keys.pressed(KeyCode::KeyS) {
-            direction -= forward;
-        }
-        if keys.pressed(KeyCode::KeyA) {
-            direction -= right; 
-        }
-        if keys.pressed(KeyCode::KeyD) {
-            direction += right;
-        }
-
-        let mut movement = Vec3::ZERO;
-        if direction != Vec3::ZERO {
-            movement += direction.normalize() * player.speed * time.delta_seconds();
-        }
-        
-        // Grounded check prevents Flappy Duke (infinite mid-air jump) and gravity over-accumulation
-        if is_grounded {
-            if player.velocity_y < 0.0 {
-                player.velocity_y = -0.5; // Slight downward snap to glue to slopes & stairs
-            }
-            if keys.just_pressed(KeyCode::Space) {
-                player.velocity_y = 5.5; // Authentic Duke 3D jump impulse
-            }
-        } else {
-            // Apply gravity with terminal velocity clamp
-            player.velocity_y = (player.velocity_y - 18.0 * time.delta_seconds()).max(-25.0);
-        }
-
-        movement.y += player.velocity_y * time.delta_seconds();
-        controller.translation = Some(movement);
     }
 }
 
