@@ -7,6 +7,7 @@ mod builder;
 mod sky;
 mod animation;
 mod scripting;
+mod interactivity;
 
 use bevy::prelude::*;
 use bevy::render::render_asset::RenderAssetUsages;
@@ -34,6 +35,7 @@ fn main() {
             ..default()
         }))
         .add_plugins(RapierPhysicsPlugin::<NoUserData>::default())
+        .add_plugins(interactivity::InteractivityPlugin)
         .insert_resource(DukeSounds::default())
         .add_systems(Startup, setup)
         .add_systems(Update, (
@@ -42,6 +44,7 @@ fn main() {
             player_move, 
             player_look, 
             cursor_grab, 
+            emit_player_interaction,
             update_billboards, 
             play_random_sound,
             update_weapon,
@@ -75,11 +78,12 @@ fn play_random_sound(
 }
 
 #[derive(Component)]
-struct Player {
-    speed: f32,
-    pitch: f32,
-    yaw: f32,
-    velocity_y: f32,
+pub struct Player {
+    pub speed: f32,
+    pub pitch: f32,
+    pub yaw: f32,
+    pub velocity_y: f32,
+    pub health: i32,
 }
 
 #[derive(Component)]
@@ -202,6 +206,9 @@ fn setup(
                 );
                 mesh_builder.build(&mut commands, &mut meshes, &mut materials);
 
+                // Spawn Phase 4 interactive sector effectors, switches, touchplates, and props
+                interactivity::spawn_interactive_elements_from_map(&mut commands, &map);
+
                 // Check for parallax sky
                 let has_sky = map.sectors.iter().any(|s| s.is_ceiling_parallax());
                 if has_sky {
@@ -244,6 +251,7 @@ fn setup(
             pitch: 0.0,
             yaw: start_yaw,
             velocity_y: 0.0,
+            health: 100,
         },
         TransformBundle::from_transform(Transform::from_translation(start_pos + Vec3::Y * 0.5)),
         RigidBody::KinematicPositionBased,
@@ -414,6 +422,28 @@ fn player_look(
     }
 }
 
+fn emit_player_interaction(
+    keys: Res<ButtonInput<KeyCode>>,
+    player_query: Query<&Transform, With<Player>>,
+    camera_query: Query<&Transform, (With<Camera>, Without<Player>)>,
+    mut interact_events: EventWriter<interactivity::InteractEvent>,
+) {
+    if keys.just_pressed(KeyCode::KeyE) {
+        if let Ok(player_trans) = player_query.get_single() {
+            let player_dir = if let Ok(cam_trans) = camera_query.get_single() {
+                cam_trans.forward().into()
+            } else {
+                Vec3::NEG_Z
+            };
+
+            interact_events.send(interactivity::InteractEvent {
+                player_pos: player_trans.translation,
+                player_dir,
+            });
+        }
+    }
+}
+
 #[derive(Resource)]
 struct GameAssets {
     tile_textures: std::collections::HashMap<i16, Handle<Image>>,
@@ -426,6 +456,8 @@ fn update_weapon(
     player_query: Query<&KinematicCharacterControllerOutput, With<Player>>,
     camera_query: Query<&Transform, (With<Camera>, Without<FirstPersonWeapon>)>,
     mut destructibles: Query<&mut Destructible>,
+    barrels: Query<&Transform, With<interactivity::ExplodingBarrel>>,
+    mut explosion_events: EventWriter<interactivity::ExplosionDamageEvent>,
     btn: Res<ButtonInput<MouseButton>>,
     sounds: Res<DukeSounds>,
     mut commands: Commands,
@@ -500,8 +532,14 @@ fn update_weapon(
                     hit_sound_idx = 2; 
 
                     if destructible.health <= 0 {
+                        if let Ok(barrel_trans) = barrels.get(entity) {
+                            explosion_events.send(interactivity::ExplosionDamageEvent {
+                                origin: barrel_trans.translation,
+                                radius: 6.0,
+                                damage: 100,
+                            });
+                        }
                         commands.entity(entity).despawn_recursive();
-                        // Optional: play death sound or spawn gibs here
                     }
                 }
 

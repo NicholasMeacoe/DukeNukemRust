@@ -54,18 +54,18 @@
 ---
 
 ## Phase 4: Sector Effector & Interactive Map Mechanics
-- [ ] Task: Sector Effector (`SE`) & Sector Trigger (`ST`) Interpreter
-  - [ ] Port core `SECTOR.C` effector dispatchers (SE 0 rotating doors, SE 15 sliding doors, SE 7 underwater)
-  - [ ] Support Sector Triggers, Touchplates, Activators, and Master Switches
-- [ ] Task: Moving Sectors, Elevators & Subways
-  - [ ] Implement smooth sector floor/ceiling interpolation for lifts and doors
-  - [ ] Implement moving sector physics colliders with Rapier 3D
-  - [ ] Implement subway / train movement (SE 25)
-- [ ] Task: Destructible & Interactive Environments
-  - [ ] Implement crack wall explosions and sector transformation triggers
-  - [ ] Implement breakable glass, light switches, and interactive toilets/water fountains
-- [ ] Task: Phase 4 Verification & Checkpoint
-  - [ ] Verify fully interactive `E1L1` map (doors open with use key/switches, cinema screen explodes, elevators work)
+- [x] Task: Sector Effector (`SE`) & Sector Trigger (`ST`) Interpreter
+  - [x] Port core `SECTOR.C` effector dispatchers (SE 0 rotating doors, SE 15 sliding doors, SE 7 underwater)
+  - [x] Support Sector Triggers, Touchplates, Activators, and Master Switches
+- [x] Task: Moving Sectors, Elevators & Subways
+  - [x] Implement smooth sector floor/ceiling interpolation for lifts and doors
+  - [x] Implement moving sector physics colliders with Rapier 3D
+  - [x] Implement subway / train movement (SE 25)
+- [x] Task: Destructible & Interactive Environments
+  - [x] Implement crack wall explosions and sector transformation triggers
+  - [x] Implement breakable glass, light switches, and interactive toilets/water fountains
+- [x] Task: Phase 4 Verification & Checkpoint
+  - [x] Verify fully interactive `E1L1` map (doors open with use key/switches, cinema screen explodes, elevators work)
 
 ---
 

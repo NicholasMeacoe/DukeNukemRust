@@ -91,7 +91,7 @@ impl<'a> MapMeshBuilder<'a> {
         meshes: &mut Assets<Mesh>,
         materials: &mut Assets<StandardMaterial>,
     ) {
-        for sector in &self.map.sectors {
+        for (sec_idx, sector) in self.map.sectors.iter().enumerate() {
             let mut loops = Vec::new();
             let mut current_loop = Vec::new();
             let mut visited_walls = HashSet::new();
@@ -227,6 +227,10 @@ impl<'a> MapMeshBuilder<'a> {
                         },
                         RigidBody::Fixed,
                         Collider::trimesh(floor_collider_vertices, floor_collider_indices),
+                        crate::interactivity::DynamicSectorMesh {
+                            sector_idx: sec_idx,
+                            orig_translation: Vec3::ZERO,
+                        },
                     ));
 
                     // Check for tile animation on floor
@@ -311,6 +315,10 @@ impl<'a> MapMeshBuilder<'a> {
                         },
                         RigidBody::Fixed,
                         Collider::trimesh(ceil_collider_vertices, ceil_collider_indices),
+                        crate::interactivity::DynamicSectorMesh {
+                            sector_idx: sec_idx,
+                            orig_translation: Vec3::ZERO,
+                        },
                     ));
 
                     // Check for tile animation on ceiling
@@ -335,7 +343,7 @@ impl<'a> MapMeshBuilder<'a> {
         meshes: &mut Assets<Mesh>,
         materials: &mut Assets<StandardMaterial>,
     ) {
-        for sector in &self.map.sectors {
+        for (sec_idx, sector) in self.map.sectors.iter().enumerate() {
             for i in 0..sector.wallnum {
                 let wall_idx = (sector.wallptr + i) as usize;
                 if wall_idx >= self.map.walls.len() {
@@ -366,6 +374,7 @@ impl<'a> MapMeshBuilder<'a> {
                         commands,
                         meshes,
                         materials,
+                        sec_idx,
                         p1,
                         p2,
                         cur_floor_y1,
@@ -396,6 +405,7 @@ impl<'a> MapMeshBuilder<'a> {
                             commands,
                             meshes,
                             materials,
+                            sec_idx,
                             p1,
                             p2,
                             next_ceil_y1,
@@ -423,6 +433,7 @@ impl<'a> MapMeshBuilder<'a> {
                             commands,
                             meshes,
                             materials,
+                            sec_idx,
                             p1,
                             p2,
                             cur_floor_y1,
@@ -454,6 +465,7 @@ impl<'a> MapMeshBuilder<'a> {
                                 commands,
                                 meshes,
                                 materials,
+                                sec_idx,
                                 p1,
                                 p2,
                                 mid_floor_y1,
@@ -477,6 +489,7 @@ impl<'a> MapMeshBuilder<'a> {
         commands: &mut Commands,
         meshes: &mut Assets<Mesh>,
         materials: &mut Assets<StandardMaterial>,
+        sec_idx: usize,
         p1: Vec2,
         p2: Vec2,
         bottom_y1: f32,
@@ -550,15 +563,21 @@ impl<'a> MapMeshBuilder<'a> {
             .collect();
         let collider_indices: Vec<[u32; 3]> = vec![[0, 1, 2], [0, 2, 3]];
 
-        let mut entity_cmds = commands.spawn(PbrBundle {
-            mesh: meshes.add(wall_mesh),
-            material: mat.clone(),
-            ..default()
-        });
+        let mut entity_cmds = commands.spawn((
+            PbrBundle {
+                mesh: meshes.add(wall_mesh),
+                material: mat.clone(),
+                ..default()
+            },
+            crate::interactivity::DynamicSectorMesh {
+                sector_idx: sec_idx,
+                orig_translation: Vec3::ZERO,
+            },
+        ));
 
         if is_solid {
             entity_cmds.insert((
-                RigidBody::Fixed,
+                RigidBody::KinematicPositionBased,
                 Collider::trimesh(collider_vertices, collider_indices),
             ));
         }
@@ -612,6 +631,68 @@ impl<'a> MapMeshBuilder<'a> {
                         _picnum: sprite.picnum,
                     },
                 ));
+
+                // Attach Phase 4 Interactive Components directly to visual entities!
+                match sprite.picnum {
+                    // SWITCHES
+                    134 | 136 | 162 | 712 | 860 | 1111 | 1122 => {
+                        entity_cmds.insert(crate::interactivity::InteractiveSwitch {
+                            switch_type: crate::interactivity::SwitchType::LightSwitch,
+                            on_tile: sprite.picnum + 1,
+                            off_tile: sprite.picnum,
+                            is_on: false,
+                            lotag: sprite.lotag,
+                            hitag: sprite.hitag,
+                            sound_id: 10,
+                            material_handle: Some(sprite_mat.clone()),
+                        });
+                    }
+                    // WATERFOUNTAIN
+                    563 => {
+                        entity_cmds.insert(crate::interactivity::WaterFountain {
+                            uses_left: 10,
+                            is_broken: false,
+                            broken_tile: 567,
+                        });
+                    }
+                    // TOILET / STALL
+                    569 | 571 => {
+                        entity_cmds.insert(crate::interactivity::ToiletProp {
+                            is_broken: false,
+                            broken_tile: if sprite.picnum == 569 { 615 } else { 573 },
+                            water_tile: 921,
+                            last_used_time: 0.0,
+                        });
+                    }
+                    // EXPLODING BARREL
+                    1238 | 1240 | 1242 => {
+                        entity_cmds.insert(crate::interactivity::ExplodingBarrel {
+                            health: 20,
+                            damage_radius: 6.0,
+                            damage: 100,
+                            is_exploded: false,
+                        });
+                    }
+                    // CRACK WALL
+                    546..=549 => {
+                        entity_cmds.insert(crate::interactivity::CrackWall {
+                            health: 30,
+                            stage: 1,
+                            lotag: sprite.lotag,
+                            is_blown: false,
+                        });
+                    }
+                    // BREAKABLE GLASS
+                    503 => {
+                        entity_cmds.insert(crate::interactivity::BreakableGlass {
+                            health: 10,
+                            is_broken: false,
+                            wall_idx: None,
+                            sector_idx: Some(sprite.sectnum as usize),
+                        });
+                    }
+                    _ => {}
+                }
 
                 // Check for tile animation on sprite
                 if let Some(&picanm) = self.picanm_map.get(&sprite.picnum) {
