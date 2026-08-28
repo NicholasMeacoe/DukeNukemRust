@@ -10,6 +10,9 @@ mod scripting;
 mod interactivity;
 pub mod player;
 pub mod combat;
+pub mod audio;
+pub mod hud;
+pub mod game_flow;
 
 pub type Player = player::PlayerController;
 
@@ -42,6 +45,9 @@ fn main() {
         .add_plugins(interactivity::InteractivityPlugin)
         .add_plugins(player::PlayerPlugin)
         .add_plugins(combat::CombatPlugin)
+        .add_plugins(audio::DukeAudioPlugin)
+        .add_plugins(hud::DukeHudPlugin)
+        .add_plugins(game_flow::GameFlowPlugin)
         .insert_resource(DukeSounds::default())
         .add_systems(Startup, setup)
         .add_systems(Update, (

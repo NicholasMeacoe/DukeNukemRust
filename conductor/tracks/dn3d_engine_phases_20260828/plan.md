@@ -88,15 +88,15 @@
 ---
 
 ## Phase 6: Audio Engine, HUD & Menus
-- [ ] Task: MIDI Music & Audio Synthesizer
-  - [ ] Integrate MIDI player (e.g. `midir` / soundfont synthesizer) for authentic level background music (`*.MID`)
-  - [ ] Implement Duke RTS (Real-Time Speech) trigger system for voice taunts
-- [ ] Task: Classic 2D Status Bar & Full-Screen HUD
-  - [ ] Render 2D status bar displaying Health, Armor, Ammo, Keys, and Selected Inventory item
-  - [ ] Implement custom Duke font renderer from `TILES*.ART` for HUD text and messages
-- [ ] Task: Game Flow, Menus & Level Progression
-  - [ ] Implement main menu, difficulty selection, episode selector, and options screen
-  - [ ] Implement end-of-level exit switch, statistics/intermission screen, and level loading transitions
-  - [ ] Implement save game and load game serialization
-- [ ] Task: Phase 6 Verification & Checkpoint
-  - [ ] Play through the entire Episode 1 (L1 through L6) from menu start to boss completion
+- [x] Task: MIDI Music & Audio Synthesizer
+  - [x] Integrate MIDI player (e.g. `midir` / soundfont synthesizer) for authentic level background music (`*.MID`)
+  - [x] Implement Duke RTS (Real-Time Speech) trigger system for voice taunts
+- [x] Task: Classic 2D Status Bar & Full-Screen HUD
+  - [x] Render 2D status bar displaying Health, Armor, Ammo, Keys, and Selected Inventory item
+  - [x] Implement custom Duke font renderer from `TILES*.ART` for HUD text and messages
+- [x] Task: Game Flow, Menus & Level Progression
+  - [x] Implement main menu, difficulty selection, episode selector, and options screen
+  - [x] Implement end-of-level exit switch, statistics/intermission screen, and level loading transitions
+  - [x] Implement save game and load game serialization
+- [x] Task: Phase 6 Verification & Checkpoint
+  - [x] Play through the entire Episode 1 (L1 through L6) from menu start to boss completion

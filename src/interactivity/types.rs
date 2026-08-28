@@ -138,6 +138,14 @@ pub struct Activator {
 }
 
 #[derive(Component, Debug, Clone)]
+pub struct NukeExitSwitch {
+    pub is_activated: bool,
+    pub is_secret: bool,
+    pub lotag: i16,
+    pub hitag: i16,
+}
+
+#[derive(Component, Debug, Clone)]
 pub struct MasterSwitch {
     pub lotag: i16,
     pub hitag: i16,

@@ -6,10 +6,12 @@ use crate::interactivity::types::*;
 pub fn handle_player_interactions(
     mut interact_events: EventReader<InteractEvent>,
     mut switches: Query<(&Transform, &mut InteractiveSwitch)>,
+    mut nuke_switches: Query<(&Transform, &mut NukeExitSwitch)>,
     mut fountains: Query<(&Transform, &mut WaterFountain)>,
     mut toilets: Query<(&Transform, &mut ToiletProp)>,
     mut tag_events: EventWriter<ActivateTagEvent>,
     mut heal_events: EventWriter<PlayerHealEvent>,
+    mut level_completed_events: EventWriter<crate::game_flow::LevelCompletedEvent>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     assets: Option<Res<crate::GameAssets>>,
 ) {
@@ -71,6 +73,16 @@ pub fn handle_player_interactions(
                     toilet.last_used_time = 10.0;
                     heal_events.send(PlayerHealEvent { amount: 10 });
                 }
+            }
+        }
+
+        // 4. Check Nuke Buttons (Level Exit)
+        for (trans, mut nuke) in nuke_switches.iter_mut() {
+            let to_obj = trans.translation - player_pos;
+            let dist = to_obj.length();
+            if dist < 2.8 && !nuke.is_activated {
+                nuke.is_activated = true;
+                level_completed_events.send(crate::game_flow::LevelCompletedEvent);
             }
         }
     }

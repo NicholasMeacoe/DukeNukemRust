@@ -701,8 +701,14 @@ impl<'a> MapMeshBuilder<'a> {
                     1820 => {
                         entity_cmds.insert(crate::combat::EnemyActor::new_octabrain());
                     }
-                    2120 => {
-                        entity_cmds.insert(crate::combat::EnemyActor::new_enforcer());
+                    // NUKE BUTTON (Level Exit)
+                    142..=145 => {
+                        entity_cmds.insert(crate::interactivity::NukeExitSwitch {
+                            is_activated: false,
+                            is_secret: sprite.lotag != 0,
+                            lotag: sprite.lotag,
+                            hitag: sprite.hitag,
+                        });
                     }
                     _ => {}
                 }
