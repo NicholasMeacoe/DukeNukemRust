@@ -1,0 +1,5 @@
+/target
+
+# Proprietary game data
+duke3d.grp
+*.grp

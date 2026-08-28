@@ -1,0 +1,3 @@
+[submodule "dukenukem3d"]
+	path = dukenukem3d
+	url = https://github.com/videogamepreservation/dukenukem3d

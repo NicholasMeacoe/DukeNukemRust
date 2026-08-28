@@ -1,0 +1,11 @@
+[package]
+name = "dukenukemrust"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bevy = { version = "0.14", features = ["wav"] }
+lyon_tessellation = "1.0"
+bevy_rapier3d = "0.27"
+rand = "0.8"
+hound = "3.5"
