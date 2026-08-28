@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use std::io::{Read, Cursor};
 use hound::{WavSpec, WavWriter, SampleFormat};
 

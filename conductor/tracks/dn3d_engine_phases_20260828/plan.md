@@ -22,18 +22,18 @@
 ---
 
 ## Phase 2: Palette Shading, Lookup Tables & Tile Animations
-- [ ] Task: Palette Shading Tables & Distance Attenuation
-  - [ ] Parse 32 shade tables from `PALETTE.DAT`
-  - [ ] Implement custom Bevy shader / material uniform to apply authentic 32-level distance lighting falloff
-  - [ ] Apply sector and wall shade modifiers (`ceilingshade`, `floorshade`, `wall.shade`, `sprite.shade`)
-- [ ] Task: Palette Swaps & Lookup Tables
-  - [ ] Parse `LOOKUP.DAT` for alternate color palettes
-  - [ ] Support sprite and sector palette remapping (e.g. green slime, red blood, player tints)
-- [ ] Task: Tile Animation System (`picanm`)
-  - [ ] Parse `picanm` 4-byte headers from `TILES*.ART` (frames, animation type, speed, oscillation)
-  - [ ] Implement Bevy system to tick and swap active texture handles for animated tiles
-- [ ] Task: Phase 2 Verification & Checkpoint
-  - [ ] Verify authentic retro lighting, glowing lamps, animated screens, and water/slime textures
+- [x] Task: Palette Shading Tables & Distance Attenuation
+  - [x] Parse 32 shade tables from `PALETTE.DAT`
+  - [x] Implement custom Bevy shader / material uniform to apply authentic 32-level distance lighting falloff
+  - [x] Apply sector and wall shade modifiers (`ceilingshade`, `floorshade`, `wall.shade`, `sprite.shade`)
+- [x] Task: Palette Swaps & Lookup Tables
+  - [x] Parse `LOOKUP.DAT` for alternate color palettes
+  - [x] Support sprite and sector palette remapping (e.g. green slime, red blood, player tints)
+- [x] Task: Tile Animation System (`picanm`)
+  - [x] Parse `picanm` 4-byte headers from `TILES*.ART` (frames, animation type, speed, oscillation)
+  - [x] Implement Bevy system to tick and swap active texture handles for animated tiles
+- [x] Task: Phase 2 Verification & Checkpoint
+  - [x] Verify authentic retro lighting, glowing lamps, animated screens, and water/slime textures
 
 ---
 

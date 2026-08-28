@@ -5,6 +5,7 @@ mod map;
 mod kwv;
 mod builder;
 mod sky;
+mod animation;
 
 use bevy::prelude::*;
 use bevy::render::render_asset::RenderAssetUsages;
@@ -22,6 +23,7 @@ use builder::MapMeshBuilder;
 fn main() {
     App::new()
         .insert_resource(ClearColor(Color::BLACK))
+        .init_resource::<animation::EngineClock>()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
                 title: "Duke Nukem 3D: Build Map Render".into(),
@@ -34,6 +36,8 @@ fn main() {
         .insert_resource(DukeSounds::default())
         .add_systems(Startup, setup)
         .add_systems(Update, (
+            animation::update_engine_clock,
+            animation::update_tile_animations,
             player_move, 
             player_look, 
             cursor_grab, 
@@ -95,11 +99,17 @@ fn setup(
     let grp_path = "dukenukem3d/duke3d.grp";
     let mut tile_textures = std::collections::HashMap::new();
     let mut tile_sizes = std::collections::HashMap::new();
+    let mut picanm_map = std::collections::HashMap::new();
 
     println!("Attempting to load assets from {}", grp_path);
     if let Ok(grp) = Grp::open(grp_path) {
         if let Ok(pal_data) = grp.read_file("PALETTE.DAT") {
-            if let Ok(pal) = Palette::from_bytes(&pal_data) {
+            if let Ok(mut pal) = Palette::from_bytes(&pal_data) {
+                if let Ok(lookup_data) = grp.read_file("LOOKUP.DAT") {
+                    let _ = pal.load_lookups(&lookup_data);
+                    println!("Successfully loaded LOOKUP.DAT ({} remappings)", pal.lookups.len());
+                }
+
                 let mut art_files_found = 0;
                 for entry in &grp.entries {
                     if entry.name.to_uppercase().starts_with("TILES") && entry.name.to_uppercase().ends_with(".ART") {
@@ -124,6 +134,9 @@ fn setup(
                                             image.sampler = ImageSampler::Descriptor(ImageSamplerDescriptor::nearest());
                                             tile_textures.insert(tile_idx as i16, images.add(image));
                                             tile_sizes.insert(tile_idx as i16, (w, h));
+                                            if let Some(picanm) = art.get_picanm(tile_idx) {
+                                                picanm_map.insert(tile_idx as i16, picanm);
+                                            }
                                         }
                                     }
                                 }
@@ -178,11 +191,12 @@ fn setup(
                 start_yaw = -(map.ang as f32 / 2048.0) * std::f32::consts::TAU + std::f32::consts::FRAC_PI_2;
                 println!("Player start position: {:?}", start_pos);
 
-                // Build map geometry with Phase 1 portal compiler and slope tessellation
+                // Build map geometry with Phase 1 & 2 portal compiler, slope tessellation, shading and animations
                 let mesh_builder = MapMeshBuilder::new(
                     &map,
                     &tile_textures,
                     &tile_sizes,
+                    &picanm_map,
                     default_material.clone(),
                 );
                 mesh_builder.build(&mut commands, &mut meshes, &mut materials);

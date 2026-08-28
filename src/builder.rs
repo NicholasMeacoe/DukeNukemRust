@@ -7,12 +7,16 @@ use lyon_tessellation::{
 };
 use std::collections::{HashMap, HashSet};
 
+use crate::animation::AnimatedTileMaterial;
+use crate::art::PicAnm;
 use crate::map::{Map, Wall};
+use crate::palette::Palette;
 
 pub struct MapMeshBuilder<'a> {
     pub map: &'a Map,
     pub tile_textures: &'a HashMap<i16, Handle<Image>>,
     pub tile_sizes: &'a HashMap<i16, (u32, u32)>,
+    pub picanm_map: &'a HashMap<i16, PicAnm>,
     pub default_material: Handle<StandardMaterial>,
 }
 
@@ -21,12 +25,14 @@ impl<'a> MapMeshBuilder<'a> {
         map: &'a Map,
         tile_textures: &'a HashMap<i16, Handle<Image>>,
         tile_sizes: &'a HashMap<i16, (u32, u32)>,
+        picanm_map: &'a HashMap<i16, PicAnm>,
         default_material: Handle<StandardMaterial>,
     ) -> Self {
         Self {
             map,
             tile_textures,
             tile_sizes,
+            picanm_map,
             default_material,
         }
     }
@@ -149,7 +155,7 @@ impl<'a> MapMeshBuilder<'a> {
             let (floor_tw, floor_th) = self.get_tile_size(sector.floorpicnum);
             let (ceil_tw, ceil_th) = self.get_tile_size(sector.ceilingpicnum);
 
-            // Generate floor vertices with slope heights
+            // 1. Generate Floor Mesh
             if !sector.is_floor_parallax() {
                 let floor_vertices: Vec<[f32; 3]> = buffers
                     .vertices
@@ -176,6 +182,9 @@ impl<'a> MapMeshBuilder<'a> {
                     })
                     .collect();
 
+                let floor_tint = Palette::shade_to_tint(sector.floorshade);
+                let floor_colors: Vec<[f32; 4]> = vec![floor_tint; floor_vertices.len()];
+
                 let floor_indices = buffers.indices.clone();
                 let floor_mat = self.get_material(sector.floorpicnum, false, materials);
 
@@ -185,6 +194,7 @@ impl<'a> MapMeshBuilder<'a> {
                 );
                 floor_mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, floor_vertices.clone());
                 floor_mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, floor_uvs);
+                floor_mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, floor_colors);
                 floor_mesh.insert_indices(bevy::render::mesh::Indices::U32(floor_indices.clone()));
                 floor_mesh.duplicate_vertices();
                 floor_mesh.compute_flat_normals();
@@ -199,19 +209,31 @@ impl<'a> MapMeshBuilder<'a> {
                     .collect();
 
                 if !floor_collider_indices.is_empty() {
-                    commands.spawn((
+                    let mut entity_cmds = commands.spawn((
                         PbrBundle {
                             mesh: meshes.add(floor_mesh),
-                            material: floor_mat,
+                            material: floor_mat.clone(),
                             ..default()
                         },
                         RigidBody::Fixed,
                         Collider::trimesh(floor_collider_vertices, floor_collider_indices),
                     ));
+
+                    // Check for tile animation on floor
+                    if let Some(&picanm) = self.picanm_map.get(&sector.floorpicnum) {
+                        if picanm.num_frames > 0 && picanm.anim_type > 0 {
+                            entity_cmds.insert(AnimatedTileMaterial {
+                                base_picnum: sector.floorpicnum,
+                                picanm,
+                                current_offset: 0,
+                                material_handle: floor_mat,
+                            });
+                        }
+                    }
                 }
             }
 
-            // Generate ceiling vertices with slope heights
+            // 2. Generate Ceiling Mesh
             if !sector.is_ceiling_parallax() {
                 let ceil_vertices: Vec<[f32; 3]> = buffers
                     .vertices
@@ -238,6 +260,9 @@ impl<'a> MapMeshBuilder<'a> {
                     })
                     .collect();
 
+                let ceil_tint = Palette::shade_to_tint(sector.ceilingshade);
+                let ceil_colors: Vec<[f32; 4]> = vec![ceil_tint; ceil_vertices.len()];
+
                 // Reverse ceiling winding order so normals face downwards
                 let ceil_indices: Vec<u32> = buffers
                     .indices
@@ -253,6 +278,7 @@ impl<'a> MapMeshBuilder<'a> {
                 );
                 ceil_mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, ceil_vertices.clone());
                 ceil_mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, ceil_uvs);
+                ceil_mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, ceil_colors);
                 ceil_mesh.insert_indices(bevy::render::mesh::Indices::U32(ceil_indices.clone()));
                 ceil_mesh.duplicate_vertices();
                 ceil_mesh.compute_flat_normals();
@@ -267,15 +293,27 @@ impl<'a> MapMeshBuilder<'a> {
                     .collect();
 
                 if !ceil_collider_indices.is_empty() {
-                    commands.spawn((
+                    let mut entity_cmds = commands.spawn((
                         PbrBundle {
                             mesh: meshes.add(ceil_mesh),
-                            material: ceil_mat,
+                            material: ceil_mat.clone(),
                             ..default()
                         },
                         RigidBody::Fixed,
                         Collider::trimesh(ceil_collider_vertices, ceil_collider_indices),
                     ));
+
+                    // Check for tile animation on ceiling
+                    if let Some(&picanm) = self.picanm_map.get(&sector.ceilingpicnum) {
+                        if picanm.num_frames > 0 && picanm.anim_type > 0 {
+                            entity_cmds.insert(AnimatedTileMaterial {
+                                base_picnum: sector.ceilingpicnum,
+                                picanm,
+                                current_offset: 0,
+                                material_handle: ceil_mat,
+                            });
+                        }
+                    }
                 }
             }
         }
@@ -457,7 +495,6 @@ impl<'a> MapMeshBuilder<'a> {
             (u0_raw, u1_raw)
         };
 
-        // Convert world height back to Build units (1 Bevy meter = 1024 * 16 Build Z units)
         let build_height = avg_height.abs() * 1024.0 * 16.0;
         let v_span = (build_height * wall.yrepeat as f32) / (th as f32 * 2048.0);
         let v0_raw = (wall.ypanning as f32) / (th as f32);
@@ -482,6 +519,8 @@ impl<'a> MapMeshBuilder<'a> {
 
         let positions = vec![v0_pos, v1_pos, v2_pos, v3_pos];
         let uvs = vec![[u0, v0], [u1, v0], [u1, v1], [u0, v1]];
+        let tint = Palette::shade_to_tint(wall.shade);
+        let colors = vec![tint; 4];
         let indices = vec![0u32, 1, 2, 0, 2, 3];
 
         let mat = self.get_material(picnum, is_masked, materials);
@@ -492,6 +531,7 @@ impl<'a> MapMeshBuilder<'a> {
         );
         wall_mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions.clone());
         wall_mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
+        wall_mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors);
         wall_mesh.insert_indices(bevy::render::mesh::Indices::U32(indices.clone()));
         wall_mesh.duplicate_vertices();
         wall_mesh.compute_flat_normals();
@@ -504,7 +544,7 @@ impl<'a> MapMeshBuilder<'a> {
 
         let mut entity_cmds = commands.spawn(PbrBundle {
             mesh: meshes.add(wall_mesh),
-            material: mat,
+            material: mat.clone(),
             ..default()
         });
 
@@ -513,6 +553,18 @@ impl<'a> MapMeshBuilder<'a> {
                 RigidBody::Fixed,
                 Collider::trimesh(collider_vertices, collider_indices),
             ));
+        }
+
+        // Check for tile animation on wall
+        if let Some(&picanm) = self.picanm_map.get(&picnum) {
+            if picanm.num_frames > 0 && picanm.anim_type > 0 {
+                entity_cmds.insert(AnimatedTileMaterial {
+                    base_picnum: picnum,
+                    picanm,
+                    current_offset: 0,
+                    material_handle: mat,
+                });
+            }
         }
     }
 
@@ -534,16 +586,18 @@ impl<'a> MapMeshBuilder<'a> {
                 let scale_y = (sprite.yrepeat as f32 / 64.0) * 3.0;
                 let is_enemy = sprite.picnum == 2000; // PIGCOP
 
-                commands.spawn((
+                let sprite_mat = materials.add(StandardMaterial {
+                    base_color_texture: Some(handle.clone()),
+                    alpha_mode: AlphaMode::Mask(0.5),
+                    unlit: true,
+                    double_sided: true,
+                    ..default()
+                });
+
+                let mut entity_cmds = commands.spawn((
                     PbrBundle {
                         mesh: meshes.add(Rectangle::new(scale_x, scale_y)),
-                        material: materials.add(StandardMaterial {
-                            base_color_texture: Some(handle.clone()),
-                            alpha_mode: AlphaMode::Mask(0.5),
-                            unlit: true,
-                            double_sided: true,
-                            ..default()
-                        }),
+                        material: sprite_mat.clone(),
                         transform: Transform::from_translation(pos),
                         ..default()
                     },
@@ -555,6 +609,18 @@ impl<'a> MapMeshBuilder<'a> {
                         _picnum: sprite.picnum,
                     },
                 ));
+
+                // Check for tile animation on sprite
+                if let Some(&picanm) = self.picanm_map.get(&sprite.picnum) {
+                    if picanm.num_frames > 0 && picanm.anim_type > 0 {
+                        entity_cmds.insert(AnimatedTileMaterial {
+                            base_picnum: sprite.picnum,
+                            picanm,
+                            current_offset: 0,
+                            material_handle: sprite_mat,
+                        });
+                    }
+                }
             }
         }
     }
