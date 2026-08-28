@@ -19,11 +19,10 @@ impl Plugin for PlayerPlugin {
         app.add_systems(
             Update,
             (
-                update_player_movement,
-                handle_weapon_selection,
-                handle_weapon_firing,
-                handle_inventory_input,
-                update_inventory_timers,
+                (handle_weapon_selection, handle_inventory_input).in_set(crate::GameSet::Input),
+                update_player_movement.in_set(crate::GameSet::Movement),
+                handle_weapon_firing.in_set(crate::GameSet::Combat),
+                update_inventory_timers.in_set(crate::GameSet::Animation),
             ),
         );
     }

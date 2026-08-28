@@ -22,12 +22,14 @@ impl Plugin for InteractivityPlugin {
             .add_systems(
                 Update,
                 (
-                    handle_player_interactions,
-                    handle_touchplates,
-                    handle_explosions,
-                    handle_tag_activations,
-                    update_sector_effectors,
-                    apply_player_healing,
+                    (
+                        handle_player_interactions,
+                        handle_touchplates,
+                        handle_explosions,
+                        handle_tag_activations,
+                        update_sector_effectors,
+                        apply_player_healing,
+                    ).in_set(crate::GameSet::Interactivity),
                 ),
             );
     }

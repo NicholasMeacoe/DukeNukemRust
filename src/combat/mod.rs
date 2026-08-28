@@ -17,15 +17,13 @@ pub struct CombatPlugin;
 impl Plugin for CombatPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<SpawnProjectileEvent>()
+            .add_event::<EntityDamageEvent>()
             .add_event::<GibEvent>()
             .add_systems(
                 Update,
                 (
-                    spawn_projectiles,
-                    update_projectiles,
-                    update_enemy_ai,
-                    handle_gib_events,
-                    update_gib_particles,
+                    (spawn_projectiles, update_projectiles, apply_damage_events, update_enemy_ai).in_set(crate::GameSet::Combat),
+                    (handle_gib_events, update_gib_particles).in_set(crate::GameSet::Animation),
                 ),
             );
     }

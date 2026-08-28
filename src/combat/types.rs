@@ -154,3 +154,19 @@ pub struct GibEvent {
     pub origin: Vec3,
     pub gib_count: usize,
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DamageSource {
+    PlayerWeapon(ProjectileType),
+    EnemyWeapon(ProjectileType),
+    Explosion,
+    Environmental,
+}
+
+#[derive(Event, Debug, Clone)]
+pub struct EntityDamageEvent {
+    pub target: Entity,
+    pub amount: i32,
+    pub source: DamageSource,
+    pub hit_origin: Vec3,
+}

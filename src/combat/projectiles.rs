@@ -35,26 +35,27 @@ pub fn update_projectiles(
     time: Res<Time>,
     mut commands: Commands,
     mut projectiles: Query<(Entity, &mut Transform, &mut Projectile)>,
-    mut enemies: Query<(&Transform, &mut EnemyActor), Without<Projectile>>,
-    mut players: Query<(&Transform, &mut PlayerController), (Without<Projectile>, Without<EnemyActor>)>,
+    mut enemies: Query<(Entity, &Transform, &mut EnemyActor), Without<Projectile>>,
+    mut players: Query<(Entity, &Transform, &mut PlayerController), (Without<Projectile>, Without<EnemyActor>)>,
+    mut damage_events: EventWriter<EntityDamageEvent>,
     mut explosion_events: EventWriter<ExplosionDamageEvent>,
-    mut gib_events: EventWriter<GibEvent>,
 ) {
     let dt = time.delta_seconds();
 
-    // Check walking squish on shrunk enemies by player
-    for (player_trans, _) in players.iter() {
-        for (enemy_trans, mut enemy) in enemies.iter_mut() {
+    // Fast squared distance walking squish on shrunk enemies by player
+    for (_, player_trans, _) in players.iter() {
+        let p_pos = player_trans.translation;
+        for (e_entity, enemy_trans, mut enemy) in enemies.iter_mut() {
             if enemy.is_shrunk && enemy.state != EnemyAiState::Gibbed && enemy.state != EnemyAiState::Dying {
-                let dist = player_trans.translation.distance(enemy_trans.translation);
-                if dist < 0.8 {
-                    // Walking squish!
-                    enemy.health = -50;
-                    enemy.state = EnemyAiState::Gibbed;
-                    gib_events.send(GibEvent {
-                        origin: enemy_trans.translation,
-                        gib_count: 6,
+                let dist_sq = p_pos.distance_squared(enemy_trans.translation);
+                if dist_sq < 0.64 { // 0.8 * 0.8
+                    damage_events.send(EntityDamageEvent {
+                        target: e_entity,
+                        amount: 100,
+                        source: DamageSource::PlayerWeapon(ProjectileType::MightyBoot),
+                        hit_origin: enemy_trans.translation,
                     });
+                    enemy.is_shrunk = false;
                 }
             }
         }
@@ -69,30 +70,20 @@ pub fn update_projectiles(
         }
 
         trans.translation += proj.velocity * dt;
+        let proj_pos = trans.translation;
 
         // Check enemy collision if player source
         if proj.is_player_source {
-            for (enemy_trans, mut enemy) in enemies.iter_mut() {
+            for (e_entity, enemy_trans, mut enemy) in enemies.iter_mut() {
                 if enemy.state == EnemyAiState::Dying || enemy.state == EnemyAiState::Gibbed {
                     continue;
                 }
 
-                let dist = trans.translation.distance(enemy_trans.translation);
-                let hit_radius = if enemy.is_shrunk { 0.5 } else { 1.2 };
+                let dist_sq = proj_pos.distance_squared(enemy_trans.translation);
+                let hit_radius_sq = if enemy.is_shrunk { 0.25 } else { 1.44 }; // 0.5^2 vs 1.2^2
 
-                if dist <= hit_radius {
-                    // 1. Freezethrower Shatter Check
-                    if enemy.state == EnemyAiState::Frozen {
-                        enemy.health = -50;
-                        enemy.state = EnemyAiState::Gibbed;
-                        gib_events.send(GibEvent {
-                            origin: enemy_trans.translation,
-                            gib_count: 6,
-                        });
-                        proj.lifetime = 0.0;
-                        break;
-                    }
-
+                if dist_sq <= hit_radius_sq {
+                    // Status effects
                     match proj.projectile_type {
                         ProjectileType::ShrinkRay => {
                             enemy.is_shrunk = true;
@@ -100,49 +91,28 @@ pub fn update_projectiles(
                             enemy.speed *= 0.5;
                         }
                         ProjectileType::FreezeShard => {
-                            enemy.health -= proj.damage;
-                            if enemy.health <= 0 {
+                            if enemy.health - proj.damage <= 0 {
                                 enemy.is_frozen = true;
                                 enemy.freeze_timer = 15.0;
                                 enemy.state = EnemyAiState::Frozen;
                             }
                         }
-                        ProjectileType::MightyBoot => {
-                            if enemy.is_shrunk {
-                                // Instant squish kill!
-                                enemy.health = -50;
-                                enemy.state = EnemyAiState::Gibbed;
-                                gib_events.send(GibEvent {
-                                    origin: enemy_trans.translation,
-                                    gib_count: 6,
-                                });
-                            } else {
-                                enemy.health -= proj.damage;
-                                enemy.state = EnemyAiState::Flinching;
-                            }
-                        }
-                        _ => {
-                            enemy.health -= proj.damage;
-                            enemy.state = EnemyAiState::Flinching;
-                        }
+                        _ => {}
                     }
+
+                    damage_events.send(EntityDamageEvent {
+                        target: e_entity,
+                        amount: proj.damage,
+                        source: DamageSource::PlayerWeapon(proj.projectile_type),
+                        hit_origin: proj_pos,
+                    });
 
                     if proj.projectile_type == ProjectileType::Rocket || proj.projectile_type == ProjectileType::DevastatorMissile {
                         explosion_events.send(ExplosionDamageEvent {
-                            origin: trans.translation,
+                            origin: proj_pos,
                             radius: 5.0,
                             damage: proj.damage,
                         });
-                    }
-
-                    if enemy.health <= -40 {
-                        enemy.state = EnemyAiState::Gibbed;
-                        gib_events.send(GibEvent {
-                            origin: enemy_trans.translation,
-                            gib_count: 6,
-                        });
-                    } else if enemy.health <= 0 && enemy.state != EnemyAiState::Frozen {
-                        enemy.state = EnemyAiState::Dying;
                     }
 
                     proj.lifetime = 0.0;
@@ -151,10 +121,15 @@ pub fn update_projectiles(
             }
         } else {
             // Enemy projectile hitting player
-            for (player_trans, mut player) in players.iter_mut() {
-                let dist = trans.translation.distance(player_trans.translation);
-                if dist <= 1.0 {
-                    player.health -= proj.damage;
+            for (p_entity, player_trans, _) in players.iter_mut() {
+                let dist_sq = proj_pos.distance_squared(player_trans.translation);
+                if dist_sq <= 1.0 {
+                    damage_events.send(EntityDamageEvent {
+                        target: p_entity,
+                        amount: proj.damage,
+                        source: DamageSource::EnemyWeapon(proj.projectile_type),
+                        hit_origin: proj_pos,
+                    });
                     proj.lifetime = 0.0;
                     break;
                 }
@@ -163,6 +138,44 @@ pub fn update_projectiles(
 
         if proj.lifetime <= 0.0 {
             commands.entity(proj_entity).despawn_recursive();
+        }
+    }
+}
+
+pub fn apply_damage_events(
+    mut damage_events: EventReader<EntityDamageEvent>,
+    mut enemies: Query<(&Transform, &mut EnemyActor)>,
+    mut players: Query<&mut PlayerController>,
+    mut gib_events: EventWriter<GibEvent>,
+) {
+    for ev in damage_events.read() {
+        if let Ok((enemy_trans, mut enemy)) = enemies.get_mut(ev.target) {
+            if enemy.state == EnemyAiState::Frozen {
+                enemy.health = -50;
+                enemy.state = EnemyAiState::Gibbed;
+                gib_events.send(GibEvent {
+                    origin: enemy_trans.translation,
+                    gib_count: 6,
+                });
+                continue;
+            }
+
+            enemy.health -= ev.amount;
+            if enemy.health <= -40 {
+                enemy.state = EnemyAiState::Gibbed;
+                gib_events.send(GibEvent {
+                    origin: enemy_trans.translation,
+                    gib_count: 6,
+                });
+            } else if enemy.health <= 0 {
+                enemy.state = EnemyAiState::Dying;
+            } else {
+                enemy.state = EnemyAiState::Flinching;
+            }
+        }
+
+        if let Ok(mut player) = players.get_mut(ev.target) {
+            player.health = player.health.saturating_sub(ev.amount);
         }
     }
 }

@@ -122,11 +122,14 @@ pub fn handle_explosions(
     mut commands: Commands,
 ) {
     for exp in explosion_events.read() {
+        let origin = exp.origin;
+        let radius_sq = exp.radius * exp.radius;
+
         // 1. Check exploding barrels
         for (entity, trans, mut barrel) in barrels.iter_mut() {
             if !barrel.is_exploded {
-                let dist = trans.translation.distance(exp.origin);
-                if dist <= exp.radius {
+                let dist_sq = trans.translation.distance_squared(origin);
+                if dist_sq <= radius_sq {
                     barrel.health -= exp.damage;
                     if barrel.health <= 0 {
                         barrel.is_exploded = true;
@@ -139,8 +142,8 @@ pub fn handle_explosions(
         // 2. Check crack walls
         for (trans, mut crack) in crack_walls.iter_mut() {
             if !crack.is_blown {
-                let dist = trans.translation.distance(exp.origin);
-                if dist <= exp.radius {
+                let dist_sq = trans.translation.distance_squared(origin);
+                if dist_sq <= radius_sq {
                     crack.health -= exp.damage;
                     if crack.health <= 0 {
                         crack.is_blown = true;
@@ -158,8 +161,8 @@ pub fn handle_explosions(
         // 3. Check breakable glass
         for (entity, trans, mut glass) in glass_windows.iter_mut() {
             if !glass.is_broken {
-                let dist = trans.translation.distance(exp.origin);
-                if dist <= exp.radius {
+                let dist_sq = trans.translation.distance_squared(origin);
+                if dist_sq <= radius_sq {
                     glass.is_broken = true;
                     commands.entity(entity).despawn_recursive();
                 }

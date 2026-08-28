@@ -29,6 +29,16 @@ use kwv::Kwv;
 use bevy_rapier3d::prelude::*;
 use builder::MapMeshBuilder;
 
+#[derive(SystemSet, Debug, Hash, PartialEq, Eq, Clone)]
+pub enum GameSet {
+    Input,
+    Movement,
+    Combat,
+    Interactivity,
+    Animation,
+    RenderSync,
+}
+
 fn main() {
     App::new()
         .insert_resource(ClearColor(Color::BLACK))
@@ -49,17 +59,20 @@ fn main() {
         .add_plugins(hud::DukeHudPlugin)
         .add_plugins(game_flow::GameFlowPlugin)
         .insert_resource(DukeSounds::default())
+        .configure_sets(Update, (
+            GameSet::Input,
+            GameSet::Movement,
+            GameSet::Combat,
+            GameSet::Interactivity,
+            GameSet::Animation,
+            GameSet::RenderSync,
+        ).chain())
         .add_systems(Startup, setup)
         .add_systems(Update, (
-            animation::update_engine_clock,
-            animation::update_tile_animations,
-            player_look, 
-            cursor_grab, 
-            emit_player_interaction,
-            update_billboards, 
-            play_random_sound,
-            update_weapon,
-            sky::update_skybox,
+            (player_look, cursor_grab, emit_player_interaction).in_set(GameSet::Input),
+            (play_random_sound, update_weapon).in_set(GameSet::Combat),
+            (animation::update_engine_clock, animation::update_tile_animations).in_set(GameSet::Animation),
+            (update_billboards, sky::update_skybox).in_set(GameSet::RenderSync),
         ))
         .run();
 }
@@ -172,9 +185,23 @@ fn setup(
 
     let default_material = materials.add(Color::srgb(0.5, 0.5, 0.6));
     
+    let spark_tile = 2595;
+    let spark_material = if let Some(handle) = tile_textures.get(&spark_tile) {
+        materials.add(StandardMaterial {
+            base_color_texture: Some(handle.clone()),
+            alpha_mode: AlphaMode::Mask(0.5),
+            unlit: true,
+            double_sided: true,
+            ..default()
+        })
+    } else {
+        default_material.clone()
+    };
+
     commands.insert_resource(GameAssets {
         tile_textures: tile_textures.clone(),
         default_material: default_material.clone(),
+        spark_material,
     });
 
     let mut start_pos = Vec3::new(0.0, 1.5, 5.0);
@@ -392,9 +419,10 @@ fn emit_player_interaction(
 }
 
 #[derive(Resource)]
-struct GameAssets {
-    tile_textures: std::collections::HashMap<i16, Handle<Image>>,
-    default_material: Handle<StandardMaterial>,
+pub struct GameAssets {
+    pub tile_textures: std::collections::HashMap<i16, Handle<Image>>,
+    pub default_material: Handle<StandardMaterial>,
+    pub spark_material: Handle<StandardMaterial>,
 }
 
 fn update_weapon(
@@ -410,7 +438,6 @@ fn update_weapon(
     mut commands: Commands,
     rapier_context: Res<RapierContext>,
     assets: Res<GameAssets>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
     mut meshes: ResMut<Assets<Mesh>>,
 ) {
     let is_moving = if let Ok(output) = player_query.get_single() {
@@ -500,19 +527,8 @@ fn update_weapon(
                     ));
                 }
 
-                // Spawn a bullet hole decal (SHOTSPARK1 is tile 2595)
-                let spark_tile = 2595;
-                let spark_mat = if let Some(handle) = assets.tile_textures.get(&spark_tile) {
-                    materials.add(StandardMaterial {
-                        base_color_texture: Some(handle.clone()),
-                        alpha_mode: AlphaMode::Mask(0.5),
-                        unlit: true,
-                        double_sided: true,
-                        ..default()
-                    })
-                } else {
-                    assets.default_material.clone()
-                };
+                // Spawn a bullet hole decal (SHOTSPARK1 is tile 2595) using pre-cached material
+                let spark_mat = assets.spark_material.clone();
 
                 // Move slightly towards the camera to prevent z-fighting
                 let decal_pos = hit_point - ray_dir * 0.05;
