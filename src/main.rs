@@ -6,6 +6,7 @@ mod kwv;
 mod builder;
 mod sky;
 mod animation;
+mod scripting;
 
 use bevy::prelude::*;
 use bevy::render::render_asset::RenderAssetUsages;
@@ -332,12 +333,13 @@ fn update_billboards(
 fn player_move(
     keys: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
-    mut query: Query<(&mut Player, &mut KinematicCharacterController)>,
+    mut query: Query<(&mut Player, &mut KinematicCharacterController, Option<&KinematicCharacterControllerOutput>)>,
     camera_query: Query<&Transform, (With<Camera>, Without<FirstPersonWeapon>)>,
 ) {
     let Ok(camera_transform) = camera_query.get_single() else { return; };
 
-    for (mut player, mut controller) in query.iter_mut() {
+    for (mut player, mut controller, output) in query.iter_mut() {
+        let is_grounded = output.map_or(false, |out| out.grounded);
         let mut direction = Vec3::ZERO;
         
         // Use Bevy's built-in directions, extracting the yaw rotation from the camera
@@ -362,13 +364,20 @@ fn player_move(
             movement += direction.normalize() * player.speed * time.delta_seconds();
         }
         
-        if keys.just_pressed(KeyCode::Space) {
-            player.velocity_y = 5.0;
+        // Grounded check prevents Flappy Duke (infinite mid-air jump) and gravity over-accumulation
+        if is_grounded {
+            if player.velocity_y < 0.0 {
+                player.velocity_y = -0.5; // Slight downward snap to glue to slopes & stairs
+            }
+            if keys.just_pressed(KeyCode::Space) {
+                player.velocity_y = 5.5; // Authentic Duke 3D jump impulse
+            }
+        } else {
+            // Apply gravity with terminal velocity clamp
+            player.velocity_y = (player.velocity_y - 18.0 * time.delta_seconds()).max(-25.0);
         }
 
-        player.velocity_y -= 15.0 * time.delta_seconds();
         movement.y += player.velocity_y * time.delta_seconds();
-
         controller.translation = Some(movement);
     }
 }

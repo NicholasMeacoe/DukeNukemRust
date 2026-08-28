@@ -18,6 +18,7 @@ pub struct MapMeshBuilder<'a> {
     pub tile_sizes: &'a HashMap<i16, (u32, u32)>,
     pub picanm_map: &'a HashMap<i16, PicAnm>,
     pub default_material: Handle<StandardMaterial>,
+    material_cache: std::cell::RefCell<HashMap<(i16, bool), Handle<StandardMaterial>>>,
 }
 
 impl<'a> MapMeshBuilder<'a> {
@@ -34,6 +35,7 @@ impl<'a> MapMeshBuilder<'a> {
             tile_sizes,
             picanm_map,
             default_material,
+            material_cache: std::cell::RefCell::new(HashMap::new()),
         }
     }
 
@@ -43,9 +45,14 @@ impl<'a> MapMeshBuilder<'a> {
         is_transparent: bool,
         materials: &mut Assets<StandardMaterial>,
     ) -> Handle<StandardMaterial> {
-        if let Some(handle) = self.tile_textures.get(&picnum) {
+        let key = (picnum, is_transparent);
+        if let Some(handle) = self.material_cache.borrow().get(&key) {
+            return handle.clone();
+        }
+
+        let handle = if let Some(tex_handle) = self.tile_textures.get(&picnum) {
             materials.add(StandardMaterial {
-                base_color_texture: Some(handle.clone()),
+                base_color_texture: Some(tex_handle.clone()),
                 alpha_mode: if is_transparent {
                     AlphaMode::Mask(0.5)
                 } else {
@@ -57,7 +64,10 @@ impl<'a> MapMeshBuilder<'a> {
             })
         } else {
             self.default_material.clone()
-        }
+        };
+
+        self.material_cache.borrow_mut().insert(key, handle.clone());
+        handle
     }
 
     fn get_tile_size(&self, picnum: i16) -> (u32, u32) {
@@ -497,20 +507,17 @@ impl<'a> MapMeshBuilder<'a> {
 
         let build_height = avg_height.abs() * 1024.0 * 16.0;
         let v_span = (build_height * wall.yrepeat as f32) / (th as f32 * 2048.0);
-        let v0_raw = (wall.ypanning as f32) / (th as f32);
-        let v1_raw = v0_raw + v_span;
+        let v_pan = (wall.ypanning as f32) / (th as f32);
 
-        let (v_bottom, v_top) = if wall.align_bottom() {
-            (v0_raw, v1_raw)
+        let (mut v_top, mut v_bottom) = if wall.align_bottom() {
+            (1.0 + v_pan - v_span, 1.0 + v_pan)
         } else {
-            (v1_raw, v0_raw)
+            (v_pan, v_pan + v_span)
         };
 
-        let (v0, v1) = if wall.is_y_flipped() {
-            (v_top, v_bottom)
-        } else {
-            (v_bottom, v_top)
-        };
+        if wall.is_y_flipped() {
+            std::mem::swap(&mut v_top, &mut v_bottom);
+        }
 
         let v0_pos = [p1.x, bottom_y1, p1.y];
         let v1_pos = [p2.x, bottom_y2, p2.y];
@@ -518,7 +525,8 @@ impl<'a> MapMeshBuilder<'a> {
         let v3_pos = [p1.x, top_y1, p1.y];
 
         let positions = vec![v0_pos, v1_pos, v2_pos, v3_pos];
-        let uvs = vec![[u0, v0], [u1, v0], [u1, v1], [u0, v1]];
+        // v0/v1 are bottom vertices, v2/v3 are top vertices
+        let uvs = vec![[u0, v_bottom], [u1, v_bottom], [u1, v_top], [u0, v_top]];
         let tint = Palette::shade_to_tint(wall.shade);
         let colors = vec![tint; 4];
         let indices = vec![0u32, 1, 2, 0, 2, 3];
@@ -575,24 +583,19 @@ impl<'a> MapMeshBuilder<'a> {
         materials: &mut Assets<StandardMaterial>,
     ) {
         for sprite in &self.map.sprites {
-            if let Some(handle) = self.tile_textures.get(&sprite.picnum) {
+            if self.tile_textures.contains_key(&sprite.picnum) {
+                let (tw, th) = self.get_tile_size(sprite.picnum);
                 let pos = Vec3::new(
                     sprite.x as f32 / 1024.0,
                     -(sprite.z as f32) / (1024.0 * 16.0),
                     sprite.y as f32 / 1024.0,
                 );
 
-                let scale_x = (sprite.xrepeat as f32 / 64.0) * 3.0;
-                let scale_y = (sprite.yrepeat as f32 / 64.0) * 3.0;
+                let scale_x = (sprite.xrepeat as f32 * tw as f32) / 4096.0 * 3.0;
+                let scale_y = (sprite.yrepeat as f32 * th as f32) / 4096.0 * 3.0;
                 let is_enemy = sprite.picnum == 2000; // PIGCOP
 
-                let sprite_mat = materials.add(StandardMaterial {
-                    base_color_texture: Some(handle.clone()),
-                    alpha_mode: AlphaMode::Mask(0.5),
-                    unlit: true,
-                    double_sided: true,
-                    ..default()
-                });
+                let sprite_mat = self.get_material(sprite.picnum, true, materials);
 
                 let mut entity_cmds = commands.spawn((
                     PbrBundle {

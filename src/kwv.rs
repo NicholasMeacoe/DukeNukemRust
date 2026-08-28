@@ -52,6 +52,9 @@ impl Kwv {
         }
 
         let num_waves = read_u32(&mut reader)?;
+        if num_waves > 10_000 {
+            return Err(format!("KWV num_waves ({}) exceeds safety limit", num_waves));
+        }
         let mut headers = Vec::with_capacity(num_waves as usize);
 
         for _ in 0..num_waves {
@@ -83,5 +86,35 @@ impl Kwv {
         }
 
         Ok(Kwv { waves })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_kwv_wave_to_wav_bytes() {
+        let wave = KvvWave {
+            name: "PISTOL".into(),
+            data: vec![128, 200, 50, 128], // 8-bit unsigned PCM
+            sample_rate: 11025,
+        };
+
+        let wav_bytes = wave.to_wav_bytes();
+        // RIFF header starts with b"RIFF" and has b"WAVE"
+        assert!(wav_bytes.starts_with(b"RIFF"));
+        assert_eq!(&wav_bytes[8..12], b"WAVE");
+    }
+
+    #[test]
+    fn test_kwv_parse_empty() {
+        // Version 0, num_waves 0
+        let mut data = Vec::new();
+        data.extend_from_slice(&0u32.to_le_bytes()); // Version 0
+        data.extend_from_slice(&0u32.to_le_bytes()); // 0 waves
+
+        let kwv = Kwv::from_bytes(&data).unwrap();
+        assert_eq!(kwv.waves.len(), 0);
     }
 }

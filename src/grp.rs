@@ -11,7 +11,7 @@ pub struct GrpEntry {
 
 pub struct Grp {
     pub entries: Vec<GrpEntry>,
-    file_path: String,
+    data: Vec<u8>,
 }
 
 impl Grp {
@@ -27,6 +27,9 @@ impl Grp {
         let mut num_files_buf = [0u8; 4];
         file.read_exact(&mut num_files_buf).map_err(|e| e.to_string())?;
         let num_files = u32::from_le_bytes(num_files_buf);
+        if num_files > 100_000 {
+            return Err(format!("GRP num_files ({}) exceeds safety limit", num_files));
+        }
         
         let mut entries = Vec::with_capacity(num_files as usize);
         let mut current_offset = 16 + (num_files as u64 * 16);
@@ -52,9 +55,14 @@ impl Grp {
             current_offset += size as u64;
         }
         
+        // Read full payload into memory buffer once to eliminate file-descriptor thrashing
+        file.seek(SeekFrom::Start(0)).map_err(|e| e.to_string())?;
+        let mut data = Vec::new();
+        file.read_to_end(&mut data).map_err(|e| e.to_string())?;
+        
         Ok(Grp {
             entries,
-            file_path: path.as_ref().to_string_lossy().to_string(),
+            data,
         })
     }
 
@@ -62,12 +70,34 @@ impl Grp {
         let entry = self.entries.iter().find(|e| e.name.eq_ignore_ascii_case(name))
             .ok_or_else(|| format!("File not found in GRP: {}", name))?;
         
-        let mut file = File::open(&self.file_path).map_err(|e| e.to_string())?;
-        file.seek(SeekFrom::Start(entry.offset)).map_err(|e| e.to_string())?;
+        let start = entry.offset as usize;
+        let end = start + entry.size as usize;
+        if end > self.data.len() {
+            return Err(format!("GRP entry {} exceeds file bounds", name));
+        }
         
-        let mut data = vec![0u8; entry.size as usize];
-        file.read_exact(&mut data).map_err(|e| e.to_string())?;
-        
-        Ok(data)
+        Ok(self.data[start..end].to_vec())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_grp_read_missing_file() {
+        let grp = Grp {
+            entries: vec![
+                GrpEntry {
+                    name: "GAME.CON".into(),
+                    size: 100,
+                    offset: 32,
+                }
+            ],
+            data: vec![0u8; 200],
+        };
+
+        assert!(grp.read_file("MISSING.ART").is_err());
+    }
+}
+

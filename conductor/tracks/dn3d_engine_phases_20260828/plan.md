@@ -38,18 +38,18 @@
 ---
 
 ## Phase 3: CON Scripting Parser, Compiler & Virtual Machine
-- [ ] Task: CON Script Lexer & AST Parser
-  - [ ] Create token lexer for `DEFS.CON`, `USER.CON`, and `GAME.CON`
-  - [ ] Parse defines, actions, moves, ai routines, state blocks, and actor declarations
-- [ ] Task: Bytecode Compiler & Runtime VM (`GAMEDEF.C` Equivalent)
-  - [ ] Compile CON AST into efficient runtime bytecode instructions
-  - [ ] Implement actor VM executor (executing per-actor CON state loops on engine ticks)
-  - [ ] Expose engine primitives to VM (distance checks, line of sight, projectile spawning, sound triggers)
-- [ ] Task: Event Hooks & Game Definitions
-  - [ ] Implement engine event handlers (`EVENT_GAME`, `EVENT_JUMP`, `EVENT_PREWORLDDRAW`, etc.)
-  - [ ] Bind weapon definitions, ammo limits, and damage lookup tables from `USER.CON`
-- [ ] Task: Phase 3 Verification & Checkpoint
-  - [ ] Verify CON scripts compile cleanly from GRP and execute basic actor state loops
+- [x] Task: CON Script Lexer & AST Parser
+  - [x] Create token lexer for `DEFS.CON`, `USER.CON`, and `GAME.CON`
+  - [x] Parse defines, actions, moves, ai routines, state blocks, and actor declarations
+- [x] Task: Bytecode Compiler & Runtime VM (`GAMEDEF.C` Equivalent)
+  - [x] Compile CON AST into efficient runtime bytecode instructions
+  - [x] Implement actor VM executor (executing per-actor CON state loops on engine ticks)
+  - [x] Expose engine primitives to VM (distance checks, line of sight, projectile spawning, sound triggers)
+- [x] Task: Event Hooks & Game Definitions
+  - [x] Implement engine event handlers (`EVENT_GAME`, `EVENT_JUMP`, `EVENT_PREWORLDDRAW`, etc.)
+  - [x] Bind weapon definitions, ammo limits, and damage lookup tables from `USER.CON`
+- [x] Task: Phase 3 Verification & Checkpoint
+  - [x] Verify CON scripts compile cleanly from GRP and execute basic actor state loops
 
 ---
 

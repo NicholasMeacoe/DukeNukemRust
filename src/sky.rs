@@ -26,7 +26,13 @@ pub fn spawn_skybox(
         half_height: 250.0,
     });
     
-    // Invert normals and set panoramic UVs
+    // Invert U coordinate so textures are not mirrored when viewed from the inside
+    if let Some(bevy::render::mesh::VertexAttributeValues::Float32x2(uvs)) = cylinder_mesh.attribute_mut(Mesh::ATTRIBUTE_UV_0) {
+        for uv in uvs.iter_mut() {
+            uv[0] = 1.0 - uv[0];
+        }
+    }
+
     cylinder_mesh.duplicate_vertices();
     cylinder_mesh.compute_flat_normals();
 

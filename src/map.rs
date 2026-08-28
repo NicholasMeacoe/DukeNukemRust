@@ -121,6 +121,9 @@ impl Map {
         let cursectnum = read_i16(&mut reader)?;
         
         let numsectors = read_i16(&mut reader)?;
+        if numsectors < 0 || numsectors > 4096 {
+            return Err(format!("Invalid sector count: {}", numsectors));
+        }
         let mut sectors = Vec::with_capacity(numsectors as usize);
         for _ in 0..numsectors {
             sectors.push(Sector {
@@ -151,6 +154,9 @@ impl Map {
         }
         
         let numwalls = read_i16(&mut reader)?;
+        if numwalls < 0 || numwalls > 16384 {
+            return Err(format!("Invalid wall count: {}", numwalls));
+        }
         let mut walls = Vec::with_capacity(numwalls as usize);
         for _ in 0..numwalls {
             walls.push(Wall {
@@ -175,6 +181,9 @@ impl Map {
         }
         
         let numsprites = read_i16(&mut reader)?;
+        if numsprites < 0 || numsprites > 16384 {
+            return Err(format!("Invalid sprite count: {}", numsprites));
+        }
         let mut sprites = Vec::with_capacity(numsprites as usize);
         for _ in 0..numsprites {
             sprites.push(Sprite {
