@@ -19,6 +19,7 @@ impl Plugin for InteractivityPlugin {
             .add_event::<InteractEvent>()
             .add_event::<ExplosionDamageEvent>()
             .add_event::<PlayerHealEvent>()
+            .add_event::<PlaySoundEvent>()
             .add_systems(
                 Update,
                 (
@@ -60,7 +61,7 @@ pub fn spawn_interactive_elements_from_map(
         match sprite.picnum {
             // SECTOREFFECTOR (Tile 1)
             1 => {
-                let ang_rad = -(sprite.ang as f32 / 2048.0) * std::f32::consts::TAU;
+                let ang_rad = (sprite.ang as f32 / 2048.0) * std::f32::consts::TAU;
                 let kind = match sprite.lotag {
                     0 => EffectorKind::RotatingDoor {
                         pivot: Vec2::new(pos.x, pos.z),

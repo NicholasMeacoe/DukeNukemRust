@@ -173,3 +173,8 @@ pub struct ExplosionDamageEvent {
 pub struct PlayerHealEvent {
     pub amount: i32,
 }
+
+#[derive(Event, Debug, Clone)]
+pub struct PlaySoundEvent {
+    pub sound_id: i32,
+}

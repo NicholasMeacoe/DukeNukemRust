@@ -11,6 +11,7 @@ pub fn handle_player_interactions(
     mut toilets: Query<(&Transform, &mut ToiletProp)>,
     mut tag_events: EventWriter<ActivateTagEvent>,
     mut heal_events: EventWriter<PlayerHealEvent>,
+    mut sound_events: EventWriter<PlaySoundEvent>,
     mut level_completed_events: EventWriter<crate::game_flow::LevelCompletedEvent>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     assets: Option<Res<crate::GameAssets>>,
@@ -32,6 +33,9 @@ pub fn handle_player_interactions(
 
                 if facing > 0.1 {
                     switch.is_on = !switch.is_on;
+                    if switch.sound_id != 0 {
+                        sound_events.send(PlaySoundEvent { sound_id: switch.sound_id });
+                    }
                     let target_tile = if switch.is_on { switch.on_tile } else { switch.off_tile };
 
                     // Swap visual texture on the switch material
@@ -124,6 +128,7 @@ pub fn handle_touchplates(
 
 pub fn handle_explosions(
     mut explosion_events: EventReader<ExplosionDamageEvent>,
+    mut new_explosions: EventWriter<ExplosionDamageEvent>,
     mut barrels: Query<(Entity, &Transform, &mut ExplodingBarrel)>,
     mut crack_walls: Query<(&Transform, &mut CrackWall)>,
     mut glass_windows: Query<(Entity, &Transform, &mut BreakableGlass)>,
@@ -142,6 +147,11 @@ pub fn handle_explosions(
                     barrel.health -= exp.damage;
                     if barrel.health <= 0 {
                         barrel.is_exploded = true;
+                        new_explosions.send(ExplosionDamageEvent {
+                            origin: trans.translation,
+                            radius: barrel.damage_radius,
+                            damage: barrel.damage,
+                        });
                         commands.entity(entity).despawn_recursive();
                     }
                 }
