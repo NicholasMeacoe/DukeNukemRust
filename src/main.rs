@@ -353,8 +353,8 @@ fn setup(
                     margin: UiRect::bottom(Val::Px(base_y)), // Offset from bottom
                     ..default()
                 },
-                // Add background color white to ensure image is visible, even if texture has alpha issues
-                background_color: Color::WHITE.into(),
+                // Transparent background so only the weapon sprite pixels render
+                background_color: Color::NONE.into(),
                 ..default()
             },
             FirstPersonWeapon {

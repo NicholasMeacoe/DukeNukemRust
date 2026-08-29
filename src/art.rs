@@ -96,28 +96,41 @@ impl Art {
 
         let num_local_tiles = (local_tile_end - local_tile_start + 1) as usize;
         let mut offset = 16;
-        if offset + num_local_tiles * 8 > data.len() {
-            return Err("Art header truncated".to_string());
+        let mut tilesizx = Vec::with_capacity(num_local_tiles);
+        for _ in 0..num_local_tiles {
+            let width = u16::from_le_bytes(data[offset..offset + 2].try_into().unwrap()) as u32;
+            offset += 2;
+            tilesizx.push(width);
+        }
+
+        let mut tilesizy = Vec::with_capacity(num_local_tiles);
+        for _ in 0..num_local_tiles {
+            let height = u16::from_le_bytes(data[offset..offset + 2].try_into().unwrap()) as u32;
+            offset += 2;
+            tilesizy.push(height);
+        }
+
+        let mut picanms = Vec::with_capacity(num_local_tiles);
+        for _ in 0..num_local_tiles {
+            let picanm_raw = u32::from_le_bytes(data[offset..offset + 4].try_into().unwrap());
+            offset += 4;
+            picanms.push(PicAnm::from_u32(picanm_raw));
         }
 
         let mut tiles = Vec::with_capacity(num_local_tiles);
 
-        // Headers first
-        let mut tile_headers = Vec::with_capacity(num_local_tiles);
-        for _ in 0..num_local_tiles {
-            let width = u16::from_le_bytes(data[offset..offset + 2].try_into().unwrap()) as u32;
-            let height =
-                u16::from_le_bytes(data[offset + 2..offset + 4].try_into().unwrap()) as u32;
-            let picanm_raw =
-                u32::from_le_bytes(data[offset + 4..offset + 8].try_into().unwrap());
-            let picanm = PicAnm::from_u32(picanm_raw);
-            offset += 8;
-            tile_headers.push((width, height, picanm));
-        }
-
-        // Data second
-        for (width, height, picanm) in tile_headers {
+        // Pixel data second
+        for i in 0..num_local_tiles {
+            let width = tilesizx[i];
+            let height = tilesizy[i];
+            let picanm = picanms[i];
             let size = (width * height) as usize;
+
+            if size == 0 {
+                tiles.push(None);
+                continue;
+            }
+
             if offset + size > data.len() {
                 return Err("Art data truncated".to_string());
             }

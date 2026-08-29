@@ -100,5 +100,23 @@ mod tests {
 
         assert!(grp.read_file("MISSING.ART").is_err());
     }
+
+    #[test]
+    fn test_load_real_grp_art_files() {
+        if let Ok(grp) = Grp::open("dukenukem3d/duke3d.grp") {
+            println!("GRP entries count: {}", grp.entries.len());
+            for entry in &grp.entries {
+                if entry.name.to_uppercase().ends_with(".ART") {
+                    println!("Found ART file: {} (size: {})", entry.name, entry.size);
+                    if let Ok(data) = grp.read_file(&entry.name) {
+                        match crate::art::Art::from_bytes(&data) {
+                            Ok(art) => println!("  -> Successfully parsed: tiles {} to {}", art.local_tile_start, art.local_tile_end),
+                            Err(e) => println!("  -> FAILED to parse: {}", e),
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
