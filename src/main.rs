@@ -39,6 +39,22 @@ pub enum GameSet {
     RenderSync,
 }
 
+fn find_grp_path() -> String {
+    let candidates = [
+        "dukenukem3d/duke3d.grp",
+        "duke3d.grp",
+        "../dukenukem3d/duke3d.grp",
+        "../../dukenukem3d/duke3d.grp",
+        "C:/Source/DukeNukemRust/dukenukem3d/duke3d.grp",
+    ];
+    for path in &candidates {
+        if std::path::Path::new(path).exists() {
+            return path.to_string();
+        }
+    }
+    "dukenukem3d/duke3d.grp".to_string()
+}
+
 fn main() {
     App::new()
         .insert_resource(ClearColor(Color::BLACK))
@@ -47,6 +63,11 @@ fn main() {
             primary_window: Some(Window {
                 title: "Duke Nukem 3D: Build Map Render".into(),
                 resolution: (1280.0, 720.0).into(),
+                position: WindowPosition::Centered(MonitorSelection::Primary),
+                focused: true,
+                visible: true,
+                mode: bevy::window::WindowMode::Windowed,
+                present_mode: bevy::window::PresentMode::AutoVsync,
                 ..default()
             }),
             ..default()
@@ -116,13 +137,13 @@ fn setup(
     mut audio_sources: ResMut<Assets<AudioSource>>,
     mut duke_sounds: ResMut<DukeSounds>,
 ) {
-    let grp_path = "dukenukem3d/duke3d.grp";
+    let grp_path = find_grp_path();
     let mut tile_textures = std::collections::HashMap::new();
     let mut tile_sizes = std::collections::HashMap::new();
     let mut picanm_map = std::collections::HashMap::new();
 
     println!("Attempting to load assets from {}", grp_path);
-    if let Ok(grp) = Grp::open(grp_path) {
+    if let Ok(grp) = Grp::open(&grp_path) {
         if let Ok(pal_data) = grp.read_file("PALETTE.DAT") {
             if let Ok(mut pal) = Palette::from_bytes(&pal_data) {
                 if let Ok(lookup_data) = grp.read_file("LOOKUP.DAT") {
@@ -213,7 +234,7 @@ fn setup(
     let map_name = "E1L1.MAP";
     println!("Attempting to load map {} from GRP", map_name);
     
-    if let Ok(grp) = Grp::open(grp_path) {
+    if let Ok(grp) = Grp::open(&grp_path) {
         if let Ok(map_data) = grp.read_file(map_name) {
             if let Ok(map) = Map::from_bytes(&map_data) {
                 println!("Map loaded successfully: {} sectors, {} walls, {} sprites", map.sectors.len(), map.walls.len(), map.sprites.len());
