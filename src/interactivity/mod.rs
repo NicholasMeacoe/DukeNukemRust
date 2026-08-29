@@ -18,6 +18,7 @@ impl Plugin for InteractivityPlugin {
         app.add_event::<ActivateTagEvent>()
             .add_event::<InteractEvent>()
             .add_event::<ExplosionDamageEvent>()
+            .add_event::<BarrelExplodeEvent>()
             .add_event::<PlayerHealEvent>()
             .add_event::<PlaySoundEvent>()
             .add_systems(
@@ -27,6 +28,7 @@ impl Plugin for InteractivityPlugin {
                         handle_player_interactions,
                         handle_touchplates,
                         handle_explosions,
+                        handle_barrel_chain_explosions,
                         handle_tag_activations,
                         update_sector_effectors,
                         apply_player_healing,

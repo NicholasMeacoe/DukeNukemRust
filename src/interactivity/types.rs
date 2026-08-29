@@ -178,3 +178,10 @@ pub struct PlayerHealEvent {
 pub struct PlaySoundEvent {
     pub sound_id: i32,
 }
+
+#[derive(Event, Debug, Clone)]
+pub struct BarrelExplodeEvent {
+    pub origin: Vec3,
+    pub radius: f32,
+    pub damage: i32,
+}

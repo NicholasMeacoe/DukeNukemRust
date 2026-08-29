@@ -128,7 +128,7 @@ pub fn handle_touchplates(
 
 pub fn handle_explosions(
     mut explosion_events: EventReader<ExplosionDamageEvent>,
-    mut new_explosions: EventWriter<ExplosionDamageEvent>,
+    mut barrel_explode_events: EventWriter<BarrelExplodeEvent>,
     mut barrels: Query<(Entity, &Transform, &mut ExplodingBarrel)>,
     mut crack_walls: Query<(&Transform, &mut CrackWall)>,
     mut glass_windows: Query<(Entity, &Transform, &mut BreakableGlass)>,
@@ -147,7 +147,7 @@ pub fn handle_explosions(
                     barrel.health -= exp.damage;
                     if barrel.health <= 0 {
                         barrel.is_exploded = true;
-                        new_explosions.send(ExplosionDamageEvent {
+                        barrel_explode_events.send(BarrelExplodeEvent {
                             origin: trans.translation,
                             radius: barrel.damage_radius,
                             damage: barrel.damage,
@@ -187,5 +187,18 @@ pub fn handle_explosions(
                 }
             }
         }
+    }
+}
+
+pub fn handle_barrel_chain_explosions(
+    mut barrel_events: EventReader<BarrelExplodeEvent>,
+    mut explosion_events: EventWriter<ExplosionDamageEvent>,
+) {
+    for exp in barrel_events.read() {
+        explosion_events.send(ExplosionDamageEvent {
+            origin: exp.origin,
+            radius: exp.radius,
+            damage: exp.damage,
+        });
     }
 }
