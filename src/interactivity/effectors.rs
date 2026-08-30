@@ -38,6 +38,18 @@ pub fn handle_tag_activations(
                         *is_at_top = !*is_at_top;
                         *auto_return_timer = if *is_at_top { Some(5.0) } else { None };
                     }
+                    EffectorKind::DropFloor { is_dropped, .. } => {
+                        *is_dropped = true;
+                    }
+                    EffectorKind::LightSwitchOperator { is_on, .. } => {
+                        *is_on = !*is_on;
+                    }
+                    EffectorKind::AutoCloseDoor { is_open, auto_close_timer, auto_close_delay, .. } => {
+                        *is_open = !*is_open;
+                        if *is_open {
+                            *auto_close_timer = Some(*auto_close_delay);
+                        }
+                    }
                     _ => {}
                 }
             }
@@ -162,8 +174,110 @@ pub fn update_sector_effectors(
                 transforms.insert(sector_idx, EffectorTransform::Elevate { delta_y });
             }
 
+            EffectorKind::DropFloor {
+                orig_floor_z,
+                target_floor_z,
+                current_floor_z,
+                speed,
+                is_dropped,
+            } => {
+                if *is_dropped {
+                    let step = (*speed as f32 * dt * 1000.0) as i32;
+                    if (*current_floor_z - *target_floor_z).abs() <= step.max(1) {
+                        *current_floor_z = *target_floor_z;
+                        should_deactivate = true;
+                    } else {
+                        *current_floor_z += step.max(1) * (*target_floor_z - *current_floor_z).signum();
+                    }
+
+                    let delta_y = -((*current_floor_z - *orig_floor_z) as f32) / (1024.0 * 16.0);
+                    transforms.insert(sector_idx, EffectorTransform::Elevate { delta_y });
+                }
+            }
+
+            EffectorKind::RotatingEngine { pivot, current_ang, speed } => {
+                *current_ang += *speed * dt;
+                transforms.insert(
+                    sector_idx,
+                    EffectorTransform::Rotate {
+                        pivot: *pivot,
+                        rot_ang: *current_ang,
+                    },
+                );
+            }
+
+            EffectorKind::SubwayTrain {
+                stop_a,
+                stop_b,
+                current_pos,
+                progress,
+                speed,
+                moving_to_b,
+                pause_timer,
+            } => {
+                if *pause_timer > 0.0 {
+                    *pause_timer -= dt;
+                } else {
+                    let step = *speed * dt;
+                    if *moving_to_b {
+                        *progress = (*progress + step).min(1.0);
+                        if *progress >= 1.0 {
+                            *moving_to_b = false;
+                            *pause_timer = 4.0; // Wait 4s at station B
+                        }
+                    } else {
+                        *progress = (*progress - step).max(0.0);
+                        if *progress <= 0.0 {
+                            *moving_to_b = true;
+                            *pause_timer = 4.0; // Wait 4s at station A
+                        }
+                    }
+
+                    let offset = (*stop_b - *stop_a) * *progress;
+                    *current_pos = *stop_a + offset;
+                    transforms.insert(sector_idx, EffectorTransform::Slide { offset });
+                }
+            }
+
             EffectorKind::LightStrobe { timer, rate, .. } => {
                 *timer += dt * *rate;
+            }
+
+            EffectorKind::AutoCloseDoor {
+                orig_ceil_z,
+                open_ceil_z,
+                current_ceil_z,
+                speed,
+                auto_close_timer,
+                auto_close_delay: _,
+                is_open,
+            } => {
+                let target_z = if *is_open { *open_ceil_z } else { *orig_ceil_z };
+                let diff = target_z - *current_ceil_z;
+                if diff != 0 {
+                    let step = (*speed as f32 * dt * 1024.0) as i32;
+                    if diff.abs() <= step {
+                        *current_ceil_z = target_z;
+                    } else {
+                        *current_ceil_z += diff.signum() * step;
+                    }
+                } else if *is_open {
+                    // Count down auto-close timer
+                    if let Some(ref mut timer) = auto_close_timer {
+                        *timer -= dt;
+                        if *timer <= 0.0 {
+                            *auto_close_timer = None;
+                            *is_open = false; // Auto close door!
+                        }
+                    }
+                } else {
+                    should_deactivate = true;
+                }
+
+                // Delta Y in meters
+                let delta_z = *current_ceil_z - *orig_ceil_z;
+                let delta_y = -(delta_z as f32) / (1024.0 * 16.0);
+                transforms.insert(sector_idx, EffectorTransform::Elevate { delta_y });
             }
 
             _ => {}

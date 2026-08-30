@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+use bevy::prelude::*;
 use std::collections::HashMap;
 
 pub struct Palette {
@@ -132,12 +133,56 @@ impl Palette {
         self.colors[shaded_idx as usize]
     }
 
+    /// Compute distance-based depth shade matching Build engine visibility decay
+    pub fn compute_depth_shade(base_shade: i8, distance: f32, visibility: f32) -> i8 {
+        let decay = (distance * visibility * 0.25) as i32;
+        let final_shade = (base_shade as i32 + decay).clamp(0, 31);
+        final_shade as i8
+    }
+
     /// Convert Build engine signed shade (-128..127) into a RGBA tint factor [0.0..1.0] for Bevy vertex color modulation.
     pub fn shade_to_tint(shade: i8) -> [f32; 4] {
         // Build shade: 0 is normal, negative is brighter, positive is darker (up to 32)
         // Shade 0 -> 1.0 intensity, Shade 32 -> 0.05 intensity, Shade -10 -> 1.25 intensity
         let factor = (1.0 - (shade as f32 / 32.0)).clamp(0.05, 1.5);
         [factor, factor, factor, 1.0]
+    }
+}
+
+#[derive(Resource, Debug, Clone, PartialEq)]
+pub struct PaletteFlashState {
+    pub red_flash: f32,
+    pub yellow_flash: f32,
+    pub blue_tint: f32,
+    pub green_tint: f32,
+    pub amber_glow: f32,
+}
+
+impl Default for PaletteFlashState {
+    fn default() -> Self {
+        Self {
+            red_flash: 0.0,
+            yellow_flash: 0.0,
+            blue_tint: 0.0,
+            green_tint: 0.0,
+            amber_glow: 0.0,
+        }
+    }
+}
+
+impl PaletteFlashState {
+    pub fn compute_screen_tint(&self) -> [f32; 4] {
+        let r = 1.0 + self.red_flash * 0.8 + self.yellow_flash * 0.4 + self.amber_glow * 0.5;
+        let g = 1.0 + self.green_tint * 0.9 + self.yellow_flash * 0.4 + self.amber_glow * 0.3;
+        let b = 1.0 + self.blue_tint * 0.8;
+        let a = (self.red_flash + self.yellow_flash + self.blue_tint + self.green_tint + self.amber_glow).min(0.85);
+        [r.clamp(0.0, 2.0), g.clamp(0.0, 2.0), b.clamp(0.0, 2.0), a]
+    }
+
+    pub fn tick(&mut self, dt: f32) {
+        self.red_flash = (self.red_flash - 2.5 * dt).max(0.0);
+        self.yellow_flash = (self.yellow_flash - 3.0 * dt).max(0.0);
+        self.amber_glow = (self.amber_glow - 1.5 * dt).max(0.0);
     }
 }
 
@@ -196,5 +241,36 @@ mod tests {
 
         let tint32 = Palette::shade_to_tint(32);
         assert!((tint32[0] - 0.05).abs() < 0.05);
+    }
+
+    #[test]
+    fn test_crt_post_process_config() {
+        let mut config = CrtPostProcessConfig::default();
+        assert!(!config.enabled);
+        assert_eq!(config.scanline_intensity, 0.25);
+
+        config.enabled = true;
+        config.scanline_intensity = 0.5;
+        assert!(config.enabled);
+        assert_eq!(config.scanline_intensity, 0.5);
+    }
+}
+
+#[derive(Resource, Debug, Clone, PartialEq)]
+pub struct CrtPostProcessConfig {
+    pub enabled: bool,
+    pub scanline_intensity: f32,
+    pub shadow_mask: bool,
+    pub vga_color_quantization: bool,
+}
+
+impl Default for CrtPostProcessConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            scanline_intensity: 0.25,
+            shadow_mask: true,
+            vga_color_quantization: false,
+        }
     }
 }

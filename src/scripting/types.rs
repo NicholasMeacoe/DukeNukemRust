@@ -292,3 +292,50 @@ pub struct ActorRegisters {
     pub temp_ang: i16,
 }
 
+/// Build engine angle difference (handles wraparound in 0..2047 space).
+/// Returns the shortest signed angular distance from `a` to `na`.
+pub fn getincangle(a: i16, na: i16) -> i16 {
+    let mut a = a & 2047;
+    let mut na = na & 2047;
+
+    if (a - na).abs() < 1024 {
+        na - a
+    } else {
+        if na > 1024 { na -= 2048; }
+        if a > 1024 { a -= 2048; }
+        na - a
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct DynamicVolumeDef {
+    pub volume_id: usize,
+    pub title: String,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct DynamicSkillDef {
+    pub skill_id: usize,
+    pub title: String,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct DynamicLevelDef {
+    pub volume: usize,
+    pub level: usize,
+    pub filename: String,
+    pub par_time_str: String,
+    pub three_dr_time_str: String,
+    pub title: String,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct DynamicSoundDef {
+    pub sound_id: i32,
+    pub filename: String,
+    pub pitch1: i32,
+    pub pitch2: i32,
+    pub priority: i32,
+    pub sound_type: i32,
+    pub volume: i32,
+}

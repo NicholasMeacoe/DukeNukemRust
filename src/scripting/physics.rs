@@ -16,7 +16,7 @@ pub struct PhysicsContext<'a> {
 }
 
 pub struct TrigTables {
-    pub sin_table: [i32; 2048],
+    pub sin_table: Vec<i32>,
 }
 
 impl Default for TrigTables {
@@ -27,7 +27,7 @@ impl Default for TrigTables {
 
 impl TrigTables {
     pub fn new() -> Self {
-        let mut sin_table = [0i32; 2048];
+        let mut sin_table = vec![0i32; 2048];
         for i in 0..2048 {
             let rad = (i as f64) * (2.0 * std::f64::consts::PI / 2048.0);
             sin_table[i] = (rad.sin() * 16384.0).round() as i32;

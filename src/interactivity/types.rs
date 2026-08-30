@@ -38,6 +38,8 @@ pub enum EffectorKind {
     /// SE 7: Underwater / Teleporter Conveyor
     UnderwaterTeleport {
         target_sector: usize,
+        target_pos: Vec3,
+        is_submerged: bool,
     },
     /// SE 3: Light Strobe / Flicker
     LightStrobe {
@@ -46,6 +48,46 @@ pub enum EffectorKind {
         max_shade: i8,
         timer: f32,
         rate: f32,
+    },
+    /// SE 12: Light Switch Operator
+    LightSwitchOperator {
+        is_on: bool,
+        on_shade: i8,
+        off_shade: i8,
+    },
+    /// SE 21: Drop Floor / Ceiling Crusher
+    DropFloor {
+        orig_floor_z: i32,
+        target_floor_z: i32,
+        current_floor_z: i32,
+        speed: i32,
+        is_dropped: bool,
+    },
+    /// SE 25: Rotating Engine / Gears
+    RotatingEngine {
+        pivot: Vec2,
+        current_ang: f32,
+        speed: f32,
+    },
+    /// SE 30: Two-Way Subway Train / Moving Sector
+    SubwayTrain {
+        stop_a: Vec2,
+        stop_b: Vec2,
+        current_pos: Vec2,
+        progress: f32,
+        speed: f32,
+        moving_to_b: bool,
+        pause_timer: f32,
+    },
+    /// SE 10: Auto-Close Door (Vertical door)
+    AutoCloseDoor {
+        orig_ceil_z: i32,
+        open_ceil_z: i32,
+        current_ceil_z: i32,
+        speed: i32,
+        auto_close_timer: Option<f32>,
+        auto_close_delay: f32,
+        is_open: bool,
     },
 }
 
@@ -73,6 +115,11 @@ pub enum SwitchType {
 }
 
 #[derive(Component, Debug, Clone)]
+pub struct KeycardPickup {
+    pub key_type: u8, // 1 = Blue, 2 = Red, 3 = Yellow
+}
+
+#[derive(Component, Debug, Clone)]
 pub struct InteractiveSwitch {
     pub switch_type: SwitchType,
     pub on_tile: i16,
@@ -97,6 +144,19 @@ pub struct ToiletProp {
     pub broken_tile: i16,
     pub water_tile: i16,
     pub last_used_time: f32,
+    pub cooldown_timer: f32,
+}
+
+impl Default for ToiletProp {
+    fn default() -> Self {
+        Self {
+            is_broken: false,
+            broken_tile: 970,
+            water_tile: 971,
+            last_used_time: 0.0,
+            cooldown_timer: 0.0,
+        }
+    }
 }
 
 #[derive(Component, Debug, Clone)]
@@ -113,6 +173,87 @@ pub struct ExplodingBarrel {
     pub damage_radius: f32,
     pub damage: i32,
     pub is_exploded: bool,
+}
+
+#[derive(Component, Debug, Clone)]
+pub struct ViewscreenProp {
+    pub camera_tag: i16,
+    pub is_active: bool,
+    pub is_broken: bool,
+    pub broken_tile: i16,
+    pub scanline_timer: f32,
+}
+
+impl Default for ViewscreenProp {
+    fn default() -> Self {
+        Self {
+            camera_tag: 0,
+            is_active: false,
+            is_broken: false,
+            broken_tile: 501, // VIEWSCREENBROKE
+            scanline_timer: 0.0,
+        }
+    }
+}
+
+#[derive(Component, Debug, Clone)]
+pub struct SecurityCamera {
+    pub tag: i16,
+    pub sweep_angle: f32,
+    pub sweep_speed: f32,
+    pub base_yaw: f32,
+}
+
+impl Default for SecurityCamera {
+    fn default() -> Self {
+        Self {
+            tag: 0,
+            sweep_angle: 0.0,
+            sweep_speed: 1.0,
+            base_yaw: 0.0,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PickupKind {
+    // Health
+    SmallMedkit,       // +10 HP (up to 100) - Tile 51
+    LargeMedkit,       // +30 HP (up to 100) - Tile 52
+    AtomicHealth,      // +50 HP (up to 200) - Tile 55
+    ArmorVest,         // 100 Armor - Tile 56
+    // Ammo
+    PistolClip,        // +12 Pistol Ammo - Tile 40
+    ShotgunBox,        // +10 Shotgun Ammo - Tile 49
+    ChaingunBox,       // +50 Chaingun Ammo - Tile 44
+    RpgRocket,         // +5 Rockets - Tile 47
+    PipebombBox,       // +5 Pipebombs - Tile 48
+    ShrinkerAmmo,      // +5 Shrinker - Tile 42
+    DevastatorBox,     // +15 Devastator - Tile 45
+    FreezeAmmo,        // +25 Freeze - Tile 46
+    // Inventory Items
+    Steroids,          // +400 Steroids - Tile 57
+    ScubaTank,         // +100 Scuba - Tile 59
+    NightvisionGoggles,// +100 Nightvision - Tile 60
+    ProtectiveBoots,   // +100 Boots - Tile 61
+    Jetpack,           // +100 Jetpack - Tile 58
+    Holoduke,          // +100 Holoduke - Tile 62
+    // Weapons on Ground
+    WeaponPistol,      // Tile 21
+    WeaponShotgun,     // Tile 22
+    WeaponChaingun,    // Tile 23
+    WeaponRpg,         // Tile 24
+    WeaponPipebomb,    // Tile 25
+    WeaponShrinker,    // Tile 26
+    WeaponDevastator,  // Tile 27
+    WeaponTripbomb,    // Tile 28
+    WeaponFreezer,     // Tile 29
+}
+
+#[derive(Component, Debug, Clone)]
+pub struct ItemPickup {
+    pub kind: PickupKind,
+    pub respawn_timer: Option<f32>,
 }
 
 #[derive(Component, Debug, Clone)]
@@ -184,4 +325,32 @@ pub struct BarrelExplodeEvent {
     pub origin: Vec3,
     pub radius: f32,
     pub damage: i32,
+}
+
+#[derive(Component, Debug, Clone)]
+pub struct MirrorProp {
+    pub cooldown_timer: f32,
+}
+
+impl Default for MirrorProp {
+    fn default() -> Self {
+        Self { cooldown_timer: 0.0 }
+    }
+}
+
+#[derive(Component, Debug, Clone, PartialEq)]
+pub struct CarrierPlatform {
+    pub velocity: Vec3,
+    pub sector_bounds_min: Vec2,
+    pub sector_bounds_max: Vec2,
+}
+
+impl Default for CarrierPlatform {
+    fn default() -> Self {
+        Self {
+            velocity: Vec3::ZERO,
+            sector_bounds_min: Vec2::splat(-1000.0),
+            sector_bounds_max: Vec2::splat(1000.0),
+        }
+    }
 }

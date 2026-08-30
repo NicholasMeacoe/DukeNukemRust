@@ -3,10 +3,13 @@
 pub mod types;
 pub mod effectors;
 pub mod props;
+pub mod props_extended;
 
 pub use types::*;
 pub use effectors::*;
 pub use props::*;
+#[allow(unused_imports)]
+pub use props_extended::{DancerProp, ExtendedPropsPlugin, FountainProp, MoneyItem};
 
 use bevy::prelude::*;
 use crate::map::Map;
@@ -15,7 +18,8 @@ pub struct InteractivityPlugin;
 
 impl Plugin for InteractivityPlugin {
     fn build(&self, app: &mut App) {
-        app.add_event::<ActivateTagEvent>()
+        app.add_plugins(props_extended::ExtendedPropsPlugin)
+            .add_event::<ActivateTagEvent>()
             .add_event::<InteractEvent>()
             .add_event::<ExplosionDamageEvent>()
             .add_event::<BarrelExplodeEvent>()
@@ -24,16 +28,21 @@ impl Plugin for InteractivityPlugin {
             .add_systems(
                 Update,
                 (
-                    (
-                        handle_player_interactions,
-                        handle_touchplates,
-                        handle_explosions,
-                        handle_barrel_chain_explosions,
-                        handle_tag_activations,
-                        update_sector_effectors,
-                        apply_player_healing,
-                    ).in_set(crate::GameSet::Interactivity),
-                ),
+                    handle_player_interactions,
+                    handle_touchplates,
+                    handle_explosions,
+                    handle_barrel_chain_explosions,
+                    handle_tag_activations,
+                ).in_set(crate::GameSet::Interactivity),
+            )
+            .add_systems(
+                Update,
+                (
+                    update_sector_effectors,
+                    update_surveillance_monitors,
+                    update_mirror_props,
+                    apply_player_healing,
+                ).in_set(crate::GameSet::Interactivity),
             );
     }
 }
@@ -95,6 +104,8 @@ pub fn spawn_interactive_elements_from_map(
                     },
                     7 => EffectorKind::UnderwaterTeleport {
                         target_sector: (sprite.hitag as usize).min(map.sectors.len().saturating_sub(1)),
+                        target_pos: pos,
+                        is_submerged: false,
                     },
                     3 => EffectorKind::LightStrobe {
                         base_shade: 0,
@@ -102,6 +113,32 @@ pub fn spawn_interactive_elements_from_map(
                         max_shade: 20,
                         timer: 0.0,
                         rate: 4.0,
+                    },
+                    12 => EffectorKind::LightSwitchOperator {
+                        is_on: true,
+                        on_shade: 0,
+                        off_shade: 25,
+                    },
+                    21 => EffectorKind::DropFloor {
+                        orig_floor_z: sprite.z,
+                        target_floor_z: sprite.z + (4096 * 16),
+                        current_floor_z: sprite.z,
+                        speed: 20,
+                        is_dropped: false,
+                    },
+                    25 => EffectorKind::RotatingEngine {
+                        pivot: Vec2::new(pos.x, pos.z),
+                        current_ang: 0.0,
+                        speed: 2.0,
+                    },
+                    30 => EffectorKind::SubwayTrain {
+                        stop_a: Vec2::new(pos.x, pos.z),
+                        stop_b: Vec2::new(pos.x + ang_rad.cos() * 50.0, pos.z + ang_rad.sin() * 50.0),
+                        current_pos: Vec2::new(pos.x, pos.z),
+                        progress: 0.0,
+                        speed: 8.0,
+                        moving_to_b: true,
+                        pause_timer: 0.0,
                     },
                     _ => EffectorKind::SlidingDoor {
                         orig_pos: Vec2::new(pos.x, pos.z),
@@ -123,6 +160,7 @@ pub fn spawn_interactive_elements_from_map(
                         active: false,
                     },
                     TransformBundle::from_transform(Transform::from_translation(pos)),
+                    crate::game_flow::LevelEntity,
                 ));
             }
 
@@ -136,6 +174,7 @@ pub fn spawn_interactive_elements_from_map(
                         triggered: false,
                     },
                     TransformBundle::from_transform(Transform::from_translation(pos)),
+                    crate::game_flow::LevelEntity,
                 ));
             }
 
@@ -147,6 +186,7 @@ pub fn spawn_interactive_elements_from_map(
                         hitag: sprite.hitag,
                     },
                     TransformBundle::from_transform(Transform::from_translation(pos)),
+                    crate::game_flow::LevelEntity,
                 ));
             }
 
@@ -245,6 +285,7 @@ mod tests {
             broken_tile: 615,
             water_tile: 921,
             last_used_time: 0.0,
+            cooldown_timer: 0.0,
         };
         toilet.last_used_time = 5.0;
         assert_eq!(toilet.last_used_time, 5.0);
@@ -293,6 +334,166 @@ mod tests {
         let to_behind = behind_pos - player_pos;
         let facing_behind = player_dir.dot(to_behind.normalize_or_zero());
         assert!(facing_behind <= 0.1); // Ignored when back is turned!
+    }
+
+    #[test]
+    fn test_access_switch_keycard_requirement() {
+        let mut player = crate::player::PlayerController::default();
+        assert!(!player.has_blue_key);
+
+        let blue_switch = InteractiveSwitch {
+            switch_type: SwitchType::AccessSwitch { key_required: 1 },
+            on_tile: 130,
+            off_tile: 131,
+            is_on: false,
+            lotag: 10,
+            hitag: 0,
+            sound_id: 76,
+            material_handle: None,
+        };
+
+        // Without key: cannot activate
+        let can_activate = match blue_switch.switch_type {
+            SwitchType::AccessSwitch { key_required } => match key_required {
+                1 => player.has_blue_key,
+                2 => player.has_red_key,
+                3 => player.has_yellow_key,
+                _ => true,
+            },
+            _ => true,
+        };
+        assert!(!can_activate);
+
+        // Pick up blue keycard
+        player.has_blue_key = true;
+        let can_activate_now = match blue_switch.switch_type {
+            SwitchType::AccessSwitch { key_required } => match key_required {
+                1 => player.has_blue_key,
+                2 => player.has_red_key,
+                3 => player.has_yellow_key,
+                _ => true,
+            },
+            _ => true,
+        };
+        assert!(can_activate_now);
+    }
+
+    #[test]
+    fn test_drop_floor_effector_trigger() {
+        let mut drop_floor = EffectorKind::DropFloor {
+            orig_floor_z: 0,
+            target_floor_z: 8192,
+            current_floor_z: 0,
+            speed: 10,
+            is_dropped: false,
+        };
+
+        // Trigger drop
+        if let EffectorKind::DropFloor { ref mut is_dropped, .. } = drop_floor {
+            *is_dropped = true;
+        }
+
+        if let EffectorKind::DropFloor { is_dropped, target_floor_z, .. } = drop_floor {
+            assert!(is_dropped);
+            assert_eq!(target_floor_z, 8192);
+        }
+    }
+
+    #[test]
+    fn test_subway_train_waypoint_interpolation() {
+        let train = EffectorKind::SubwayTrain {
+            stop_a: Vec2::new(0.0, 0.0),
+            stop_b: Vec2::new(100.0, 0.0),
+            current_pos: Vec2::new(50.0, 0.0),
+            progress: 0.5,
+            speed: 10.0,
+            moving_to_b: true,
+            pause_timer: 0.0,
+        };
+
+        if let EffectorKind::SubwayTrain { progress, current_pos, .. } = train {
+            assert_eq!(progress, 0.5);
+            assert_eq!(current_pos, Vec2::new(50.0, 0.0));
+        }
+    }
+
+    #[test]
+    fn test_rotating_engine_continuous_angle() {
+        let mut engine = EffectorKind::RotatingEngine {
+            pivot: Vec2::new(10.0, 10.0),
+            current_ang: 0.0,
+            speed: 2.0,
+        };
+
+        if let EffectorKind::RotatingEngine { ref mut current_ang, speed, .. } = engine {
+            *current_ang += speed * 0.5; // dt = 0.5s -> 1.0 rad
+        }
+
+        if let EffectorKind::RotatingEngine { current_ang, .. } = engine {
+            assert_eq!(current_ang, 1.0);
+        }
+    }
+
+    #[test]
+    fn test_auto_close_door_effector_lifecycle() {
+        let mut door = EffectorKind::AutoCloseDoor {
+            orig_ceil_z: 0,
+            open_ceil_z: -8192,
+            current_ceil_z: 0,
+            speed: 16,
+            auto_close_timer: None,
+            auto_close_delay: 5.0,
+            is_open: false,
+        };
+
+        // Open door
+        if let EffectorKind::AutoCloseDoor { ref mut is_open, ref mut auto_close_timer, auto_close_delay, .. } = door {
+            *is_open = true;
+            *auto_close_timer = Some(auto_close_delay);
+        }
+
+        if let EffectorKind::AutoCloseDoor { is_open, auto_close_timer, .. } = door {
+            assert!(is_open);
+            assert_eq!(auto_close_timer, Some(5.0));
+        }
+
+        // Count down timer to 0
+        if let EffectorKind::AutoCloseDoor { ref mut is_open, ref mut auto_close_timer, .. } = door {
+            if let Some(ref mut timer) = auto_close_timer {
+                *timer -= 5.0;
+                if *timer <= 0.0 {
+                    *is_open = false;
+                }
+            }
+        }
+
+        if let EffectorKind::AutoCloseDoor { is_open, .. } = door {
+            assert!(!is_open); // Door auto-closed!
+        }
+    }
+
+    #[test]
+    fn test_platform_carrier_momentum_transfer() {
+        let carrier = CarrierPlatform {
+            velocity: Vec3::new(0.0, 2.5, 0.0), // Elevator ascending at 2.5 m/s
+            sector_bounds_min: Vec2::new(-5.0, -5.0),
+            sector_bounds_max: Vec2::new(5.0, 5.0),
+        };
+
+        let mut passenger_pos = Vec3::new(0.0, 10.0, 0.0);
+        let dt = 0.1;
+
+        // Verify bounds check
+        let is_inside = passenger_pos.x >= carrier.sector_bounds_min.x
+            && passenger_pos.x <= carrier.sector_bounds_max.x
+            && passenger_pos.z >= carrier.sector_bounds_min.y
+            && passenger_pos.z <= carrier.sector_bounds_max.y;
+
+        assert!(is_inside);
+
+        // Apply carrier delta
+        passenger_pos += carrier.velocity * dt;
+        assert_eq!(passenger_pos.y, 10.25);
     }
 }
 

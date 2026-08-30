@@ -13,6 +13,11 @@ pub mod combat;
 pub mod audio;
 pub mod hud;
 pub mod game_flow;
+pub mod campaign;
+pub mod save;
+pub mod demo;
+pub mod config;
+pub mod net;
 
 pub type Player = player::PlayerController;
 
@@ -25,7 +30,6 @@ use grp::Grp;
 use art::Art;
 use palette::Palette;
 use map::Map;
-use kwv::Kwv;
 use bevy_rapier3d::prelude::*;
 use builder::MapMeshBuilder;
 
@@ -79,46 +83,52 @@ fn main() {
         .add_plugins(audio::DukeAudioPlugin)
         .add_plugins(hud::DukeHudPlugin)
         .add_plugins(game_flow::GameFlowPlugin)
-        .insert_resource(DukeSounds::default())
+        .add_plugins(campaign::CampaignPlugin)
+        .add_plugins(save::SaveLoadPlugin)
+        .add_plugins(demo::DemoPlugin)
+        .add_plugins(config::ConfigPlugin)
+        .add_plugins(net::NetPlugin)
+        .init_resource::<palette::PaletteFlashState>()
         .configure_sets(Update, (
-            GameSet::Input,
-            GameSet::Movement,
-            GameSet::Combat,
-            GameSet::Interactivity,
-            GameSet::Animation,
+            GameSet::Input.run_if(in_state(game_flow::GamePhase::Playing)),
+            GameSet::Movement.run_if(in_state(game_flow::GamePhase::Playing)),
+            GameSet::Combat.run_if(in_state(game_flow::GamePhase::Playing)),
+            GameSet::Interactivity.run_if(in_state(game_flow::GamePhase::Playing)),
+            GameSet::Animation.run_if(in_state(game_flow::GamePhase::Playing)),
             GameSet::RenderSync,
         ).chain())
         .add_systems(Startup, setup)
         .add_systems(Update, (
             (player_look, cursor_grab, emit_player_interaction).in_set(GameSet::Input),
-            (play_random_sound, update_weapon).in_set(GameSet::Combat),
+            (play_duke_quotes, update_weapon).in_set(GameSet::Combat),
             (animation::update_engine_clock, animation::update_tile_animations).in_set(GameSet::Animation),
-            (update_billboards, sky::update_skybox).in_set(GameSet::RenderSync),
+            (update_billboards, sky::update_skybox, capture_debug_screenshot).in_set(GameSet::RenderSync),
         ))
         .run();
 }
 
-#[derive(Resource, Default)]
-struct DukeSounds {
-    handles: Vec<Handle<AudioSource>>,
+fn capture_debug_screenshot(
+    main_window: Query<Entity, With<bevy::window::PrimaryWindow>>,
+    mut screenshot_manager: ResMut<bevy::render::view::screenshot::ScreenshotManager>,
+    keys: Res<ButtonInput<KeyCode>>,
+) {
+    if keys.just_pressed(KeyCode::F12) || keys.just_pressed(KeyCode::F10) {
+        if let Ok(window_entity) = main_window.get_single() {
+            let path = "debug_screenshot.png";
+            let _ = screenshot_manager.save_screenshot_to_disk(window_entity, path);
+            println!("Saved in-game screenshot to {}", path);
+        }
+    }
 }
 
-fn play_random_sound(
+fn play_duke_quotes(
     keys: Res<ButtonInput<KeyCode>>,
-    sounds: Res<DukeSounds>,
-    mut commands: Commands,
+    mut voice_events: EventWriter<audio::PlayDukeVoiceEvent>,
 ) {
-    if keys.just_pressed(KeyCode::KeyE) {
-        if !sounds.handles.is_empty() {
-            let idx = rand::random::<usize>() % sounds.handles.len();
-            if let Some(handle) = sounds.handles.get(idx) {
-                println!("Playing random Duke sound index: {}", idx);
-                commands.spawn(AudioBundle {
-                    source: handle.clone(),
-                    ..default()
-                });
-            }
-        }
+    // Press 'T' for authentic Duke Nukem voice taunt / speech quote!
+    if keys.just_pressed(KeyCode::KeyT) {
+        println!("Triggering Duke Nukem voice quote!");
+        voice_events.send(audio::PlayDukeVoiceEvent { name: None });
     }
 }
 
@@ -134,8 +144,6 @@ fn setup(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut images: ResMut<Assets<Image>>,
-    mut audio_sources: ResMut<Assets<AudioSource>>,
-    mut duke_sounds: ResMut<DukeSounds>,
 ) {
     let grp_path = find_grp_path();
     let mut tile_textures = std::collections::HashMap::new();
@@ -188,20 +196,6 @@ fn setup(
                 println!("Total ART files found in GRP: {}", art_files_found);
             }
         }
-
-        if let Ok(kwv_data) = grp.read_file("WAVES.KWV") {
-            if let Ok(kwv) = Kwv::from_bytes(&kwv_data) {
-                println!("Loaded {} sounds from WAVES.KWV", kwv.waves.len());
-                for wave in kwv.waves {
-                    if wave.data.is_empty() { continue; }
-                    let wav_bytes = wave.to_wav_bytes();
-                    let source = AudioSource {
-                        bytes: wav_bytes.into(),
-                    };
-                    duke_sounds.handles.push(audio_sources.add(source));
-                }
-            }
-        }
     }
 
     let default_material = materials.add(Color::srgb(0.5, 0.5, 0.6));
@@ -223,9 +217,12 @@ fn setup(
 
     commands.insert_resource(GameAssets {
         tile_textures: tile_textures.clone(),
+        tile_sizes: tile_sizes.clone(),
+        picanm_map: picanm_map.clone(),
         default_material: default_material.clone(),
         spark_material,
         spark_mesh,
+        grp_path: grp_path.clone(),
     });
 
     let mut start_pos = Vec3::new(0.0, 1.5, 5.0);
@@ -235,15 +232,24 @@ fn setup(
     println!("Attempting to load map {} from GRP", map_name);
     
     if let Ok(grp) = Grp::open(&grp_path) {
+        // Initialize CON Scripting Engine from GRP (or built-in fallback)
+        let con_engine = scripting::ConScriptEngine::from_grp(&grp);
+        commands.insert_resource(con_engine);
+
         if let Ok(map_data) = grp.read_file(map_name) {
             if let Ok(map) = Map::from_bytes(&map_data) {
                 println!("Map loaded successfully: {} sectors, {} walls, {} sprites", map.sectors.len(), map.walls.len(), map.sprites.len());
             
                 // Build units to meters: 1024 units ~= 1 meter (approx)
-                // Build Z units are 16x smaller
+                let floor_y = if (map.cursectnum as usize) < map.sectors.len() {
+                    map.sectors[map.cursectnum as usize].get_floor_y_at(&map.walls, map.posx, map.posy)
+                } else {
+                    -(map.posz as f32) / (1024.0 * 16.0) - 0.85
+                };
+
                 start_pos = Vec3::new(
                     map.posx as f32 / 1024.0,
-                    -(map.posz as f32) / (1024.0 * 16.0),
+                    floor_y + 0.85,
                     map.posy as f32 / 1024.0,
                 );
                 start_yaw = -(map.ang as f32 / 2048.0) * std::f32::consts::TAU + std::f32::consts::FRAC_PI_2;
@@ -270,6 +276,9 @@ fn setup(
                 }
             }
         }
+    } else {
+        let con_engine = scripting::ConScriptEngine::from_source(scripting::DEFAULT_CORE_CON_SCRIPT).unwrap();
+        commands.insert_resource(con_engine);
     }
 
     commands.spawn(PointLightBundle {
@@ -301,15 +310,25 @@ fn setup(
     let player_entity = commands.spawn((
         player::PlayerController {
             yaw: start_yaw,
+            spawn_position: start_pos,
             ..default()
         },
-        TransformBundle::from_transform(Transform::from_translation(start_pos + Vec3::Y * 0.5)),
+        TransformBundle::from_transform(Transform::from_translation(start_pos)),
         RigidBody::KinematicPositionBased,
         Collider::capsule_y(0.5, 0.3),
         LockedAxes::ROTATION_LOCKED, // Prevent the player from tipping over
         KinematicCharacterController {
             up: Vec3::Y,
-            offset: CharacterLength::Relative(0.01),
+            offset: CharacterLength::Absolute(0.02),
+            slide: true,
+            autostep: Some(CharacterAutostep {
+                max_height: CharacterLength::Absolute(0.35),
+                min_width: CharacterLength::Absolute(0.1),
+                include_dynamic_bodies: false,
+            }),
+            snap_to_ground: None,
+            max_slope_climb_angle: 45.0f32.to_radians(),
+            min_slope_slide_angle: 60.0f32.to_radians(),
             ..default()
         },
     )).id();
@@ -444,12 +463,15 @@ fn emit_player_interaction(
     }
 }
 
-#[derive(Resource)]
+#[derive(Resource, Clone)]
 pub struct GameAssets {
     pub tile_textures: std::collections::HashMap<i16, Handle<Image>>,
+    pub tile_sizes: std::collections::HashMap<i16, (u32, u32)>,
+    pub picanm_map: std::collections::HashMap<i16, art::PicAnm>,
     pub default_material: Handle<StandardMaterial>,
     pub spark_material: Handle<StandardMaterial>,
     pub spark_mesh: Handle<Mesh>,
+    pub grp_path: String,
 }
 
 fn update_weapon(
@@ -461,7 +483,7 @@ fn update_weapon(
     barrels: Query<&Transform, With<interactivity::ExplodingBarrel>>,
     mut explosion_events: EventWriter<interactivity::ExplosionDamageEvent>,
     btn: Res<ButtonInput<MouseButton>>,
-    sounds: Res<DukeSounds>,
+    mut sound_events: EventWriter<audio::PlaySoundEvent>,
     mut commands: Commands,
     rapier_context: Res<RapierContext>,
     assets: Res<GameAssets>,
@@ -496,18 +518,8 @@ fn update_weapon(
             // "Fire" recoil
             weapon.fire_timer = 0.5; 
 
-            // Play firing sound
-            if !sounds.handles.is_empty() {
-                // The pistol sound index depends on the KWV file structure. We will just play index 5 for now.
-                let fire_sound_idx = 5.min(sounds.handles.len() - 1);
-                if let Some(handle) = sounds.handles.get(fire_sound_idx) {
-                    println!("Playing fire sound at index: {}", fire_sound_idx);
-                    commands.spawn(AudioBundle {
-                        source: handle.clone(),
-                        ..default()
-                    });
-                }
-            }
+            // Play firing sound (PISTOL_FIRE = 3)
+            sound_events.send(audio::PlaySoundEvent { sound_id: 3 });
 
             // Hitscan Logic
             let ray_pos = camera_transform.translation;
@@ -543,15 +555,7 @@ fn update_weapon(
                     }
                 }
 
-                if let Some(handle) = sounds.handles.get(hit_sound_idx) {
-                    commands.spawn((
-                        AudioBundle {
-                            source: handle.clone(),
-                            ..default()
-                        },
-                        TransformBundle::from_transform(Transform::from_translation(hit_point)),
-                    ));
-                }
+                sound_events.send(audio::PlaySoundEvent { sound_id: hit_sound_idx });
 
                 // Spawn a bullet hole decal (SHOTSPARK1 is tile 2595) using pre-cached material
                 let spark_mat = assets.spark_material.clone();
@@ -582,16 +586,16 @@ fn update_weapon(
 fn cursor_grab(
     mut windows: Query<&mut Window, With<PrimaryWindow>>,
     btn: Res<ButtonInput<MouseButton>>,
-    key: Res<ButtonInput<KeyCode>>,
+    state: Res<State<game_flow::GamePhase>>,
 ) {
     let Ok(mut window) = windows.get_single_mut() else { return; };
 
-    if btn.just_pressed(MouseButton::Left) {
-        window.cursor.grab_mode = CursorGrabMode::Locked;
-        window.cursor.visible = false;
-    }
-
-    if key.just_pressed(KeyCode::Escape) {
+    if *state.get() == game_flow::GamePhase::Playing {
+        if btn.just_pressed(MouseButton::Left) {
+            window.cursor.grab_mode = CursorGrabMode::Locked;
+            window.cursor.visible = false;
+        }
+    } else {
         window.cursor.grab_mode = CursorGrabMode::None;
         window.cursor.visible = true;
     }

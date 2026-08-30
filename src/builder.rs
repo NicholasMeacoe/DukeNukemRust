@@ -150,7 +150,7 @@ impl<'a> MapMeshBuilder<'a> {
             }
             let path = path_builder.build();
 
-            if tessellator
+            let lyon_ok = tessellator
                 .tessellate_path(
                     &path,
                     &FillOptions::default(),
@@ -158,8 +158,25 @@ impl<'a> MapMeshBuilder<'a> {
                         [vertex.position().x, vertex.position().y]
                     }),
                 )
-                .is_err()
-            {
+                .is_ok();
+
+            // Robust Fallback: if Lyon produced 0 triangles or failed on complex/self-intersecting loops,
+            // use guaranteed ear-clipping and fan triangulation across the loops
+            if !lyon_ok || buffers.indices.is_empty() {
+                buffers.vertices.clear();
+                buffers.indices.clear();
+                for poly in &loops {
+                    if poly.len() < 3 { continue; }
+                    let base_idx = buffers.vertices.len() as u32;
+                    for p in poly {
+                        buffers.vertices.push([p.x, p.y]);
+                    }
+                    let indices = triangulate_polygon_ear_clipping(poly, base_idx);
+                    buffers.indices.extend(indices);
+                }
+            }
+
+            if buffers.indices.is_empty() {
                 continue;
             }
 
@@ -214,10 +231,10 @@ impl<'a> MapMeshBuilder<'a> {
                     .iter()
                     .map(|v| Vect::new(v[0], v[1], v[2]))
                     .collect();
-                let floor_collider_indices: Vec<[u32; 3]> = floor_indices
-                    .chunks(3)
-                    .map(|c| [c[0], c[1], c[2]])
-                    .collect();
+                let mut floor_collider_indices: Vec<[u32; 3]> = Vec::new();
+                for c in floor_indices.chunks(3) {
+                    floor_collider_indices.push([c[0], c[1], c[2]]);
+                }
 
                 if !floor_collider_indices.is_empty() {
                     let mut entity_cmds = commands.spawn((
@@ -232,6 +249,7 @@ impl<'a> MapMeshBuilder<'a> {
                             sector_idx: sec_idx,
                             orig_translation: Vec3::ZERO,
                         },
+                        crate::game_flow::LevelEntity,
                     ));
 
                     // Check for tile animation on floor
@@ -302,10 +320,11 @@ impl<'a> MapMeshBuilder<'a> {
                     .iter()
                     .map(|v| Vect::new(v[0], v[1], v[2]))
                     .collect();
-                let ceil_collider_indices: Vec<[u32; 3]> = ceil_indices
-                    .chunks(3)
-                    .map(|c| [c[0], c[1], c[2]])
-                    .collect();
+                let mut ceil_collider_indices: Vec<[u32; 3]> = Vec::new();
+                for c in ceil_indices.chunks(3) {
+                    ceil_collider_indices.push([c[0], c[1], c[2]]);
+                    ceil_collider_indices.push([c[0], c[2], c[1]]);
+                }
 
                 if !ceil_collider_indices.is_empty() {
                     let mut entity_cmds = commands.spawn((
@@ -320,6 +339,7 @@ impl<'a> MapMeshBuilder<'a> {
                             sector_idx: sec_idx,
                             orig_translation: Vec3::ZERO,
                         },
+                        crate::game_flow::LevelEntity,
                     ));
 
                     // Check for tile animation on ceiling
@@ -562,7 +582,10 @@ impl<'a> MapMeshBuilder<'a> {
             .iter()
             .map(|v| Vect::new(v[0], v[1], v[2]))
             .collect();
-        let collider_indices: Vec<[u32; 3]> = vec![[0, 1, 2], [0, 2, 3]];
+        let collider_indices: Vec<[u32; 3]> = vec![
+            [0, 1, 2], [0, 2, 3],
+            [0, 2, 1], [0, 3, 2], // Double-sided wall collision
+        ];
 
         let mut entity_cmds = commands.spawn((
             PbrBundle {
@@ -574,11 +597,12 @@ impl<'a> MapMeshBuilder<'a> {
                 sector_idx: sec_idx,
                 orig_translation: Vec3::ZERO,
             },
+            crate::game_flow::LevelEntity,
         ));
 
         if is_solid {
             entity_cmds.insert((
-                RigidBody::KinematicPositionBased,
+                RigidBody::Fixed,
                 Collider::trimesh(collider_vertices, collider_indices),
             ));
         }
@@ -631,6 +655,7 @@ impl<'a> MapMeshBuilder<'a> {
                         health: if is_enemy { 100 } else { 10 },
                         _picnum: sprite.picnum,
                     },
+                    crate::game_flow::LevelEntity,
                 ));
 
                 // Attach Phase 4 Interactive Components directly to visual entities!
@@ -648,8 +673,184 @@ impl<'a> MapMeshBuilder<'a> {
                             material_handle: Some(sprite_mat.clone()),
                         });
                     }
-                    // WATERFOUNTAIN
-                    563 => {
+                    // KEYCARDS (Tiles 175 = Blue, 176 = Red, 177 = Yellow)
+                    175 => {
+                        entity_cmds.insert(crate::interactivity::KeycardPickup { key_type: 1 });
+                    }
+                    176 => {
+                        entity_cmds.insert(crate::interactivity::KeycardPickup { key_type: 2 });
+                    }
+                    177 => {
+                        entity_cmds.insert(crate::interactivity::KeycardPickup { key_type: 3 });
+                    }
+                    // HEALTH & ARMOR PICKUPS
+                    51 => {
+                        entity_cmds.insert(crate::interactivity::ItemPickup {
+                            kind: crate::interactivity::PickupKind::SmallMedkit,
+                            respawn_timer: None,
+                        });
+                    }
+                    52 => {
+                        entity_cmds.insert(crate::interactivity::ItemPickup {
+                            kind: crate::interactivity::PickupKind::LargeMedkit,
+                            respawn_timer: None,
+                        });
+                    }
+                    55 => {
+                        entity_cmds.insert(crate::interactivity::ItemPickup {
+                            kind: crate::interactivity::PickupKind::AtomicHealth,
+                            respawn_timer: None,
+                        });
+                    }
+                    56 => {
+                        entity_cmds.insert(crate::interactivity::ItemPickup {
+                            kind: crate::interactivity::PickupKind::ArmorVest,
+                            respawn_timer: None,
+                        });
+                    }
+                    // AMMO PICKUPS
+                    40 => {
+                        entity_cmds.insert(crate::interactivity::ItemPickup {
+                            kind: crate::interactivity::PickupKind::PistolClip,
+                            respawn_timer: None,
+                        });
+                    }
+                    44 => {
+                        entity_cmds.insert(crate::interactivity::ItemPickup {
+                            kind: crate::interactivity::PickupKind::ChaingunBox,
+                            respawn_timer: None,
+                        });
+                    }
+                    47 => {
+                        entity_cmds.insert(crate::interactivity::ItemPickup {
+                            kind: crate::interactivity::PickupKind::RpgRocket,
+                            respawn_timer: None,
+                        });
+                    }
+                    48 => {
+                        entity_cmds.insert(crate::interactivity::ItemPickup {
+                            kind: crate::interactivity::PickupKind::PipebombBox,
+                            respawn_timer: None,
+                        });
+                    }
+                    49 => {
+                        entity_cmds.insert(crate::interactivity::ItemPickup {
+                            kind: crate::interactivity::PickupKind::ShotgunBox,
+                            respawn_timer: None,
+                        });
+                    }
+                    42 => {
+                        entity_cmds.insert(crate::interactivity::ItemPickup {
+                            kind: crate::interactivity::PickupKind::ShrinkerAmmo,
+                            respawn_timer: None,
+                        });
+                    }
+                    45 => {
+                        entity_cmds.insert(crate::interactivity::ItemPickup {
+                            kind: crate::interactivity::PickupKind::DevastatorBox,
+                            respawn_timer: None,
+                        });
+                    }
+                    46 => {
+                        entity_cmds.insert(crate::interactivity::ItemPickup {
+                            kind: crate::interactivity::PickupKind::FreezeAmmo,
+                            respawn_timer: None,
+                        });
+                    }
+                    // INVENTORY ITEM PICKUPS
+                    57 => {
+                        entity_cmds.insert(crate::interactivity::ItemPickup {
+                            kind: crate::interactivity::PickupKind::Steroids,
+                            respawn_timer: None,
+                        });
+                    }
+                    58 => {
+                        entity_cmds.insert(crate::interactivity::ItemPickup {
+                            kind: crate::interactivity::PickupKind::Jetpack,
+                            respawn_timer: None,
+                        });
+                    }
+                    59 => {
+                        entity_cmds.insert(crate::interactivity::ItemPickup {
+                            kind: crate::interactivity::PickupKind::ScubaTank,
+                            respawn_timer: None,
+                        });
+                    }
+                    60 => {
+                        entity_cmds.insert(crate::interactivity::ItemPickup {
+                            kind: crate::interactivity::PickupKind::NightvisionGoggles,
+                            respawn_timer: None,
+                        });
+                    }
+                    61 => {
+                        entity_cmds.insert(crate::interactivity::ItemPickup {
+                            kind: crate::interactivity::PickupKind::ProtectiveBoots,
+                            respawn_timer: None,
+                        });
+                    }
+                    62 => {
+                        entity_cmds.insert(crate::interactivity::ItemPickup {
+                            kind: crate::interactivity::PickupKind::Holoduke,
+                            respawn_timer: None,
+                        });
+                    }
+                    // WEAPONS ON GROUND
+                    21 => {
+                        entity_cmds.insert(crate::interactivity::ItemPickup {
+                            kind: crate::interactivity::PickupKind::WeaponPistol,
+                            respawn_timer: None,
+                        });
+                    }
+                    22 => {
+                        entity_cmds.insert(crate::interactivity::ItemPickup {
+                            kind: crate::interactivity::PickupKind::WeaponShotgun,
+                            respawn_timer: None,
+                        });
+                    }
+                    23 => {
+                        entity_cmds.insert(crate::interactivity::ItemPickup {
+                            kind: crate::interactivity::PickupKind::WeaponChaingun,
+                            respawn_timer: None,
+                        });
+                    }
+                    24 => {
+                        entity_cmds.insert(crate::interactivity::ItemPickup {
+                            kind: crate::interactivity::PickupKind::WeaponRpg,
+                            respawn_timer: None,
+                        });
+                    }
+                    25 => {
+                        entity_cmds.insert(crate::interactivity::ItemPickup {
+                            kind: crate::interactivity::PickupKind::WeaponPipebomb,
+                            respawn_timer: None,
+                        });
+                    }
+                    26 => {
+                        entity_cmds.insert(crate::interactivity::ItemPickup {
+                            kind: crate::interactivity::PickupKind::WeaponShrinker,
+                            respawn_timer: None,
+                        });
+                    }
+                    27 => {
+                        entity_cmds.insert(crate::interactivity::ItemPickup {
+                            kind: crate::interactivity::PickupKind::WeaponDevastator,
+                            respawn_timer: None,
+                        });
+                    }
+                    28 => {
+                        entity_cmds.insert(crate::interactivity::ItemPickup {
+                            kind: crate::interactivity::PickupKind::WeaponTripbomb,
+                            respawn_timer: None,
+                        });
+                    }
+                    29 => {
+                        entity_cmds.insert(crate::interactivity::ItemPickup {
+                            kind: crate::interactivity::PickupKind::WeaponFreezer,
+                            respawn_timer: None,
+                        });
+                    }
+                    // WATER FOUNTAIN
+                    564 | 565 => {
                         entity_cmds.insert(crate::interactivity::WaterFountain {
                             uses_left: 10,
                             is_broken: false,
@@ -663,6 +864,26 @@ impl<'a> MapMeshBuilder<'a> {
                             broken_tile: if sprite.picnum == 569 { 615 } else { 573 },
                             water_tile: 921,
                             last_used_time: 0.0,
+                            cooldown_timer: 0.0,
+                        });
+                    }
+                    // VIEWSCREEN CRT MONITOR
+                    499 | 502 => {
+                        entity_cmds.insert(crate::interactivity::ViewscreenProp {
+                            camera_tag: sprite.hitag,
+                            is_active: true,
+                            is_broken: false,
+                            broken_tile: 501,
+                            scanline_timer: 0.0,
+                        });
+                    }
+                    // SECURITY CAMERA (CAMERA1)
+                    500 => {
+                        entity_cmds.insert(crate::interactivity::SecurityCamera {
+                            tag: sprite.hitag,
+                            sweep_angle: 0.0,
+                            sweep_speed: 1.0,
+                            base_yaw: sprite.ang as f32,
                         });
                     }
                     // EXPLODING BARREL
@@ -692,15 +913,179 @@ impl<'a> MapMeshBuilder<'a> {
                             sector_idx: Some(sprite.sectnum as usize),
                         });
                     }
-                    // ENEMIES
-                    2000 => {
-                        entity_cmds.insert(crate::combat::EnemyActor::new_pigcop());
+                    // ENEMIES & BOSSES
+                    // 1. Assault Trooper & Captain (1680..=1744)
+                    1680..=1744 => {
+                        let is_captain = sprite.pal == 21;
+                        let (enemy, actor_hp) = if is_captain {
+                            (crate::combat::EnemyActor::new_captain(), 60)
+                        } else {
+                            (crate::combat::EnemyActor::new_liztroop(), 30)
+                        };
+                        let is_dormant = matches!(sprite.picnum, 1682 | 1741 | 1742 | 1744);
+                        let is_jetpack = sprite.picnum == 1725;
+
+                        entity_cmds.insert((
+                            enemy,
+                            crate::scripting::ConActor::new(1680, sprite.sectnum, sprite.ang, actor_hp),
+                            crate::combat::SituationalSpawn {
+                                initial_picnum: sprite.picnum,
+                                is_dormant,
+                            },
+                        ));
+                        if is_jetpack {
+                            entity_cmds.insert(crate::combat::FlyingActor::default());
+                        }
                     }
-                    1680 => {
-                        entity_cmds.insert(crate::combat::EnemyActor::new_liztroop());
+                    // 2. Pigcop (2000, 2001, 2045)
+                    2000 | 2001 | 2045 => {
+                        entity_cmds.insert((
+                            crate::combat::EnemyActor::new_pigcop(),
+                            crate::scripting::ConActor::new(2000, sprite.sectnum, sprite.ang, 100),
+                            crate::combat::SituationalSpawn {
+                                initial_picnum: sprite.picnum,
+                                is_dormant: sprite.picnum == 2001,
+                            },
+                        ));
                     }
-                    1820 => {
-                        entity_cmds.insert(crate::combat::EnemyActor::new_octabrain());
+                    // 3. Pigcop Recon Car (1960)
+                    1960 => {
+                        entity_cmds.insert((
+                            crate::combat::EnemyActor::new_recon(),
+                            crate::scripting::ConActor::new(1960, sprite.sectnum, sprite.ang, 50),
+                            crate::combat::FlyingActor::default(),
+                        ));
+                    }
+                    // 4. Pigcop Riot Tank (1975)
+                    1975 => {
+                        entity_cmds.insert((
+                            crate::combat::EnemyActor::new_tank(),
+                            crate::scripting::ConActor::new(1975, sprite.sectnum, sprite.ang, 500),
+                        ));
+                    }
+                    // 5. Octabrain (1820, 1821)
+                    1820 | 1821 => {
+                        entity_cmds.insert((
+                            crate::combat::EnemyActor::new_octabrain(),
+                            crate::scripting::ConActor::new(1820, sprite.sectnum, sprite.ang, 175),
+                            crate::combat::SituationalSpawn {
+                                initial_picnum: sprite.picnum,
+                                is_dormant: sprite.picnum == 1821,
+                            },
+                            crate::combat::FlyingActor::default(),
+                        ));
+                    }
+                    // 6. Protozoid Egg & Slimer (675, 2370)
+                    675 => {
+                        entity_cmds.insert((
+                            crate::combat::EnemyActor::new_egg(),
+                            crate::scripting::ConActor::new(675, sprite.sectnum, sprite.ang, 20),
+                            crate::combat::SituationalSpawn {
+                                initial_picnum: 675,
+                                is_dormant: true,
+                            },
+                        ));
+                    }
+                    2370 => {
+                        entity_cmds.insert((
+                            crate::combat::EnemyActor::new_slimer(),
+                            crate::scripting::ConActor::new(2370, sprite.sectnum, sprite.ang, 1),
+                        ));
+                    }
+                    // 7. Enforcer (2120, 2121, 2150, 2160, 2165)
+                    2120..=2165 => {
+                        entity_cmds.insert((
+                            crate::combat::EnemyActor::new_enforcer(),
+                            crate::scripting::ConActor::new(2120, sprite.sectnum, sprite.ang, 120),
+                            crate::combat::SituationalSpawn {
+                                initial_picnum: sprite.picnum,
+                                is_dormant: sprite.picnum == 2121,
+                            },
+                        ));
+                    }
+                    // 8. Assault Commander (1920, 1921)
+                    1920 | 1921 => {
+                        entity_cmds.insert((
+                            crate::combat::EnemyActor::new_commander(),
+                            crate::scripting::ConActor::new(1920, sprite.sectnum, sprite.ang, 350),
+                            crate::combat::SituationalSpawn {
+                                initial_picnum: sprite.picnum,
+                                is_dormant: sprite.picnum == 1921,
+                            },
+                            crate::combat::FlyingActor::default(),
+                        ));
+                    }
+                    // 9. Sentry Drone (1880)
+                    1880 => {
+                        entity_cmds.insert((
+                            crate::combat::EnemyActor::new_drone(),
+                            crate::scripting::ConActor::new(1880, sprite.sectnum, sprite.ang, 150),
+                            crate::combat::FlyingActor::default(),
+                        ));
+                    }
+                    // 10. Shark (1550)
+                    1550 => {
+                        entity_cmds.insert((
+                            crate::combat::EnemyActor::new_shark(),
+                            crate::scripting::ConActor::new(1550, sprite.sectnum, sprite.ang, 35),
+                            crate::combat::FlyingActor::default(),
+                        ));
+                    }
+                    // 11. Protector Drone (4610, 4611, 4670, 4690)
+                    4610 | 4611 | 4670 | 4690 => {
+                        entity_cmds.insert((
+                            crate::combat::EnemyActor::new_protector_drone(),
+                            crate::scripting::ConActor::new(4610, sprite.sectnum, sprite.ang, 300),
+                            crate::combat::SituationalSpawn {
+                                initial_picnum: sprite.picnum,
+                                is_dormant: sprite.picnum == 4670 || sprite.picnum == 4611,
+                            },
+                        ));
+                    }
+                    // 12. Turret (2360)
+                    2360 => {
+                        entity_cmds.insert((
+                            crate::combat::EnemyActor::new_turret(),
+                            crate::scripting::ConActor::new(2360, sprite.sectnum, sprite.ang, 40),
+                        ));
+                    }
+                    // 13. Boss 1: Battlelord & Mini-Battlelord (2630, 2631)
+                    2630 | 2631 => {
+                        let is_mini = sprite.pal == 21;
+                        let (enemy, actor_hp) = if is_mini {
+                            (crate::combat::EnemyActor::new_battlelord(true), 1000)
+                        } else {
+                            (crate::combat::EnemyActor::new_battlelord(false), 4500)
+                        };
+                        entity_cmds.insert((
+                            enemy,
+                            crate::scripting::ConActor::new(2630, sprite.sectnum, sprite.ang, actor_hp),
+                            crate::combat::SituationalSpawn {
+                                initial_picnum: sprite.picnum,
+                                is_dormant: sprite.picnum == 2631,
+                            },
+                        ));
+                    }
+                    // 14. Boss 2: Overlord (2710)
+                    2710 => {
+                        entity_cmds.insert((
+                            crate::combat::EnemyActor::new_overlord(),
+                            crate::scripting::ConActor::new(2710, sprite.sectnum, sprite.ang, 4500),
+                        ));
+                    }
+                    // 15. Boss 3: Cycloid Emperor (2760)
+                    2760 => {
+                        entity_cmds.insert((
+                            crate::combat::EnemyActor::new_cycloid(),
+                            crate::scripting::ConActor::new(2760, sprite.sectnum, sprite.ang, 4500),
+                        ));
+                    }
+                    // 16. Boss 4: Alien Queen (4740)
+                    4740 => {
+                        entity_cmds.insert((
+                            crate::combat::EnemyActor::new_queen(),
+                            crate::scripting::ConActor::new(4740, sprite.sectnum, sprite.ang, 6000),
+                        ));
                     }
                     // NUKE BUTTON (Level Exit)
                     142..=145 => {
@@ -725,6 +1110,201 @@ impl<'a> MapMeshBuilder<'a> {
                         });
                     }
                 }
+            }
+        }
+    }
+}
+
+fn triangulate_polygon_ear_clipping(points: &[Vec2], base_idx: u32) -> Vec<u32> {
+    let mut indices = Vec::new();
+    let n = points.len();
+    if n < 3 {
+        return indices;
+    }
+    if n == 3 {
+        return vec![base_idx, base_idx + 1, base_idx + 2];
+    }
+
+    let mut vertex_indices: Vec<usize> = (0..n).collect();
+    let mut count = 0;
+    while vertex_indices.len() > 2 && count < n * 4 {
+        count += 1;
+        let mut ear_found = false;
+        let len = vertex_indices.len();
+        for i in 0..len {
+            let prev = vertex_indices[(i + len - 1) % len];
+            let curr = vertex_indices[i];
+            let next = vertex_indices[(i + 1) % len];
+
+            let a = points[prev];
+            let b = points[curr];
+            let c = points[next];
+
+            let cross = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+            if cross.abs() > 0.00001 {
+                let mut contains_other = false;
+                for &idx in &vertex_indices {
+                    if idx == prev || idx == curr || idx == next {
+                        continue;
+                    }
+                    let p = points[idx];
+                    if point_in_triangle_2d(p, a, b, c) {
+                        contains_other = true;
+                        break;
+                    }
+                }
+
+                if !contains_other {
+                    indices.push(base_idx + prev as u32);
+                    indices.push(base_idx + curr as u32);
+                    indices.push(base_idx + next as u32);
+                    vertex_indices.remove(i);
+                    ear_found = true;
+                    break;
+                }
+            }
+        }
+        if !ear_found {
+            // Fan fallback for remaining vertices
+            let first = vertex_indices[0];
+            for i in 1..vertex_indices.len() - 1 {
+                indices.push(base_idx + first as u32);
+                indices.push(base_idx + vertex_indices[i] as u32);
+                indices.push(base_idx + vertex_indices[i + 1] as u32);
+            }
+            break;
+        }
+    }
+    indices
+}
+
+fn point_in_triangle_2d(p: Vec2, a: Vec2, b: Vec2, c: Vec2) -> bool {
+    let d1 = (p.x - b.x) * (a.y - b.y) - (a.x - b.x) * (p.y - b.y);
+    let d2 = (p.x - c.x) * (b.y - c.y) - (b.x - c.x) * (p.y - c.y);
+    let d3 = (p.x - a.x) * (c.y - a.y) - (c.x - a.x) * (p.y - a.y);
+    let has_neg = (d1 < 0.0) || (d2 < 0.0) || (d3 < 0.0);
+    let has_pos = (d1 > 0.0) || (d2 > 0.0) || (d3 > 0.0);
+    !(has_neg && has_pos)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use lyon_tessellation::math::point;
+    use lyon_tessellation::{BuffersBuilder, FillOptions, FillTessellator, FillVertex, VertexBuffers};
+
+    #[test]
+    fn test_e1l1_all_sectors_tessellation() {
+        if let Ok(grp) = crate::grp::Grp::open("dukenukem3d/duke3d.grp") {
+            if let Ok(map_data) = grp.read_file("E1L1.MAP") {
+                let map = Map::from_bytes(&map_data).unwrap();
+                println!("Testing E1L1.MAP with {} sectors...", map.sectors.len());
+                let mut failed_sectors = 0;
+                let total_sectors = map.sectors.len();
+
+                for (sec_idx, sector) in map.sectors.iter().enumerate() {
+                    let mut loops = Vec::new();
+                    let mut current_loop = Vec::new();
+                    let mut visited_walls = HashSet::new();
+
+                    for i in 0..sector.wallnum {
+                        let wall_idx = (sector.wallptr + i) as usize;
+                        if visited_walls.contains(&wall_idx) || wall_idx >= map.walls.len() {
+                            continue;
+                        }
+
+                        let mut w = wall_idx;
+                        loop {
+                            if visited_walls.contains(&w) || w >= map.walls.len() {
+                                break;
+                            }
+                            visited_walls.insert(w);
+                            let wall = &map.walls[w];
+                            current_loop.push(Vec2::new(
+                                wall.x as f32 / 1024.0,
+                                wall.y as f32 / 1024.0,
+                            ));
+                            let next_w = wall.point2 as usize;
+                            if next_w == wall_idx {
+                                break;
+                            }
+                            if next_w < sector.wallptr as usize
+                                || next_w >= (sector.wallptr + sector.wallnum) as usize
+                            {
+                                break;
+                            }
+                            w = next_w;
+                        }
+                        if !current_loop.is_empty() {
+                            loops.push(std::mem::take(&mut current_loop));
+                        }
+                    }
+
+                    if loops.is_empty() {
+                        println!("Sector {} has NO loops!", sec_idx);
+                        failed_sectors += 1;
+                        continue;
+                    }
+
+                    let mut tessellator = FillTessellator::new();
+                    let mut buffers: VertexBuffers<[f32; 2], u32> = VertexBuffers::new();
+                    let mut path_builder = lyon_tessellation::path::Path::builder();
+                    for poly_points in &loops {
+                        if poly_points.len() < 3 {
+                            continue;
+                        }
+                        path_builder.begin(point(poly_points[0].x, poly_points[0].y));
+                        for p in poly_points.iter().skip(1) {
+                            path_builder.line_to(point(p.x, p.y));
+                        }
+                        path_builder.end(true);
+                    }
+                    let path = path_builder.build();
+
+                    let lyon_ok = tessellator.tessellate_path(
+                        &path,
+                        &FillOptions::default(),
+                        &mut BuffersBuilder::new(&mut buffers, |vertex: FillVertex| {
+                            [vertex.position().x, vertex.position().y]
+                        }),
+                    ).is_ok();
+
+                    if !lyon_ok || buffers.indices.is_empty() {
+                        buffers.vertices.clear();
+                        buffers.indices.clear();
+                        for poly in &loops {
+                            if poly.len() < 3 { continue; }
+                            let base_idx = buffers.vertices.len() as u32;
+                            for p in poly {
+                                buffers.vertices.push([p.x, p.y]);
+                            }
+                            let indices = triangulate_polygon_ear_clipping(poly, base_idx);
+                            buffers.indices.extend(indices);
+                        }
+                    }
+
+                    if buffers.indices.is_empty() {
+                        println!("Sector {} FAILED! wallptr={}, wallnum={}, loops count={}", sec_idx, sector.wallptr, sector.wallnum, loops.len());
+                        failed_sectors += 1;
+                    }
+                }
+
+                println!("Tessellation result: {}/{} succeeded, {} failed", total_sectors - failed_sectors, total_sectors, failed_sectors);
+                assert_eq!(failed_sectors, 0, "All sectors must succeed!");
+            }
+        }
+    }
+
+    #[test]
+    fn test_e1l1_player_start_sector_floor_collider() {
+        if let Ok(grp) = crate::grp::Grp::open("dukenukem3d/duke3d.grp") {
+            if let Ok(map_data) = grp.read_file("E1L1.MAP") {
+                let map = Map::from_bytes(&map_data).unwrap();
+                let sec_idx = map.cursectnum as usize;
+                let sector = &map.sectors[sec_idx];
+                let floor_y = sector.get_floor_y_at(&map.walls, map.posx, map.posy);
+                assert!((floor_y - 9.0625).abs() < 0.001);
+                assert_eq!(sector.floorstat, 100);
             }
         }
     }

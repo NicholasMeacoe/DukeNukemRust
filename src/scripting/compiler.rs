@@ -6,23 +6,33 @@ use crate::scripting::types::*;
 
 pub struct CompiledScript {
     pub bytecode: Vec<i32>,
-    pub actor_script_ptrs: [Option<usize>; MAX_TILES],
-    pub actor_types: [u8; MAX_TILES],
+    pub actor_script_ptrs: Vec<Option<usize>>,
+    pub actor_types: Vec<u8>,
     pub symbols: HashMap<String, i32>,
     pub actions: HashMap<String, ActionDef>,
     pub moves: HashMap<String, MoveDef>,
     pub ais: HashMap<String, AiDef>,
+    pub volumes: Vec<DynamicVolumeDef>,
+    pub skills: Vec<DynamicSkillDef>,
+    pub levels: Vec<DynamicLevelDef>,
+    pub quotes: HashMap<i32, String>,
+    pub sounds: Vec<DynamicSoundDef>,
 }
 
 pub struct Compiler {
     bytecode: Vec<i32>,
-    actor_script_ptrs: [Option<usize>; MAX_TILES],
-    actor_types: [u8; MAX_TILES],
+    actor_script_ptrs: Vec<Option<usize>>,
+    actor_types: Vec<u8>,
     symbols: HashMap<String, i32>,
     actions: HashMap<String, ActionDef>,
     moves: HashMap<String, MoveDef>,
     ais: HashMap<String, AiDef>,
     states: HashMap<String, usize>,
+    volumes: Vec<DynamicVolumeDef>,
+    skills: Vec<DynamicSkillDef>,
+    levels: Vec<DynamicLevelDef>,
+    quotes: HashMap<i32, String>,
+    sounds: Vec<DynamicSoundDef>,
 }
 
 impl Default for Compiler {
@@ -51,13 +61,18 @@ impl Compiler {
 
         Self {
             bytecode: vec![0], // Reserve index 0 so NULL_PTR / STOPPED (0) never collides with real addresses
-            actor_script_ptrs: [None; MAX_TILES],
-            actor_types: [0; MAX_TILES],
+            actor_script_ptrs: vec![None; MAX_TILES],
+            actor_types: vec![0; MAX_TILES],
             symbols,
             actions: HashMap::new(),
             moves: HashMap::new(),
             ais: HashMap::new(),
             states: HashMap::new(),
+            volumes: Vec::new(),
+            skills: Vec::new(),
+            levels: Vec::new(),
+            quotes: HashMap::new(),
+            sounds: Vec::new(),
         }
     }
 
@@ -207,8 +222,126 @@ impl Compiler {
                                 return Err(format!("Actor picnum out of range: {}", picnum));
                             }
                         }
+                        "definevolumename" => {
+                            pos += 1;
+                            let vol_id = self.expect_num_or_symbol(&tokens, &mut pos)? as usize;
+                            let mut title_words = Vec::new();
+                            while pos < tokens.len() {
+                                match &tokens[pos] {
+                                    Token::Str(s) => {
+                                        title_words.push(s.clone());
+                                        pos += 1;
+                                        break;
+                                    }
+                                    Token::Ident(s) => {
+                                        if is_keyword(s) { break; }
+                                        title_words.push(s.clone());
+                                        pos += 1;
+                                    }
+                                    Token::Number(n) => {
+                                        title_words.push(n.to_string());
+                                        pos += 1;
+                                    }
+                                    _ => break,
+                                }
+                            }
+                            let title = title_words.join(" ");
+                            self.volumes.push(DynamicVolumeDef { volume_id: vol_id, title });
+                        }
+                        "defineskillname" => {
+                            pos += 1;
+                            let skill_id = self.expect_num_or_symbol(&tokens, &mut pos)? as usize;
+                            let mut title_words = Vec::new();
+                            while pos < tokens.len() {
+                                match &tokens[pos] {
+                                    Token::Str(s) => {
+                                        title_words.push(s.clone());
+                                        pos += 1;
+                                        break;
+                                    }
+                                    Token::Ident(s) => {
+                                        if is_keyword(s) { break; }
+                                        title_words.push(s.clone());
+                                        pos += 1;
+                                    }
+                                    Token::Number(n) => {
+                                        title_words.push(n.to_string());
+                                        pos += 1;
+                                    }
+                                    _ => break,
+                                }
+                            }
+                            let title = title_words.join(" ");
+                            self.skills.push(DynamicSkillDef { skill_id, title });
+                        }
+                        "definelevelname" => {
+                            pos += 1;
+                            let volume = self.expect_num_or_symbol(&tokens, &mut pos)? as usize;
+                            let level = self.expect_num_or_symbol(&tokens, &mut pos)? as usize;
+                            let filename = self.expect_ident_or_str(&tokens, &mut pos)?;
+                            let par_time_str = self.expect_ident_or_str(&tokens, &mut pos)?;
+                            let three_dr_time_str = self.expect_ident_or_str(&tokens, &mut pos)?;
+                            let mut title_words = Vec::new();
+                            while pos < tokens.len() {
+                                match &tokens[pos] {
+                                    Token::Str(s) => {
+                                        title_words.push(s.clone());
+                                        pos += 1;
+                                        break;
+                                    }
+                                    Token::Ident(s) => {
+                                        if is_keyword(s) { break; }
+                                        title_words.push(s.clone());
+                                        pos += 1;
+                                    }
+                                    Token::Number(n) => {
+                                        title_words.push(n.to_string());
+                                        pos += 1;
+                                    }
+                                    _ => break,
+                                }
+                            }
+                            let title = title_words.join(" ");
+                            self.levels.push(DynamicLevelDef { volume, level, filename, par_time_str, three_dr_time_str, title });
+                        }
+                        "definequote" => {
+                            pos += 1;
+                            let quote_id = self.expect_num_or_symbol(&tokens, &mut pos)?;
+                            let mut text_words = Vec::new();
+                            while pos < tokens.len() {
+                                match &tokens[pos] {
+                                    Token::Str(s) => {
+                                        text_words.push(s.clone());
+                                        pos += 1;
+                                        break;
+                                    }
+                                    Token::Ident(s) => {
+                                        if is_keyword(s) { break; }
+                                        text_words.push(s.clone());
+                                        pos += 1;
+                                    }
+                                    Token::Number(n) => {
+                                        text_words.push(n.to_string());
+                                        pos += 1;
+                                    }
+                                    _ => break,
+                                }
+                            }
+                            self.quotes.insert(quote_id, text_words.join(" "));
+                        }
+                        "definesound" => {
+                            pos += 1;
+                            let sound_id = self.expect_num_or_symbol(&tokens, &mut pos)?;
+                            let filename = self.expect_ident_or_str(&tokens, &mut pos)?;
+                            let pitch1 = self.expect_num_or_symbol(&tokens, &mut pos)?;
+                            let pitch2 = self.expect_num_or_symbol(&tokens, &mut pos)?;
+                            let priority = self.expect_num_or_symbol(&tokens, &mut pos)?;
+                            let sound_type = self.expect_num_or_symbol(&tokens, &mut pos)?;
+                            let volume = self.expect_num_or_symbol(&tokens, &mut pos)?;
+                            self.sounds.push(DynamicSoundDef { sound_id, filename, pitch1, pitch2, priority, sound_type, volume });
+                        }
                         _ => {
-                            // Other top level keywords (definelevelname, definesound, definequote, gamestartup, etc.)
+                            // Other top level keywords
                             pos += 1;
                         }
                     }
@@ -219,12 +352,17 @@ impl Compiler {
 
         Ok(CompiledScript {
             bytecode: self.bytecode.clone(),
-            actor_script_ptrs: self.actor_script_ptrs,
-            actor_types: self.actor_types,
+            actor_script_ptrs: self.actor_script_ptrs.clone(),
+            actor_types: self.actor_types.clone(),
             symbols: self.symbols.clone(),
             actions: self.actions.clone(),
             moves: self.moves.clone(),
             ais: self.ais.clone(),
+            volumes: self.volumes.clone(),
+            skills: self.skills.clone(),
+            levels: self.levels.clone(),
+            quotes: self.quotes.clone(),
+            sounds: self.sounds.clone(),
         })
     }
 
@@ -528,6 +666,27 @@ impl Compiler {
         Err(format!("Expected identifier at pos {}", *pos))
     }
 
+    fn expect_ident_or_str(&self, tokens: &[Token], pos: &mut usize) -> Result<String, String> {
+        if *pos < tokens.len() {
+            match &tokens[*pos] {
+                Token::Ident(s) => {
+                    *pos += 1;
+                    return Ok(s.clone());
+                }
+                Token::Str(s) => {
+                    *pos += 1;
+                    return Ok(s.clone());
+                }
+                Token::Number(n) => {
+                    *pos += 1;
+                    return Ok(n.to_string());
+                }
+                _ => {}
+            }
+        }
+        Err(format!("Expected string or identifier at pos {}", *pos))
+    }
+
     fn expect_num_or_symbol(&self, tokens: &[Token], pos: &mut usize) -> Result<i32, String> {
         if *pos < tokens.len() {
             match &tokens[*pos] {
@@ -564,7 +723,8 @@ pub fn is_keyword(s: &str) -> bool {
     let kw = s.to_lowercase();
     matches!(
         kw.as_str(),
-        "define" | "action" | "move" | "ai" | "state" | "ends" | "actor" | "useractor" | "enda"
+        "define" | "definevolumename" | "defineskillname" | "definelevelname" | "definequote" | "definesound"
+        | "action" | "move" | "ai" | "state" | "ends" | "actor" | "useractor" | "enda"
         | "ifpdistl" | "ifpdistg" | "ifcansee" | "ifhitweapon" | "ifdead" | "sound" | "killit"
         | "else" | "{" | "}" | "ifrnd" | "ifcount" | "ifactioncount" | "ifaction" | "ifmove"
         | "ifai" | "ifactor" | "ifstrength" | "ifwasweapon" | "ifspawnedby" | "ifpinventory"
@@ -664,5 +824,41 @@ mod tests {
 
         assert!(compiled.actor_script_ptrs[2120].is_some());
         assert_eq!(compiled.actor_types[2120], 1); // Enemy
+    }
+
+    #[test]
+    fn test_compiler_dynamic_con_definitions() {
+        let script = r#"
+            definevolumename 0 L.A. MELTDOWN
+            definevolumename 1 LUNAR APOCALYPSE
+            defineskillname 0 PIECE OF CAKE
+            defineskillname 1 LET'S ROCK
+            definelevelname 0 0 E1L1.map 01:45 00:53 HOLLYWOOD HOLOCAUST
+            definelevelname 0 1 E1L2.map 05:10 03:21 RED LIGHT DISTRICT
+            definequote 113 CLIPPING: OFF
+            definesound 78 DUKE_LOOKING_GOOD.VOC 0 0 100 4 255
+        "#;
+
+        let mut compiler = Compiler::new();
+        let compiled = compiler.compile(script).unwrap();
+
+        assert_eq!(compiled.volumes.len(), 2);
+        assert_eq!(compiled.volumes[0].volume_id, 0);
+        assert_eq!(compiled.volumes[0].title, "L.A. MELTDOWN");
+        assert_eq!(compiled.volumes[1].title, "LUNAR APOCALYPSE");
+
+        assert_eq!(compiled.skills.len(), 2);
+        assert_eq!(compiled.skills[0].title, "PIECE OF CAKE");
+
+        assert_eq!(compiled.levels.len(), 2);
+        assert_eq!(compiled.levels[0].filename, "E1L1.map");
+        assert_eq!(compiled.levels[0].par_time_str, "01:45");
+        assert_eq!(compiled.levels[0].title, "HOLLYWOOD HOLOCAUST");
+
+        assert_eq!(compiled.quotes.get(&113).map(|s| s.as_str()), Some("CLIPPING: OFF"));
+
+        assert_eq!(compiled.sounds.len(), 1);
+        assert_eq!(compiled.sounds[0].sound_id, 78);
+        assert_eq!(compiled.sounds[0].filename, "DUKE_LOOKING_GOOD.VOC");
     }
 }

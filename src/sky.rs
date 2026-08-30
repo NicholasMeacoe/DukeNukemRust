@@ -44,6 +44,7 @@ pub fn spawn_skybox(
             ..default()
         },
         SkyboxDome,
+        crate::game_flow::LevelEntity,
     ));
 }
 
@@ -55,6 +56,10 @@ pub fn update_skybox(
         for mut sky_trans in sky_query.iter_mut() {
             sky_trans.translation.x = cam_trans.translation.x;
             sky_trans.translation.z = cam_trans.translation.z;
+            let (yaw, pitch, _) = cam_trans.rotation.to_euler(EulerRot::YXZ);
+            let clamped_pitch = pitch.clamp(-0.75, 0.75);
+            sky_trans.translation.y = 50.0 + clamped_pitch * 20.0;
+            sky_trans.rotation = Quat::from_rotation_y(yaw * 0.5);
         }
     }
 }

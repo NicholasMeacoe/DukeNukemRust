@@ -56,6 +56,8 @@ pub struct InventoryState {
     pub jetpack_amount: i32,       // 0..100
     pub jetpack_active: bool,
     pub air_supply: f32,           // 0..100.0 (suffocation when 0)
+    pub inventory_accumulator: f32,
+    pub drowning_damage_timer: f32,
 }
 
 impl Default for InventoryState {
@@ -73,8 +75,20 @@ impl Default for InventoryState {
             jetpack_amount: 0,
             jetpack_active: false,
             air_supply: 100.0,
+            inventory_accumulator: 0.0,
+            drowning_damage_timer: 0.0,
         }
     }
+}
+
+#[derive(Component, Debug, Clone)]
+pub struct HoloDukeDecoy {
+    pub lifetime: f32,
+}
+
+#[derive(Component, Debug, Clone)]
+pub struct HazardSector {
+    pub damage_per_sec: f32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -105,6 +119,13 @@ pub struct PlayerController {
     pub quick_kick_timer: f32,
     pub pistol_mag: i32, // Current clip (0..12)
     pub devastator_alt_side: bool,
+    pub has_blue_key: bool,
+    pub has_red_key: bool,
+    pub has_yellow_key: bool,
+    pub spawn_position: Vec3,
+    pub velocity_xz: Vec2,
+    pub god_mode: bool,
+    pub no_clip: bool,
 }
 
 impl Default for PlayerController {
@@ -142,6 +163,13 @@ impl Default for PlayerController {
             quick_kick_timer: 0.0,
             pistol_mag: 12,
             devastator_alt_side: false,
+            has_blue_key: false,
+            has_red_key: false,
+            has_yellow_key: false,
+            spawn_position: Vec3::ZERO,
+            velocity_xz: Vec2::ZERO,
+            god_mode: false,
+            no_clip: false,
         }
     }
 }

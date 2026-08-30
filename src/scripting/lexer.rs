@@ -85,32 +85,25 @@ impl<'a> Lexer<'a> {
                 continue;
             }
 
-            // Number (including negative numbers like -10)
-            if ch.is_ascii_digit() || (ch == '-' && self.peek(1).map_or(false, |c| c.is_ascii_digit())) {
+            // Number or Identifier / keyword / formatted string (01:45, E1L1.map, etc.)
+            if ch.is_ascii_digit() || is_ident_char(ch) || (ch == '-' && self.peek(1).map_or(false, |c| c.is_ascii_digit())) {
                 let start = self.pos;
                 if ch == '-' {
                     self.pos += 1;
                 }
-                while self.pos < self.chars.len() && self.chars[self.pos].is_ascii_digit() {
-                    self.pos += 1;
-                }
-                let num_str: String = self.chars[start..self.pos].iter().collect();
-                if let Ok(num) = num_str.parse::<i32>() {
-                    tokens.push(Token::Number(num));
-                } else {
-                    tokens.push(Token::Ident(num_str));
-                }
-                continue;
-            }
-
-            // Identifier or keyword
-            if is_ident_char(ch) {
-                let start = self.pos;
                 while self.pos < self.chars.len() && is_ident_char(self.chars[self.pos]) {
                     self.pos += 1;
                 }
-                let ident: String = self.chars[start..self.pos].iter().collect();
-                tokens.push(Token::Ident(ident));
+                let token_str: String = self.chars[start..self.pos].iter().collect();
+                if let Ok(num) = token_str.parse::<i32>() {
+                    if !token_str.contains(':') && !token_str.contains('.') {
+                        tokens.push(Token::Number(num));
+                    } else {
+                        tokens.push(Token::Ident(token_str));
+                    }
+                } else {
+                    tokens.push(Token::Ident(token_str));
+                }
                 continue;
             }
 
@@ -138,7 +131,7 @@ impl<'a> Lexer<'a> {
 }
 
 fn is_ident_char(ch: char) -> bool {
-    ch.is_alphanumeric() || ch == '_' || ch == '-' || ch == '.' || ch == '$'
+    ch.is_alphanumeric() || ch == '_' || ch == '-' || ch == '.' || ch == '$' || ch == ':'
 }
 
 #[cfg(test)]

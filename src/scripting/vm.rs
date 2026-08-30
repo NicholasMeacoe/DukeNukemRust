@@ -6,8 +6,8 @@ pub const MAX_CALL_DEPTH: usize = 64;
 
 pub struct ConVm {
     pub bytecode: Vec<i32>,
-    pub actor_script_ptrs: [Option<usize>; MAX_TILES],
-    pub actor_types: [u8; MAX_TILES],
+    pub actor_script_ptrs: Vec<Option<usize>>,
+    pub actor_types: Vec<u8>,
 }
 
 pub struct VmActorContext<'a> {
@@ -43,13 +43,63 @@ pub struct VmActorContext<'a> {
     pub player_inventory_deltas: Vec<(i32, i32)>,
     pub debris_events: Vec<(i16, i32)>,
     pub hitradius_events: Vec<(i32, i32, i32, i32, i32)>,
+    pub end_of_game: Option<i32>,
+
+    // --- Player state (populated from PlayerController before VM execution) ---
+    pub player_health: i32,
+    pub player_ang: i16,
+    pub player_on_ground: bool,
+    pub player_jumping_counter: i32,
+    pub player_posz_velocity: i32,
+    pub player_crouching: bool,
+    pub player_xvel: i32,
+    pub player_running: bool,
+    pub player_quick_kick: i32,
+    pub player_shrunk: bool,
+    pub player_jetpack_on: bool,
+    pub player_steroids_active: bool,
+    pub player_dead: bool,
+    pub player_weapon: i32,
+    pub player_kickback: i32,
+    pub player_facing_actor: bool,
+
+    // --- Inventory amounts (for ifpinventory) ---
+    pub player_steroids_amount: i32,
+    pub player_shield_amount: i32,
+    pub player_scuba_amount: i32,
+    pub player_holoduke_amount: i32,
+    pub player_jetpack_amount: i32,
+    pub player_heat_amount: i32,
+    pub player_firstaid_amount: i32,
+    pub player_boot_amount: i32,
+    pub player_got_access: i32,
+
+    // --- World state ---
+    pub sector_lotag: i32,
+    pub sector_ceilingstat: i32,
+    pub is_multiplayer: bool,
+    pub hit_space_pressed: bool,
+
+    // --- Tracking fields ---
+    pub spawned_by_picnum: i16,
+    pub last_hit_weapon: i16,
+
+    // --- AI Conditionals ---
+    pub can_shoot_target: bool,
+    pub bullet_near: bool,
+    pub not_moving: bool,
+
+    // --- Output: directional shoot events (separate from spawned_sprites) ---
+    /// (tile, x, y, z, ang) — the consuming ECS system uses ang to fire projectiles
+    pub shoot_events: Vec<(i16, i32, i32, i32, i16)>,
 }
+
 
 impl ConVm {
     pub fn new(
         bytecode: Vec<i32>,
-        actor_script_ptrs: [Option<usize>; MAX_TILES],
-        actor_types: [u8; MAX_TILES],
+        actor_script_ptrs: Vec<Option<usize>>,
+        actor_types: Vec<u8>,
     ) -> Self {
         Self {
             bytecode,
@@ -66,11 +116,7 @@ impl ConVm {
     /// Executes one tick for an actor.
     pub fn execute(&self, ctx: &mut VmActorContext) {
         let picnum = *ctx.sprite_picnum as usize;
-        if picnum >= MAX_TILES {
-            return;
-        }
-
-        let script_entry = match self.actor_script_ptrs[picnum] {
+        let script_entry = match self.actor_script_ptrs.get(picnum).copied().flatten() {
             Some(entry) => entry,
             None => return,
         };
@@ -274,43 +320,179 @@ impl ConVm {
                 }
 
                 Opcode::IfPHealthL => {
-                    let health = self.get_word(ip + 1).unwrap_or(0);
+                    // Original GAMEDEF.C case 78: parseifelse(sprite[ps[g_p].i].extra < *insptr)
+                    let threshold = self.get_word(ip + 1).unwrap_or(0);
                     let fail_target = self.get_word(ip + 2).unwrap_or(0) as usize;
-                    let cond = health > 0;
+                    let cond = ctx.player_health < threshold;
                     self.handle_if_else(cond, &mut ip, 3, fail_target);
                 }
 
                 Opcode::IfAngDiffL => {
+                    // Original GAMEDEF.C case 111: j = klabs(getincangle(ps[g_p].ang, g_sp->ang)); parseifelse(j <= *insptr);
                     let max_diff = self.get_word(ip + 1).unwrap_or(0);
                     let fail_target = self.get_word(ip + 2).unwrap_or(0) as usize;
-                    let cond = max_diff > 0;
+                    let ang_diff = getincangle(ctx.player_ang, *ctx.sprite_ang).abs() as i32;
+                    let cond = ang_diff <= max_diff;
                     self.handle_if_else(cond, &mut ip, 3, fail_target);
                 }
 
                 Opcode::IfP => {
-                    let _flags = self.get_word(ip + 1).unwrap_or(0);
+                    // Original GAMEDEF.C case 51 (L2722-2778)
+                    let flags = self.get_word(ip + 1).unwrap_or(0);
                     let fail_target = self.get_word(ip + 2).unwrap_or(0) as usize;
-                    let cond = true;
-                    self.handle_if_else(cond, &mut ip, 3, fail_target);
+                    let mut j = false;
+
+                    if (flags & 1) != 0 && ctx.player_xvel >= 0 && ctx.player_xvel < 8 { j = true; }
+                    else if (flags & 2) != 0 && ctx.player_xvel >= 8 && !ctx.player_running { j = true; }
+                    else if (flags & 4) != 0 && ctx.player_xvel >= 8 && ctx.player_running { j = true; }
+                    else if (flags & 8) != 0 && ctx.player_on_ground && ctx.player_crouching { j = true; }
+                    else if (flags & 16) != 0 && !ctx.player_on_ground && ctx.player_posz_velocity > 2048 { j = true; }
+                    else if (flags & 32) != 0 && ctx.player_jumping_counter > 348 { j = true; }
+                    else if (flags & 64) != 0 && ctx.player_health > 0 { j = true; }
+                    else if (flags & 128) != 0 && ctx.player_xvel <= -8 && !ctx.player_running { j = true; }
+                    else if (flags & 256) != 0 && ctx.player_xvel <= -8 && ctx.player_running { j = true; }
+                    else if (flags & 512) != 0 && (ctx.player_quick_kick > 0 || (ctx.player_weapon == 0 && ctx.player_kickback > 0)) { j = true; }
+                    else if (flags & 1024) != 0 && ctx.player_shrunk { j = true; }
+                    else if (flags & 2048) != 0 && ctx.player_jetpack_on { j = true; }
+                    else if (flags & 4096) != 0 && ctx.player_steroids_active { j = true; }
+                    else if (flags & 8192) != 0 && ctx.player_on_ground { j = true; }
+                    else if (flags & 16384) != 0 && !ctx.player_shrunk && ctx.player_health > 0 { j = true; }
+                    else if (flags & 32768) != 0 && ctx.player_dead { j = true; }
+                    else if (flags & 65536) != 0 && ctx.player_facing_actor { j = true; }
+
+                    self.handle_if_else(j, &mut ip, 3, fail_target);
                 }
 
                 Opcode::IfPInventory => {
-                    let _item = self.get_word(ip + 1).unwrap_or(0);
-                    let _amount = self.get_word(ip + 2).unwrap_or(0);
+                    // Original GAMEDEF.C case 75 (L2898-2929)
+                    let item = self.get_word(ip + 1).unwrap_or(0);
+                    let amount = self.get_word(ip + 2).unwrap_or(0);
                     let fail_target = self.get_word(ip + 3).unwrap_or(0) as usize;
-                    let cond = true;
+                    let cond = match item {
+                        0 => ctx.player_steroids_amount != amount,
+                        1 => ctx.player_shield_amount != 100,
+                        2 => ctx.player_scuba_amount != amount,
+                        3 => ctx.player_holoduke_amount != amount,
+                        4 => ctx.player_jetpack_amount != amount,
+                        6 => match *ctx.sprite_pal {
+                            0 => (ctx.player_got_access & 1) != 0,
+                            21 => (ctx.player_got_access & 2) != 0,
+                            23 => (ctx.player_got_access & 4) != 0,
+                            _ => false,
+                        },
+                        7 => ctx.player_heat_amount != amount,
+                        9 => ctx.player_firstaid_amount != amount,
+                        10 => ctx.player_boot_amount != amount,
+                        _ => false,
+                    };
                     self.handle_if_else(cond, &mut ip, 4, fail_target);
                 }
 
-                Opcode::IfWasWeapon | Opcode::IfSpawnedBy | Opcode::IfGotWeaponCe => {
+                Opcode::IfWasWeapon => {
+                    // Original GAMEDEF.C case 33: parseifelse(hittype[g_i].picnum == *insptr);
+                    let expected = self.get_word(ip + 1).unwrap_or(0) as i16;
+                    let fail_target = self.get_word(ip + 2).unwrap_or(0) as usize;
+                    let cond = ctx.last_hit_weapon == expected;
+                    self.handle_if_else(cond, &mut ip, 3, fail_target);
+                }
+
+                Opcode::IfSpawnedBy => {
+                    // Original GAMEDEF.C case 59: parseifelse(hittype[g_i].picnum == *insptr);
+                    let expected = self.get_word(ip + 1).unwrap_or(0) as i16;
+                    let fail_target = self.get_word(ip + 2).unwrap_or(0) as usize;
+                    let cond = ctx.spawned_by_picnum == expected;
+                    self.handle_if_else(cond, &mut ip, 3, fail_target);
+                }
+
+                Opcode::IfGotWeaponCe => {
+                    // TODO: Requires coop weapon recording system
                     let fail_target = self.get_word(ip + 2).unwrap_or(0) as usize;
                     self.handle_if_else(false, &mut ip, 3, fail_target);
                 }
 
-                Opcode::IfSquished | Opcode::IfOnWater | Opcode::IfInWater | Opcode::IfOutside
-                | Opcode::IfMultiplayer | Opcode::IfInSpace | Opcode::IfInOuterSpace | Opcode::IfBulletNear
-                | Opcode::IfRespawn | Opcode::IfNotMoving | Opcode::IfAwayFromWall | Opcode::IfNoSounds
-                | Opcode::IfHitSpace | Opcode::IfActorNotStayput | Opcode::IfCanShootTarget => {
+                Opcode::IfOnWater => {
+                    // Original GAMEDEF.C case 43: klabs(g_sp->z - sector[g_sp->sectnum].floorz) < (32<<8) && sector[g_sp->sectnum].lotag == 1
+                    let fail_target = self.get_word(ip + 1).unwrap_or(0) as usize;
+                    let floor_dist = (ctx.registers.floor_z - *ctx.sprite_z).abs();
+                    let cond = floor_dist <= (32 << 8) && ctx.sector_lotag == 1;
+                    self.handle_if_else(cond, &mut ip, 2, fail_target);
+                }
+
+                Opcode::IfInWater => {
+                    // Original GAMEDEF.C case 44: sector[g_sp->sectnum].lotag == 2
+                    let fail_target = self.get_word(ip + 1).unwrap_or(0) as usize;
+                    let cond = ctx.sector_lotag == 2;
+                    self.handle_if_else(cond, &mut ip, 2, fail_target);
+                }
+
+                Opcode::IfOutside => {
+                    // Original GAMEDEF.C case 64: sector[g_sp->sectnum].ceilingstat & 1
+                    let fail_target = self.get_word(ip + 1).unwrap_or(0) as usize;
+                    let cond = (ctx.sector_ceilingstat & 1) != 0;
+                    self.handle_if_else(cond, &mut ip, 2, fail_target);
+                }
+
+                Opcode::IfMultiplayer => {
+                    // Original GAMEDEF.C case 65: ud.multimode > 1
+                    let fail_target = self.get_word(ip + 1).unwrap_or(0) as usize;
+                    let cond = ctx.is_multiplayer;
+                    self.handle_if_else(cond, &mut ip, 2, fail_target);
+                }
+
+                Opcode::IfHitSpace => {
+                    // Original GAMEDEF.C case 63: sync[g_p].bits & (1<<29)
+                    let fail_target = self.get_word(ip + 1).unwrap_or(0) as usize;
+                    let cond = ctx.hit_space_pressed;
+                    self.handle_if_else(cond, &mut ip, 2, fail_target);
+                }
+
+                Opcode::IfNotMoving => {
+                    // Original GAMEDEF.C case 82: (hittype[g_i].movflag & 49152) > 16384
+                    let fail_target = self.get_word(ip + 1).unwrap_or(0) as usize;
+                    let cond = ctx.not_moving || (ctx.registers.mov_flag as i32 & 49152) > 16384;
+                    self.handle_if_else(cond, &mut ip, 2, fail_target);
+                }
+
+                Opcode::IfActorNotStayput => {
+                    // Original GAMEDEF.C case 49: hittype[g_i].actorstayput == -1
+                    let fail_target = self.get_word(ip + 1).unwrap_or(0) as usize;
+                    let cond = ctx.registers.actor_stay_put == -1;
+                    self.handle_if_else(cond, &mut ip, 2, fail_target);
+                }
+
+                Opcode::IfCanShootTarget => {
+                    // Check line of sight and firing angle alignment
+                    let fail_target = self.get_word(ip + 1).unwrap_or(0) as usize;
+                    let cond = ctx.can_shoot_target;
+                    self.handle_if_else(cond, &mut ip, 2, fail_target);
+                }
+
+                Opcode::IfBulletNear => {
+                    // Check if player projectiles are within dodging radius
+                    let fail_target = self.get_word(ip + 1).unwrap_or(0) as usize;
+                    let cond = ctx.bullet_near;
+                    self.handle_if_else(cond, &mut ip, 2, fail_target);
+                }
+
+                Opcode::IfAwayFromWall => {
+                    // TODO: Requires updatesector() wall proximity check
+                    let fail_target = self.get_word(ip + 1).unwrap_or(0) as usize;
+                    self.handle_if_else(true, &mut ip, 2, fail_target);
+                }
+
+                Opcode::IfNoSounds => {
+                    // TODO: Requires tracking sound ownership per-sprite
+                    let fail_target = self.get_word(ip + 1).unwrap_or(0) as usize;
+                    self.handle_if_else(true, &mut ip, 2, fail_target);
+                }
+
+                Opcode::IfSquished => {
+                    // TODO: Requires floor/ceiling crush detection
+                    let fail_target = self.get_word(ip + 1).unwrap_or(0) as usize;
+                    self.handle_if_else(false, &mut ip, 2, fail_target);
+                }
+
+                Opcode::IfInSpace | Opcode::IfInOuterSpace | Opcode::IfRespawn => {
                     let fail_target = self.get_word(ip + 1).unwrap_or(0) as usize;
                     self.handle_if_else(false, &mut ip, 2, fail_target);
                 }
@@ -459,7 +641,7 @@ impl ConVm {
 
                 Opcode::Shoot => {
                     let tile = self.get_word(ip + 1).unwrap_or(0) as i16;
-                    ctx.spawned_sprites.push((tile, *ctx.sprite_x, *ctx.sprite_y, *ctx.sprite_z));
+                    ctx.shoot_events.push((tile, *ctx.sprite_x, *ctx.sprite_y, *ctx.sprite_z, *ctx.sprite_ang));
                     ip += 2;
                 }
 
@@ -476,7 +658,28 @@ impl ConVm {
                     ip += 3;
                 }
 
-                Opcode::SizeTo | Opcode::SizeAt => {
+                Opcode::SizeTo => {
+                    let target_xr = self.get_word(ip + 1).unwrap_or(64) as i32;
+                    let target_yr = self.get_word(ip + 2).unwrap_or(64) as i32;
+
+                    let dx = (target_xr - *ctx.sprite_xrepeat as i32) << 1;
+                    if dx > 0 {
+                        *ctx.sprite_xrepeat = ctx.sprite_xrepeat.saturating_add(1);
+                    } else if dx < 0 {
+                        *ctx.sprite_xrepeat = ctx.sprite_xrepeat.saturating_sub(1);
+                    }
+
+                    let dy = (target_yr - *ctx.sprite_yrepeat as i32) << 1;
+                    if dy > 0 {
+                        *ctx.sprite_yrepeat = ctx.sprite_yrepeat.saturating_add(1);
+                    } else if dy < 0 {
+                        *ctx.sprite_yrepeat = ctx.sprite_yrepeat.saturating_sub(1);
+                    }
+
+                    ip += 3;
+                }
+
+                Opcode::SizeAt => {
                     let xr = self.get_word(ip + 1).unwrap_or(64) as u8;
                     let yr = self.get_word(ip + 2).unwrap_or(64) as u8;
                     *ctx.sprite_xrepeat = xr;
@@ -509,7 +712,13 @@ impl ConVm {
                     ip += 2;
                 }
 
-                Opcode::SleepTime | Opcode::AddKills | Opcode::EndOfGame | Opcode::Debug => {
+                Opcode::EndOfGame => {
+                    let delay = self.get_word(ip + 1).unwrap_or(52);
+                    ctx.end_of_game = Some(delay as i32);
+                    ip += 2;
+                }
+
+                Opcode::SleepTime | Opcode::AddKills | Opcode::Debug => {
                     ip += 2;
                 }
 
@@ -554,6 +763,97 @@ mod tests {
     use super::*;
     use crate::scripting::compiler::Compiler;
 
+    fn create_test_context<'a>(
+        reg: &'a mut ActorRegisters,
+        x: &'a mut i32,
+        y: &'a mut i32,
+        z: &'a mut i32,
+        ang: &'a mut i16,
+        xvel: &'a mut i16,
+        zvel: &'a mut i16,
+        extra: &'a mut i16,
+        picnum: &'a mut i16,
+        sectnum: &'a mut i16,
+        cstat: &'a mut i16,
+        pal: &'a mut u8,
+        xrepeat: &'a mut u8,
+        yrepeat: &'a mut u8,
+        clipdist: &'a mut u8,
+        lotag: &'a mut i16,
+        hitag: &'a mut i16,
+    ) -> VmActorContext<'a> {
+        VmActorContext {
+            sprite_idx: 0,
+            player_idx: 0,
+            dist_to_player: 500,
+            can_see_player: true,
+            hit_by_weapon: false,
+            registers: reg,
+            sprite_x: x,
+            sprite_y: y,
+            sprite_z: z,
+            sprite_ang: ang,
+            sprite_xvel: xvel,
+            sprite_zvel: zvel,
+            sprite_extra: extra,
+            sprite_picnum: picnum,
+            sprite_sectnum: sectnum,
+            sprite_cstat: cstat,
+            sprite_pal: pal,
+            sprite_xrepeat: xrepeat,
+            sprite_yrepeat: yrepeat,
+            sprite_clipdist: clipdist,
+            sprite_lotag: lotag,
+            sprite_hitag: hitag,
+            killit_flag: false,
+            spawned_sprites: Vec::new(),
+            sound_events: Vec::new(),
+            quotes_displayed: Vec::new(),
+            pal_flashes: Vec::new(),
+            player_health_delta: 0,
+            player_ammo_deltas: Vec::new(),
+            player_inventory_deltas: Vec::new(),
+            debris_events: Vec::new(),
+            hitradius_events: Vec::new(),
+            end_of_game: None,
+            player_health: 100,
+            player_ang: 0,
+            player_on_ground: true,
+            player_jumping_counter: 0,
+            player_posz_velocity: 0,
+            player_crouching: false,
+            player_xvel: 0,
+            player_running: false,
+            player_quick_kick: 0,
+            player_shrunk: false,
+            player_jetpack_on: false,
+            player_steroids_active: false,
+            player_dead: false,
+            player_weapon: 1,
+            player_kickback: 0,
+            player_facing_actor: false,
+            player_steroids_amount: 0,
+            player_shield_amount: 0,
+            player_scuba_amount: 0,
+            player_holoduke_amount: 0,
+            player_jetpack_amount: 0,
+            player_heat_amount: 0,
+            player_firstaid_amount: 0,
+            player_boot_amount: 0,
+            player_got_access: 0,
+            sector_lotag: 0,
+            sector_ceilingstat: 0,
+            is_multiplayer: false,
+            hit_space_pressed: false,
+            spawned_by_picnum: 0,
+            last_hit_weapon: 0,
+            can_shoot_target: false,
+            bullet_near: false,
+            not_moving: false,
+            shoot_events: Vec::new(),
+        }
+    }
+
     #[test]
     fn test_vm_execution_death_and_killit() {
         let script = r#"
@@ -580,40 +880,11 @@ mod tests {
         let mut xrepeat = 64; let mut yrepeat = 64;
         let mut clipdist = 32; let mut lotag = 0; let mut hitag = 0;
 
-        let mut ctx = VmActorContext {
-            sprite_idx: 0,
-            player_idx: 0,
-            dist_to_player: 500,
-            can_see_player: true,
-            hit_by_weapon: false,
-            registers: &mut reg,
-            sprite_x: &mut x,
-            sprite_y: &mut y,
-            sprite_z: &mut z,
-            sprite_ang: &mut ang,
-            sprite_xvel: &mut xvel,
-            sprite_zvel: &mut zvel,
-            sprite_extra: &mut extra,
-            sprite_picnum: &mut picnum,
-            sprite_sectnum: &mut sectnum,
-            sprite_cstat: &mut cstat,
-            sprite_pal: &mut pal,
-            sprite_xrepeat: &mut xrepeat,
-            sprite_yrepeat: &mut yrepeat,
-            sprite_clipdist: &mut clipdist,
-            sprite_lotag: &mut lotag,
-            sprite_hitag: &mut hitag,
-            killit_flag: false,
-            spawned_sprites: Vec::new(),
-            sound_events: Vec::new(),
-            quotes_displayed: Vec::new(),
-            pal_flashes: Vec::new(),
-            player_health_delta: 0,
-            player_ammo_deltas: Vec::new(),
-            player_inventory_deltas: Vec::new(),
-            debris_events: Vec::new(),
-            hitradius_events: Vec::new(),
-        };
+        let mut ctx = create_test_context(
+            &mut reg, &mut x, &mut y, &mut z, &mut ang, &mut xvel, &mut zvel,
+            &mut extra, &mut picnum, &mut sectnum, &mut cstat, &mut pal,
+            &mut xrepeat, &mut yrepeat, &mut clipdist, &mut lotag, &mut hitag,
+        );
 
         // First tick: extra 100 -> enters else branch -> subtracts 10
         vm.execute(&mut ctx);
@@ -654,40 +925,12 @@ mod tests {
         let mut xrepeat = 64; let mut yrepeat = 64;
         let mut clipdist = 32; let mut lotag = 0; let mut hitag = 0;
 
-        let mut ctx = VmActorContext {
-            sprite_idx: 0,
-            player_idx: 0,
-            dist_to_player: 500, // < 1024
-            can_see_player: true,
-            hit_by_weapon: false,
-            registers: &mut reg,
-            sprite_x: &mut x,
-            sprite_y: &mut y,
-            sprite_z: &mut z,
-            sprite_ang: &mut ang,
-            sprite_xvel: &mut xvel,
-            sprite_zvel: &mut zvel,
-            sprite_extra: &mut extra,
-            sprite_picnum: &mut picnum,
-            sprite_sectnum: &mut sectnum,
-            sprite_cstat: &mut cstat,
-            sprite_pal: &mut pal,
-            sprite_xrepeat: &mut xrepeat,
-            sprite_yrepeat: &mut yrepeat,
-            sprite_clipdist: &mut clipdist,
-            sprite_lotag: &mut lotag,
-            sprite_hitag: &mut hitag,
-            killit_flag: false,
-            spawned_sprites: Vec::new(),
-            sound_events: Vec::new(),
-            quotes_displayed: Vec::new(),
-            pal_flashes: Vec::new(),
-            player_health_delta: 0,
-            player_ammo_deltas: Vec::new(),
-            player_inventory_deltas: Vec::new(),
-            debris_events: Vec::new(),
-            hitradius_events: Vec::new(),
-        };
+        let mut ctx = create_test_context(
+            &mut reg, &mut x, &mut y, &mut z, &mut ang, &mut xvel, &mut zvel,
+            &mut extra, &mut picnum, &mut sectnum, &mut cstat, &mut pal,
+            &mut xrepeat, &mut yrepeat, &mut clipdist, &mut lotag, &mut hitag,
+        );
+        ctx.dist_to_player = 500; // < 1024
 
         vm.execute(&mut ctx);
         assert_eq!(ctx.sound_events.len(), 1);
@@ -729,40 +972,11 @@ mod tests {
         let mut clipdist = 32; let mut lotag = 777; // Ensure lotag is untouched!
         let mut hitag = 888;
 
-        let mut ctx = VmActorContext {
-            sprite_idx: 0,
-            player_idx: 0,
-            dist_to_player: 500,
-            can_see_player: true,
-            hit_by_weapon: false,
-            registers: &mut reg,
-            sprite_x: &mut x,
-            sprite_y: &mut y,
-            sprite_z: &mut z,
-            sprite_ang: &mut ang,
-            sprite_xvel: &mut xvel,
-            sprite_zvel: &mut zvel,
-            sprite_extra: &mut extra,
-            sprite_picnum: &mut picnum,
-            sprite_sectnum: &mut sectnum,
-            sprite_cstat: &mut cstat,
-            sprite_pal: &mut pal,
-            sprite_xrepeat: &mut xrepeat,
-            sprite_yrepeat: &mut yrepeat,
-            sprite_clipdist: &mut clipdist,
-            sprite_lotag: &mut lotag,
-            sprite_hitag: &mut hitag,
-            killit_flag: false,
-            spawned_sprites: Vec::new(),
-            sound_events: Vec::new(),
-            quotes_displayed: Vec::new(),
-            pal_flashes: Vec::new(),
-            player_health_delta: 0,
-            player_ammo_deltas: Vec::new(),
-            player_inventory_deltas: Vec::new(),
-            debris_events: Vec::new(),
-            hitradius_events: Vec::new(),
-        };
+        let mut ctx = create_test_context(
+            &mut reg, &mut x, &mut y, &mut z, &mut ang, &mut xvel, &mut zvel,
+            &mut extra, &mut picnum, &mut sectnum, &mut cstat, &mut pal,
+            &mut xrepeat, &mut yrepeat, &mut clipdist, &mut lotag, &mut hitag,
+        );
 
         // Tick 1: count is 0 -> enters else branch -> sets count to 5
         vm.execute(&mut ctx);
@@ -788,7 +1002,7 @@ mod tests {
             actor BOSS 500
                 addammo 1 50
                 debris 1000 4
-                sizeto 80 80
+                sizeat 80 80
                 hitradius 1024 100 50 25 10
                 palfrom 30 63 0 0
                 break
@@ -810,40 +1024,11 @@ mod tests {
         let mut xrepeat = 64; let mut yrepeat = 64;
         let mut clipdist = 32; let mut lotag = 0; let mut hitag = 0;
 
-        let mut ctx = VmActorContext {
-            sprite_idx: 0,
-            player_idx: 0,
-            dist_to_player: 500,
-            can_see_player: true,
-            hit_by_weapon: false,
-            registers: &mut reg,
-            sprite_x: &mut x,
-            sprite_y: &mut y,
-            sprite_z: &mut z,
-            sprite_ang: &mut ang,
-            sprite_xvel: &mut xvel,
-            sprite_zvel: &mut zvel,
-            sprite_extra: &mut extra,
-            sprite_picnum: &mut picnum,
-            sprite_sectnum: &mut sectnum,
-            sprite_cstat: &mut cstat,
-            sprite_pal: &mut pal,
-            sprite_xrepeat: &mut xrepeat,
-            sprite_yrepeat: &mut yrepeat,
-            sprite_clipdist: &mut clipdist,
-            sprite_lotag: &mut lotag,
-            sprite_hitag: &mut hitag,
-            killit_flag: false,
-            spawned_sprites: Vec::new(),
-            sound_events: Vec::new(),
-            quotes_displayed: Vec::new(),
-            pal_flashes: Vec::new(),
-            player_health_delta: 0,
-            player_ammo_deltas: Vec::new(),
-            player_inventory_deltas: Vec::new(),
-            debris_events: Vec::new(),
-            hitradius_events: Vec::new(),
-        };
+        let mut ctx = create_test_context(
+            &mut reg, &mut x, &mut y, &mut z, &mut ang, &mut xvel, &mut zvel,
+            &mut extra, &mut picnum, &mut sectnum, &mut cstat, &mut pal,
+            &mut xrepeat, &mut yrepeat, &mut clipdist, &mut lotag, &mut hitag,
+        );
 
         vm.execute(&mut ctx);
         // Multi-arg opcodes synchronized properly
@@ -852,6 +1037,7 @@ mod tests {
         assert_eq!(ctx.debris_events.len(), 1);
         assert_eq!(ctx.debris_events[0], (1000, 4));
         assert_eq!(*ctx.sprite_xrepeat, 80);
+        assert_eq!(*ctx.sprite_yrepeat, 80);
         assert_eq!(ctx.hitradius_events.len(), 1);
         assert_eq!(ctx.pal_flashes.len(), 1);
 
@@ -861,7 +1047,6 @@ mod tests {
 
     #[test]
     fn test_vm_instruction_limit_guard() {
-        // Construct a circular subroutine state loop: state loop -> loop -> ...
         let script = r#"
             define TESTACTOR 2700
             state infiniteloop
@@ -885,43 +1070,449 @@ mod tests {
         let mut xrepeat = 64; let mut yrepeat = 64;
         let mut clipdist = 32; let mut lotag = 0; let mut hitag = 0;
 
-        let mut ctx = VmActorContext {
-            sprite_idx: 0,
-            player_idx: 0,
-            dist_to_player: 500,
-            can_see_player: true,
-            hit_by_weapon: false,
-            registers: &mut reg,
-            sprite_x: &mut x,
-            sprite_y: &mut y,
-            sprite_z: &mut z,
-            sprite_ang: &mut ang,
-            sprite_xvel: &mut xvel,
-            sprite_zvel: &mut zvel,
-            sprite_extra: &mut extra,
-            sprite_picnum: &mut picnum,
-            sprite_sectnum: &mut sectnum,
-            sprite_cstat: &mut cstat,
-            sprite_pal: &mut pal,
-            sprite_xrepeat: &mut xrepeat,
-            sprite_yrepeat: &mut yrepeat,
-            sprite_clipdist: &mut clipdist,
-            sprite_lotag: &mut lotag,
-            sprite_hitag: &mut hitag,
-            killit_flag: false,
-            spawned_sprites: Vec::new(),
-            sound_events: Vec::new(),
-            quotes_displayed: Vec::new(),
-            pal_flashes: Vec::new(),
-            player_health_delta: 0,
-            player_ammo_deltas: Vec::new(),
-            player_inventory_deltas: Vec::new(),
-            debris_events: Vec::new(),
-            hitradius_events: Vec::new(),
-        };
+        let mut ctx = create_test_context(
+            &mut reg, &mut x, &mut y, &mut z, &mut ang, &mut xvel, &mut zvel,
+            &mut extra, &mut picnum, &mut sectnum, &mut cstat, &mut pal,
+            &mut xrepeat, &mut yrepeat, &mut clipdist, &mut lotag, &mut hitag,
+        );
 
         // VM terminates safely without hanging the process
         vm.execute(&mut ctx);
         assert_eq!(*ctx.sprite_picnum, 2700);
     }
+
+    #[test]
+    fn test_vm_ifphealthl_checks_actual_health() {
+        let script = r#"
+            define DOCTOR 2800
+            actor DOCTOR 100
+                ifphealthl 50
+                    sound 10
+                else
+                    sound 20
+            enda
+        "#;
+        let mut compiler = Compiler::new();
+        let compiled = compiler.compile(script).unwrap();
+        let vm = ConVm::new(compiled.bytecode, compiled.actor_script_ptrs, compiled.actor_types);
+
+        let mut reg = ActorRegisters::default();
+        let mut x = 0; let mut y = 0; let mut z = 0;
+        let mut ang = 0; let mut xvel = 0; let mut zvel = 0;
+        let mut extra = 100;
+        let mut picnum = 2800;
+        let mut sectnum = 0;
+        let mut cstat = 0; let mut pal = 0;
+        let mut xrepeat = 64; let mut yrepeat = 64;
+        let mut clipdist = 32; let mut lotag = 0; let mut hitag = 0;
+
+        let mut ctx = create_test_context(
+            &mut reg, &mut x, &mut y, &mut z, &mut ang, &mut xvel, &mut zvel,
+            &mut extra, &mut picnum, &mut sectnum, &mut cstat, &mut pal,
+            &mut xrepeat, &mut yrepeat, &mut clipdist, &mut lotag, &mut hitag,
+        );
+
+        // Health 30 < 50 -> should play sound 10
+        ctx.player_health = 30;
+        vm.execute(&mut ctx);
+        assert_eq!(ctx.sound_events.len(), 1);
+        assert_eq!(ctx.sound_events[0].0, 10);
+
+        // Health 80 >= 50 -> should play sound 20
+        ctx.sound_events.clear();
+        ctx.player_health = 80;
+        vm.execute(&mut ctx);
+        assert_eq!(ctx.sound_events.len(), 1);
+        assert_eq!(ctx.sound_events[0].0, 20);
+    }
+
+    #[test]
+    fn test_vm_ifangdiffl_uses_build_angles() {
+        let script = r#"
+            define WATCHER 2801
+            actor WATCHER 100
+                ifangdiffl 128
+                    sound 100
+                else
+                    sound 200
+            enda
+        "#;
+        let mut compiler = Compiler::new();
+        let compiled = compiler.compile(script).unwrap();
+        let vm = ConVm::new(compiled.bytecode, compiled.actor_script_ptrs, compiled.actor_types);
+
+        let mut reg = ActorRegisters::default();
+        let mut x = 0; let mut y = 0; let mut z = 0;
+        let mut ang = 50; // Actor facing angle 50
+        let mut xvel = 0; let mut zvel = 0;
+        let mut extra = 100;
+        let mut picnum = 2801;
+        let mut sectnum = 0;
+        let mut cstat = 0; let mut pal = 0;
+        let mut xrepeat = 64; let mut yrepeat = 64;
+        let mut clipdist = 32; let mut lotag = 0; let mut hitag = 0;
+
+        let mut ctx = create_test_context(
+            &mut reg, &mut x, &mut y, &mut z, &mut ang, &mut xvel, &mut zvel,
+            &mut extra, &mut picnum, &mut sectnum, &mut cstat, &mut pal,
+            &mut xrepeat, &mut yrepeat, &mut clipdist, &mut lotag, &mut hitag,
+        );
+
+        // Player angle 80 -> diff is 30 <= 128 -> sound 100
+        ctx.player_ang = 80;
+        vm.execute(&mut ctx);
+        assert_eq!(ctx.sound_events.len(), 1);
+        assert_eq!(ctx.sound_events[0].0, 100);
+
+        // Player angle 1024 -> diff is 974 > 128 -> sound 200
+        ctx.sound_events.clear();
+        ctx.player_ang = 1024;
+        vm.execute(&mut ctx);
+        assert_eq!(ctx.sound_events.len(), 1);
+        assert_eq!(ctx.sound_events[0].0, 200);
+    }
+
+    #[test]
+    fn test_vm_ifp_player_state_flags() {
+        let script = r#"
+            define JETPACKACTOR 2802
+            actor JETPACKACTOR 100
+                ifp 2048 // Jetpack active flag
+                    sound 50
+                else
+                    sound 60
+            enda
+        "#;
+        let mut compiler = Compiler::new();
+        let compiled = compiler.compile(script).unwrap();
+        let vm = ConVm::new(compiled.bytecode, compiled.actor_script_ptrs, compiled.actor_types);
+
+        let mut reg = ActorRegisters::default();
+        let mut x = 0; let mut y = 0; let mut z = 0;
+        let mut ang = 0; let mut xvel = 0; let mut zvel = 0;
+        let mut extra = 100;
+        let mut picnum = 2802;
+        let mut sectnum = 0;
+        let mut cstat = 0; let mut pal = 0;
+        let mut xrepeat = 64; let mut yrepeat = 64;
+        let mut clipdist = 32; let mut lotag = 0; let mut hitag = 0;
+
+        let mut ctx = create_test_context(
+            &mut reg, &mut x, &mut y, &mut z, &mut ang, &mut xvel, &mut zvel,
+            &mut extra, &mut picnum, &mut sectnum, &mut cstat, &mut pal,
+            &mut xrepeat, &mut yrepeat, &mut clipdist, &mut lotag, &mut hitag,
+        );
+
+        ctx.player_jetpack_on = true;
+        vm.execute(&mut ctx);
+        assert_eq!(ctx.sound_events.len(), 1);
+        assert_eq!(ctx.sound_events[0].0, 50);
+
+        ctx.sound_events.clear();
+        ctx.player_jetpack_on = false;
+        vm.execute(&mut ctx);
+        assert_eq!(ctx.sound_events.len(), 1);
+        assert_eq!(ctx.sound_events[0].0, 60);
+    }
+
+    #[test]
+    fn test_vm_ifpinventory_checks_items() {
+        let script = r#"
+            define LOCKACTOR 2803
+            actor LOCKACTOR 100
+                ifpinventory 6 0 // Check blue keycard (pal 0, bitmask 1)
+                    sound 11
+                else
+                    sound 22
+            enda
+        "#;
+        let mut compiler = Compiler::new();
+        let compiled = compiler.compile(script).unwrap();
+        let vm = ConVm::new(compiled.bytecode, compiled.actor_script_ptrs, compiled.actor_types);
+
+        let mut reg = ActorRegisters::default();
+        let mut x = 0; let mut y = 0; let mut z = 0;
+        let mut ang = 0; let mut xvel = 0; let mut zvel = 0;
+        let mut extra = 100;
+        let mut picnum = 2803;
+        let mut sectnum = 0;
+        let mut cstat = 0; let mut pal = 0; // Blue keycard
+        let mut xrepeat = 64; let mut yrepeat = 64;
+        let mut clipdist = 32; let mut lotag = 0; let mut hitag = 0;
+
+        let mut ctx = create_test_context(
+            &mut reg, &mut x, &mut y, &mut z, &mut ang, &mut xvel, &mut zvel,
+            &mut extra, &mut picnum, &mut sectnum, &mut cstat, &mut pal,
+            &mut xrepeat, &mut yrepeat, &mut clipdist, &mut lotag, &mut hitag,
+        );
+
+        // Player has blue keycard (got_access = 1)
+        ctx.player_got_access = 1;
+        vm.execute(&mut ctx);
+        assert_eq!(ctx.sound_events.len(), 1);
+        assert_eq!(ctx.sound_events[0].0, 11);
+
+        // Player doesn't have keycard
+        ctx.sound_events.clear();
+        ctx.player_got_access = 0;
+        vm.execute(&mut ctx);
+        assert_eq!(ctx.sound_events.len(), 1);
+        assert_eq!(ctx.sound_events[0].0, 22);
+    }
+
+    #[test]
+    fn test_vm_water_and_outside_conditionals() {
+        let script = r#"
+            define AQUAACTOR 2804
+            actor AQUAACTOR 100
+                ifinwater
+                    sound 300
+                else ifoutside
+                    sound 400
+            enda
+        "#;
+        let mut compiler = Compiler::new();
+        let compiled = compiler.compile(script).unwrap();
+        let vm = ConVm::new(compiled.bytecode, compiled.actor_script_ptrs, compiled.actor_types);
+
+        let mut reg = ActorRegisters::default();
+        let mut x = 0; let mut y = 0; let mut z = 0;
+        let mut ang = 0; let mut xvel = 0; let mut zvel = 0;
+        let mut extra = 100;
+        let mut picnum = 2804;
+        let mut sectnum = 0;
+        let mut cstat = 0; let mut pal = 0;
+        let mut xrepeat = 64; let mut yrepeat = 64;
+        let mut clipdist = 32; let mut lotag = 0; let mut hitag = 0;
+
+        let mut ctx = create_test_context(
+            &mut reg, &mut x, &mut y, &mut z, &mut ang, &mut xvel, &mut zvel,
+            &mut extra, &mut picnum, &mut sectnum, &mut cstat, &mut pal,
+            &mut xrepeat, &mut yrepeat, &mut clipdist, &mut lotag, &mut hitag,
+        );
+
+        // Sector lotag = 2 -> in water
+        ctx.sector_lotag = 2;
+        vm.execute(&mut ctx);
+        assert_eq!(ctx.sound_events.len(), 1);
+        assert_eq!(ctx.sound_events[0].0, 300);
+
+        // Sector ceilingstat = 1 -> outside
+        ctx.sound_events.clear();
+        ctx.sector_lotag = 0;
+        ctx.sector_ceilingstat = 1;
+        vm.execute(&mut ctx);
+        assert_eq!(ctx.sound_events.len(), 1);
+        assert_eq!(ctx.sound_events[0].0, 400);
+    }
+
+    #[test]
+    fn test_vm_shoot_produces_directional_events() {
+        let script = r#"
+            define SHOOTER 2805
+            actor SHOOTER 100
+                shoot 1600
+            enda
+        "#;
+        let mut compiler = Compiler::new();
+        let compiled = compiler.compile(script).unwrap();
+        let vm = ConVm::new(compiled.bytecode, compiled.actor_script_ptrs, compiled.actor_types);
+
+        let mut reg = ActorRegisters::default();
+        let mut x = 100; let mut y = 200; let mut z = 300;
+        let mut ang = 512; // Facing right (512 in Build 0-2047)
+        let mut xvel = 0; let mut zvel = 0;
+        let mut extra = 100;
+        let mut picnum = 2805;
+        let mut sectnum = 0;
+        let mut cstat = 0; let mut pal = 0;
+        let mut xrepeat = 64; let mut yrepeat = 64;
+        let mut clipdist = 32; let mut lotag = 0; let mut hitag = 0;
+
+        let mut ctx = create_test_context(
+            &mut reg, &mut x, &mut y, &mut z, &mut ang, &mut xvel, &mut zvel,
+            &mut extra, &mut picnum, &mut sectnum, &mut cstat, &mut pal,
+            &mut xrepeat, &mut yrepeat, &mut clipdist, &mut lotag, &mut hitag,
+        );
+
+        vm.execute(&mut ctx);
+        assert_eq!(ctx.spawned_sprites.len(), 0); // Not a passive spawn
+        assert_eq!(ctx.shoot_events.len(), 1);
+        assert_eq!(ctx.shoot_events[0], (1600, 100, 200, 300, 512));
+    }
+
+    #[test]
+    fn test_vm_sizeto_gradual_interpolation() {
+        let script = r#"
+            define GROWACTOR 2806
+            actor GROWACTOR 100
+                sizeto 80 80
+            enda
+        "#;
+        let mut compiler = Compiler::new();
+        let compiled = compiler.compile(script).unwrap();
+        let vm = ConVm::new(compiled.bytecode, compiled.actor_script_ptrs, compiled.actor_types);
+
+        let mut reg = ActorRegisters::default();
+        let mut x = 0; let mut y = 0; let mut z = 0;
+        let mut ang = 0; let mut xvel = 0; let mut zvel = 0;
+        let mut extra = 100;
+        let mut picnum = 2806;
+        let mut sectnum = 0;
+        let mut cstat = 0; let mut pal = 0;
+        let mut xrepeat = 64; let mut yrepeat = 64;
+        let mut clipdist = 32; let mut lotag = 0; let mut hitag = 0;
+
+        let mut ctx = create_test_context(
+            &mut reg, &mut x, &mut y, &mut z, &mut ang, &mut xvel, &mut zvel,
+            &mut extra, &mut picnum, &mut sectnum, &mut cstat, &mut pal,
+            &mut xrepeat, &mut yrepeat, &mut clipdist, &mut lotag, &mut hitag,
+        );
+
+        // Tick 1: increments from 64 to 65
+        vm.execute(&mut ctx);
+        assert_eq!(*ctx.sprite_xrepeat, 65);
+        assert_eq!(*ctx.sprite_yrepeat, 65);
+
+        // Tick 2: increments from 65 to 66
+        vm.execute(&mut ctx);
+        assert_eq!(*ctx.sprite_xrepeat, 66);
+        assert_eq!(*ctx.sprite_yrepeat, 66);
+    }
+
+    #[test]
+    fn test_vm_ifwasweapon_and_ifspawnedby() {
+        let script = r#"
+            define TARGETACTOR 2807
+            actor TARGETACTOR 100
+                ifwasweapon 21 // RPG
+                    sound 77
+                else ifspawnedby 2000 // Pigcop
+                    sound 88
+            enda
+        "#;
+        let mut compiler = Compiler::new();
+        let compiled = compiler.compile(script).unwrap();
+        let vm = ConVm::new(compiled.bytecode, compiled.actor_script_ptrs, compiled.actor_types);
+
+        let mut reg = ActorRegisters::default();
+        let mut x = 0; let mut y = 0; let mut z = 0;
+        let mut ang = 0; let mut xvel = 0; let mut zvel = 0;
+        let mut extra = 100;
+        let mut picnum = 2807;
+        let mut sectnum = 0;
+        let mut cstat = 0; let mut pal = 0;
+        let mut xrepeat = 64; let mut yrepeat = 64;
+        let mut clipdist = 32; let mut lotag = 0; let mut hitag = 0;
+
+        let mut ctx = create_test_context(
+            &mut reg, &mut x, &mut y, &mut z, &mut ang, &mut xvel, &mut zvel,
+            &mut extra, &mut picnum, &mut sectnum, &mut cstat, &mut pal,
+            &mut xrepeat, &mut yrepeat, &mut clipdist, &mut lotag, &mut hitag,
+        );
+
+        // Hit by RPG
+        ctx.last_hit_weapon = 21;
+        vm.execute(&mut ctx);
+        assert_eq!(ctx.sound_events.len(), 1);
+        assert_eq!(ctx.sound_events[0].0, 77);
+
+        // Spawned by Pigcop
+        ctx.sound_events.clear();
+        ctx.last_hit_weapon = 0;
+        ctx.spawned_by_picnum = 2000;
+        vm.execute(&mut ctx);
+        assert_eq!(ctx.sound_events.len(), 1);
+        assert_eq!(ctx.sound_events[0].0, 88);
+    }
+
+    #[test]
+    fn test_vm_ai_raycast_and_dodge_conditionals() {
+        let script = r#"
+            define ENEMY 2808
+            actor ENEMY 100
+                ifcanshoottarget
+                    sound 101
+                else ifbulletnear
+                    sound 202
+                else ifnotmoving
+                    sound 303
+            enda
+        "#;
+        let mut compiler = Compiler::new();
+        let compiled = compiler.compile(script).unwrap();
+        let vm = ConVm::new(compiled.bytecode, compiled.actor_script_ptrs, compiled.actor_types);
+
+        let mut reg = ActorRegisters::default();
+        let mut x = 0; let mut y = 0; let mut z = 0;
+        let mut ang = 0; let mut xvel = 0; let mut zvel = 0;
+        let mut extra = 100;
+        let mut picnum = 2808;
+        let mut sectnum = 0;
+        let mut cstat = 0; let mut pal = 0;
+        let mut xrepeat = 64; let mut yrepeat = 64;
+        let mut clipdist = 32; let mut lotag = 0; let mut hitag = 0;
+
+        let mut ctx = create_test_context(
+            &mut reg, &mut x, &mut y, &mut z, &mut ang, &mut xvel, &mut zvel,
+            &mut extra, &mut picnum, &mut sectnum, &mut cstat, &mut pal,
+            &mut xrepeat, &mut yrepeat, &mut clipdist, &mut lotag, &mut hitag,
+        );
+
+        // 1. can_shoot_target = true -> sound 101
+        ctx.can_shoot_target = true;
+        vm.execute(&mut ctx);
+        assert_eq!(ctx.sound_events.len(), 1);
+        assert_eq!(ctx.sound_events[0].0, 101);
+
+        // 2. bullet_near = true -> sound 202
+        ctx.sound_events.clear();
+        ctx.can_shoot_target = false;
+        ctx.bullet_near = true;
+        vm.execute(&mut ctx);
+        assert_eq!(ctx.sound_events.len(), 1);
+        assert_eq!(ctx.sound_events[0].0, 202);
+
+        // 3. not_moving = true -> sound 303
+        ctx.sound_events.clear();
+        ctx.bullet_near = false;
+        ctx.not_moving = true;
+        vm.execute(&mut ctx);
+        assert_eq!(ctx.sound_events.len(), 1);
+        assert_eq!(ctx.sound_events[0].0, 303);
+    }
+
+    #[test]
+    fn test_vm_endofgame_opcode() {
+        let script = r#"
+            define BOSS 2630
+            actor BOSS 4500
+                ifdead
+                    endofgame 52
+            enda
+        "#;
+        let mut compiler = Compiler::new();
+        let compiled = compiler.compile(script).unwrap();
+        let vm = ConVm::new(compiled.bytecode, compiled.actor_script_ptrs, compiled.actor_types);
+
+        let mut reg = ActorRegisters::default();
+        let mut x = 0; let mut y = 0; let mut z = 0;
+        let mut ang = 0; let mut xvel = 0; let mut zvel = 0;
+        let mut extra = 0; // dead
+        let mut picnum = 2630;
+        let mut sectnum = 0;
+        let mut cstat = 0; let mut pal = 0;
+        let mut xrepeat = 64; let mut yrepeat = 64;
+        let mut clipdist = 32; let mut lotag = 0; let mut hitag = 0;
+
+        let mut ctx = create_test_context(
+            &mut reg, &mut x, &mut y, &mut z, &mut ang, &mut xvel, &mut zvel,
+            &mut extra, &mut picnum, &mut sectnum, &mut cstat, &mut pal,
+            &mut xrepeat, &mut yrepeat, &mut clipdist, &mut lotag, &mut hitag,
+        );
+
+        vm.execute(&mut ctx);
+        assert_eq!(ctx.end_of_game, Some(52));
+    }
 }
+

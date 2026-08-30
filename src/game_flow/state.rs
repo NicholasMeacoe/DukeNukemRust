@@ -4,10 +4,10 @@ use bevy::prelude::*;
 
 #[derive(States, Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum GamePhase {
-    #[default]
     MainMenu,
     EpisodeSelect,
     SkillSelect,
+    #[default]
     Playing,
     Intermission,
     Paused,
@@ -84,3 +84,12 @@ impl LevelProgress {
 
 #[derive(Event, Debug, Clone)]
 pub struct LevelCompletedEvent;
+
+#[derive(Component, Debug, Clone)]
+pub struct LevelEntity;
+
+#[derive(Event, Debug, Clone)]
+pub struct LoadLevelEvent {
+    pub episode: usize,
+    pub level: usize,
+}
