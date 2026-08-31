@@ -1,6 +1,8 @@
-# Duke Nukem 3D - Rust / Bevy Renderer
+# Duke Nukem 3D — Rust / Bevy Source Port (Gold Master)
 
-A Duke Nukem 3D Build Engine map and asset renderer built with [Rust](https://www.rust-lang.org/) and the [Bevy engine](https://bevyengine.org/) (with [Rapier 3D](https://rapier.rs/) physics).
+An authentic, modern Duke Nukem 3D game engine and renderer built in [Rust](https://www.rust-lang.org/) with the [Bevy engine](https://bevyengine.org/) (and [Rapier 3D](https://rapier.rs/) physics).
+
+---
 
 ## ⚠️ Important: Proprietary Game Assets
 
@@ -13,51 +15,70 @@ To run the project, you must provide your own copy of `duke3d.grp` from a licens
 
 ---
 
-## Features
+## 📥 Cloning & Submodules
 
-- **GRP Archive Parsing**: Directly reads game assets, textures, sounds, and maps from `duke3d.grp`.
-- **Palette & ART Texture Decoding**: Decodes `PALETTE.DAT` and `TILES*.ART` texture sheets with nearest-neighbor pixel sampling.
-- **Build Map Geometry**: Parses `.MAP` files (`E1L1.MAP`), tessellates sector floor/ceiling polygons using `lyon_tessellation`, and constructs 3D wall meshes.
-- **Player Movement & Physics**: First-person controller with mouselook, movement, and collisions powered by `bevy_rapier3d`.
-- **Billboard Sprites & Weapons**: Renders camera-facing 2D sprites and animated HUD weapons.
-- **Audio Support**: Reads VOC / WAV audio files from `WAVES.KWV`.
+The original 1996 C/C++ source code is tracked as a Git submodule in `dukenukem3d/`.
+
+### Clone with Submodules:
+```bash
+git clone --recurse-submodules https://github.com/NicholasMeacoe/DukeNukemRust.git
+cd DukeNukemRust
+```
+
+### If Already Cloned:
+If you cloned without `--recurse-submodules`, initialize and pull the submodule:
+```bash
+git submodule update --init --recursive
+```
 
 ---
 
-## Prerequisites
+## 🎮 Features
 
-- [Rust toolchain](https://www.rust-lang.org/tools/install) (edition 2021, Rust 1.75+)
-- Operating system dependencies required by Bevy (e.g. Vulkan / DirectX 12 graphics drivers).
+- **Full Asset Pipeline**: Directly ingests `duke3d.grp`, `PALETTE.DAT`, `LOOKUP.DAT`, `TILES*.ART`, `WAVES.KWV`, and `*.MID` audio files with real-time software MIDI synthesis.
+- **Complete 12-Weapon Arsenal**: Mighty Foot, Pistol (with clip reload & casing ejection), Shotgun (7-pellet raycast), Chaingun (spread & brass shower), RPG, Pipebomb (with bouncing arc & remote detonator queue), Shrinker (with boot squish/stomp), Devastator (dual salvos), Laser Tripbomb (wall-mounted laser trigger), Freezethrower (ice shatter), and Expander (organic burst).
+- **Comprehensive Bestiary & Boss AI**: All 14 enemy types (Troopers, Pigcops, Octabrains, Enforcers, Drones, Commanders, etc.) + Episode Bosses (Battlelord, Overlord, Cycloid Emperor, Alien Queen) with 3D flight, swimming, situational wake-up states, and death drops.
+- **Dynamic CON Scripting Engine**: Bytecode compiler and CON VM supporting `USER.CON` / `GAME.CON` state subroutines, AI actions, and dynamic definitions (`definevolumename`, `defineskillname`, `definelevelname`, `definequote`, `definesound`).
+- **Full 4-Episode Campaign Matrix**: 44 maps, par times, secret level routing (e.g. E1L3 -> E1L8 -> E1L4), and intermission statistics rollout.
+- **Save / Load Game Snapshot System**: Full binary serialization across 10 save slots with QuickSave (`F6`) and QuickLoad (`F9`).
+- **Deterministic Demo Recording & Attract Mode**: Frame-accurate input stream recording and playback with idle attract mode loop.
+- **2D/3D Vector Overhead Automap**: Toggleable radar overlay (`Tab`) with unvisited line culling, color-coded walls, and zoom controls.
+- **In-Game Developer Console & Cheats**: Dropdown console (`~`) with CVars (`god`, `noclip`, `give`, `map <name>`, `r_crt <0|1>`, `r_scanlines <intensity>`, `r_quantize <0|1>`, `r_stats <0|1>`) and authentic cheat codes (`dnkroz`, `dnstuff`, `dnitems`, `dnclip`, `dnhyper`, `dnrate`, `dnkeys`, `dnweapons`, `dninventory`, `dnshowmap`).
+- **Retro CRT Post-Processing**: 32-level distance lighting attenuation, 6-bit VGA DAC conversion, scanlines, shadow mask, and screen damage palette flash tints.
+- **High-Precision Slopes & Interactive Platforms**: Sloped sector height interpolation, room-over-room portal classification, and sticky passenger momentum transfer for moving elevators, drop floors, and subway trains.
 
 ---
 
-## Building and Running
+## 🛠️ Building and Running
 
-1. Clone this repository:
-   ```bash
-   git clone <repository-url>
-   cd DukeNukemRust
-   ```
-
-2. Copy your `duke3d.grp` into the `dukenukem3d/` folder:
-   ```text
-   DukeNukemRust/
-   ├── dukenukem3d/
-   │   └── duke3d.grp
-   ├── src/
-   ├── Cargo.toml
-   └── README.md
-   ```
-
-3. Build and launch:
+1. **Prerequisites**: [Rust toolchain](https://www.rust-lang.org/tools/install) (Rust 1.75+ or newer).
+2. **Place `duke3d.grp`** inside the `dukenukem3d/` directory.
+3. **Build & Run**:
    ```bash
    cargo run --release
    ```
+4. **Run Test Suite** (140 automated tests):
+   ```bash
+   cargo test --bin dukenukemrust
+   ```
 
-### Controls
+---
 
-- **WASD / Move**: Walk around the map
-- **Mouse**: Look around
-- **Left Click**: Grab / release cursor
-- **E**: Play a random Duke sound
-- **Space**: Jump
+## ⌨️ Controls
+
+| Key / Action | Function |
+|---|---|
+| **W, A, S, D** | Walk & Strafe |
+| **Mouse** | Look around (Mouselook) |
+| **Left Click / Ctrl** | Fire Active Weapon |
+| **Right Click** | Alt Action / Detonate Pipebomb |
+| **Space** | Jump |
+| **C** | Crouch |
+| **Tab** | Toggle 2D/3D Overhead Automap |
+| **~ (Backquote)** | Toggle In-Game Developer Console |
+| **F3** | Level Select & Episode Warping Menu |
+| **F6 / F9** | QuickSave / QuickLoad |
+| **F7** | Dukematch Frag Scoreboard |
+| **1 .. 0** | Weapon Selection (0 = Foot, 1 = Pistol, .. 0 = Expander) |
+| **J / N / B / M** | Activate Jetpack / Nightvision / Boots / Medkit |
+| **E / Space on Wall** | Interact (Switches, Doors, Toilets, Fountains, Mirrors) |
