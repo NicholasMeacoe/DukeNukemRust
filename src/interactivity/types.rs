@@ -89,6 +89,71 @@ pub enum EffectorKind {
         auto_close_delay: f32,
         is_open: bool,
     },
+    /// SE 1: Pivot Rotating Sector
+    PivotRotatingSector {
+        pivot: Vec2,
+        orig_ang: f32,
+        target_ang: f32,
+        current_ang: f32,
+        speed: f32,
+        is_open: bool,
+    },
+    /// SE 2 & 22: Earthquake Camera Shake
+    Earthquake {
+        intensity: f32,
+        duration: f32,
+        elapsed: f32,
+        is_triggered: bool,
+    },
+    /// SE 4 & 5: Random Light Flicker / Light Buzz
+    RandomFlicker {
+        base_shade: i8,
+        min_shade: i8,
+        max_shade: i8,
+        timer: f32,
+        is_buzz: bool,
+    },
+    /// SE 11: Continuous Rotating Sector
+    ContinuousRotation {
+        pivot: Vec2,
+        current_ang: f32,
+        angular_speed: f32,
+    },
+    /// SE 12: Smooth Light Glow Gradient
+    GlowGradient {
+        min_shade: i8,
+        max_shade: i8,
+        current_shade: f32,
+        rate: f32,
+        increasing: bool,
+    },
+    /// SE 20: Stretch Ceiling
+    StretchCeiling {
+        orig_ceil_z: i32,
+        target_ceil_z: i32,
+        current_ceil_z: i32,
+        speed: i32,
+        is_stretched: bool,
+    },
+    /// SE 24: Conveyor Belt Floor Velocity
+    ConveyorBelt {
+        direction: Vec2,
+        speed: f32,
+    },
+    /// SE 31 & 32: Crusher Sectors (Floor rise / Ceiling lower)
+    CrusherSector {
+        min_z: i32,
+        max_z: i32,
+        current_z: i32,
+        speed: i32,
+        crushing_ceiling: bool,
+        moving_down: bool,
+    },
+    /// SE 36: Shooting Breakable Glass Pane
+    ShootingGlassPane {
+        health: i32,
+        is_shattered: bool,
+    },
 }
 
 #[derive(Component, Debug, Clone)]
@@ -220,6 +285,7 @@ pub enum PickupKind {
     // Health
     SmallMedkit,       // +10 HP (up to 100) - Tile 51
     LargeMedkit,       // +30 HP (up to 100) - Tile 52
+    PortableMedkit,    // +100 Portable Medkit - Tile 53
     AtomicHealth,      // +50 HP (up to 200) - Tile 55
     ArmorVest,         // 100 Armor - Tile 56
     // Ammo
@@ -231,6 +297,7 @@ pub enum PickupKind {
     ShrinkerAmmo,      // +5 Shrinker - Tile 42
     DevastatorBox,     // +15 Devastator - Tile 45
     FreezeAmmo,        // +25 Freeze - Tile 46
+    ExpanderAmmo,      // +20 Expander - Tile 45
     // Inventory Items
     Steroids,          // +400 Steroids - Tile 57
     ScubaTank,         // +100 Scuba - Tile 59
@@ -248,6 +315,7 @@ pub enum PickupKind {
     WeaponDevastator,  // Tile 27
     WeaponTripbomb,    // Tile 28
     WeaponFreezer,     // Tile 29
+    WeaponExpander,    // Tile 32
 }
 
 #[derive(Component, Debug, Clone)]

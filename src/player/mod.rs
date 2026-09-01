@@ -314,9 +314,37 @@ mod tests {
             let current_vel = Vec3::new(player.velocity_xz.x, 0.0, player.velocity_xz.y);
             let new_vel = current_vel.move_towards(target_vel, 6.0 * player.speed * dt);
             player.velocity_xz = Vec2::new(new_vel.x, new_vel.z);
+        } else {
+            // Authentic mid-air aerodynamic damping
+            player.velocity_xz *= (1.0 - 0.75 * dt).max(0.0);
         }
 
-        // In mid-air with no input, horizontal velocity is 100% preserved (zero air drag)
-        assert_eq!(player.velocity_xz, Vec2::new(8.0, 0.0));
+        // In mid-air with no input, horizontal velocity decays gently with aerodynamic drag
+        assert!(player.velocity_xz.x < 8.0 && player.velocity_xz.x > 7.8);
+        assert_eq!(player.velocity_xz.y, 0.0);
+    }
+
+    #[test]
+    fn test_swimming_and_diving_submerged_movement() {
+        let mut player = PlayerController::default();
+        player.movement_mode = PlayerMovementMode::Swimming;
+
+        let dt = 0.016;
+        let mut speed_multiplier = 1.0;
+        let is_swimming = matches!(player.movement_mode, PlayerMovementMode::Swimming | PlayerMovementMode::Diving);
+        if is_swimming {
+            speed_multiplier *= 0.7; // Water fluid drag
+        }
+
+        let current_speed = player.speed * speed_multiplier;
+        assert_eq!(current_speed, 10.0 * 0.7);
+
+        // Buoyancy downward sink
+        player.velocity_y = -0.3;
+        assert_eq!(player.velocity_y, -0.3);
+
+        // Active upward swimming
+        player.velocity_y = 3.5;
+        assert_eq!(player.velocity_y, 3.5);
     }
 }

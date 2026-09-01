@@ -84,6 +84,9 @@ pub enum EnemyKind {
     Shark,
     ProtectorDrone,
     Turret,
+    ScamperingRat,
+    ToxicSlimeHazard,
+    SecurityCameraProp,
     Boss1Battlelord,
     Boss1Mini,
     Boss2Overlord,
@@ -395,6 +398,66 @@ impl EnemyActor {
             attack_timer: 0.0,
             sight_radius: 35.0,
             attack_range: 30.0,
+            is_shrunk: false,
+            shrink_timer: 0.0,
+            is_frozen: false,
+            freeze_timer: 0.0,
+            is_expanding: false,
+            expand_timer: 0.0,
+        }
+    }
+
+    pub fn new_rat() -> Self {
+        Self {
+            kind: EnemyKind::ScamperingRat,
+            state: EnemyAiState::Idle,
+            health: 5,
+            max_health: 5,
+            speed: 10.0,
+            attack_cooldown: 5.0,
+            attack_timer: 0.0,
+            sight_radius: 8.0,
+            attack_range: 0.0,
+            is_shrunk: false,
+            shrink_timer: 0.0,
+            is_frozen: false,
+            freeze_timer: 0.0,
+            is_expanding: false,
+            expand_timer: 0.0,
+        }
+    }
+
+    pub fn new_slime_hazard() -> Self {
+        Self {
+            kind: EnemyKind::ToxicSlimeHazard,
+            state: EnemyAiState::Idle,
+            health: 50,
+            max_health: 50,
+            speed: 0.0,
+            attack_cooldown: 0.5,
+            attack_timer: 0.0,
+            sight_radius: 2.0,
+            attack_range: 1.5,
+            is_shrunk: false,
+            shrink_timer: 0.0,
+            is_frozen: false,
+            freeze_timer: 0.0,
+            is_expanding: false,
+            expand_timer: 0.0,
+        }
+    }
+
+    pub fn new_camera_prop() -> Self {
+        Self {
+            kind: EnemyKind::SecurityCameraProp,
+            state: EnemyAiState::Idle,
+            health: 20,
+            max_health: 20,
+            speed: 0.0,
+            attack_cooldown: 1.0,
+            attack_timer: 0.0,
+            sight_radius: 25.0,
+            attack_range: 0.0,
             is_shrunk: false,
             shrink_timer: 0.0,
             is_frozen: false,

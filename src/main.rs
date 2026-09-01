@@ -18,6 +18,7 @@ pub mod save;
 pub mod demo;
 pub mod config;
 pub mod net;
+pub mod names;
 
 pub type Player = player::PlayerController;
 

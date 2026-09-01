@@ -48,6 +48,7 @@ pub fn update_projectiles(
     mut damage_events: EventWriter<EntityDamageEvent>,
     mut explosion_events: EventWriter<ExplosionDamageEvent>,
     mut sound_events: EventWriter<crate::audio::PlaySoundEvent>,
+    mut decal_events: EventWriter<crate::combat::decals::SpawnDecalEvent>,
     rapier_context: Option<Res<RapierContext>>,
 ) {
     let dt = time.delta_seconds();
@@ -116,6 +117,11 @@ pub fn update_projectiles(
                         radius: 5.0,
                         damage: proj.damage,
                     });
+                    decal_events.send(crate::combat::decals::SpawnDecalEvent {
+                        origin: hit_point,
+                        normal: hit_normal,
+                        decal_type: crate::combat::decals::DecalType::ScorchMark,
+                    });
                     sound_events.send(crate::audio::PlaySoundEvent { sound_id: 115 });
                     proj.lifetime = 0.0;
                 }
@@ -142,6 +148,11 @@ pub fn update_projectiles(
                     }
                 }
                 _ => {
+                    decal_events.send(crate::combat::decals::SpawnDecalEvent {
+                        origin: hit_point,
+                        normal: hit_normal,
+                        decal_type: crate::combat::decals::DecalType::BulletHole,
+                    });
                     proj.lifetime = 0.0;
                     sound_events.send(crate::audio::PlaySoundEvent { sound_id: 110 });
                 }
@@ -193,6 +204,12 @@ pub fn update_projectiles(
                         amount: proj.damage,
                         source: DamageSource::PlayerWeapon(proj.projectile_type),
                         hit_origin: new_pos,
+                    });
+
+                    decal_events.send(crate::combat::decals::SpawnDecalEvent {
+                        origin: new_pos,
+                        normal: Vec3::Y,
+                        decal_type: crate::combat::decals::DecalType::BloodSplatter,
                     });
 
                     if proj.projectile_type == ProjectileType::Rocket || proj.projectile_type == ProjectileType::DevastatorMissile {

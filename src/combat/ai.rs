@@ -120,10 +120,14 @@ pub fn update_con_actors(
         let last_hit = *last_hit_weapon;
 
         let mut bullet_near = false;
+        let actor_pos = trans.translation;
         for proj_trans in projectiles.iter() {
-            if trans.translation.distance_squared(proj_trans.translation) < 25.0 {
-                bullet_near = true;
-                break;
+            let p = proj_trans.translation;
+            if (p.x - actor_pos.x).abs() < 5.0 && (p.z - actor_pos.z).abs() < 5.0 && (p.y - actor_pos.y).abs() < 5.0 {
+                if actor_pos.distance_squared(p) < 25.0 {
+                    bullet_near = true;
+                    break;
+                }
             }
         }
         let can_shoot_target = can_see && dist_to_player <= 30.0;
@@ -269,6 +273,29 @@ pub fn update_con_actors(
                         damage: 5,
                         is_player_source: false,
                     });
+                }
+            }
+
+            // Rat scampering behavior (flees away from player within 5.0m)
+            if enemy.kind == EnemyKind::ScamperingRat && dist_to_player <= 5.0 {
+                let flee_dir = -dir_to_player.with_y(0.0).normalize_or_zero();
+                trans.translation += flee_dir * (enemy.speed * dt);
+            }
+
+            // Turret tracking and continuous firing
+            if enemy.kind == EnemyKind::Turret && can_see && dist_to_player <= 30.0 {
+                enemy.attack_timer += dt;
+                if enemy.attack_timer >= enemy.attack_cooldown {
+                    enemy.attack_timer = 0.0;
+                    projectile_events.send(SpawnProjectileEvent {
+                        projectile_type: ProjectileType::AlienBlaster,
+                        origin: trans.translation + Vec3::NEG_Y * 0.3 + dir_to_player * 0.4,
+                        direction: dir_to_player,
+                        velocity: 35.0,
+                        damage: 15,
+                        is_player_source: false,
+                    });
+                    sound_events.send(crate::audio::PlaySoundEvent { sound_id: 110 });
                 }
             }
         }

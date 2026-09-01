@@ -1514,5 +1514,84 @@ mod tests {
         vm.execute(&mut ctx);
         assert_eq!(ctx.end_of_game, Some(52));
     }
+
+    #[test]
+    fn test_vm_ifp_17_flags_evaluation() {
+        let script = r#"
+            define ENEMY 2809
+            actor ENEMY 100
+                ifp 8 // crouching
+                    sound 8
+                else ifp 2048 // jetpack
+                    sound 2048
+                else ifp 4096 // steroids
+                    sound 4096
+                else ifp 32768 // dead
+                    sound 32768
+                else ifp 65536 // facing actor
+                    sound 65536
+            enda
+        "#;
+        let mut compiler = Compiler::new();
+        let compiled = compiler.compile(script).unwrap();
+        let vm = ConVm::new(compiled.bytecode, compiled.actor_script_ptrs, compiled.actor_types);
+
+        let mut reg = ActorRegisters::default();
+        let mut x = 0; let mut y = 0; let mut z = 0;
+        let mut ang = 0; let mut xvel = 0; let mut zvel = 0;
+        let mut extra = 100;
+        let mut picnum = 2809;
+        let mut sectnum = 0;
+        let mut cstat = 0; let mut pal = 0;
+        let mut xrepeat = 64; let mut yrepeat = 64;
+        let mut clipdist = 32; let mut lotag = 0; let mut hitag = 0;
+
+        let mut ctx = create_test_context(
+            &mut reg, &mut x, &mut y, &mut z, &mut ang, &mut xvel, &mut zvel,
+            &mut extra, &mut picnum, &mut sectnum, &mut cstat, &mut pal,
+            &mut xrepeat, &mut yrepeat, &mut clipdist, &mut lotag, &mut hitag,
+        );
+
+        // 1. Ducking
+        ctx.player_on_ground = true;
+        ctx.player_crouching = true;
+        vm.execute(&mut ctx);
+        assert_eq!(ctx.sound_events.len(), 1);
+        assert_eq!(ctx.sound_events[0].0, 8);
+
+        // 2. Jetpack
+        ctx.sound_events.clear();
+        ctx.player_crouching = false;
+        ctx.player_jetpack_on = true;
+        vm.execute(&mut ctx);
+        assert_eq!(ctx.sound_events.len(), 1);
+        assert_eq!(ctx.sound_events[0].0, 2048);
+
+        // 3. Steroids
+        ctx.sound_events.clear();
+        ctx.player_jetpack_on = false;
+        ctx.player_steroids_active = true;
+        vm.execute(&mut ctx);
+        assert_eq!(ctx.sound_events.len(), 1);
+        assert_eq!(ctx.sound_events[0].0, 4096);
+
+        // 4. Dead
+        ctx.sound_events.clear();
+        ctx.player_steroids_active = false;
+        ctx.player_dead = true;
+        ctx.player_health = 0;
+        vm.execute(&mut ctx);
+        assert_eq!(ctx.sound_events.len(), 1);
+        assert_eq!(ctx.sound_events[0].0, 32768);
+
+        // 5. Facing actor
+        ctx.sound_events.clear();
+        ctx.player_dead = false;
+        ctx.player_health = 100;
+        ctx.player_facing_actor = true;
+        vm.execute(&mut ctx);
+        assert_eq!(ctx.sound_events.len(), 1);
+        assert_eq!(ctx.sound_events[0].0, 65536);
+    }
 }
 

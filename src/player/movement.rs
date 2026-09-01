@@ -97,8 +97,10 @@ pub fn update_player_movement(
             let current_vel = Vec3::new(player.velocity_xz.x, 0.0, player.velocity_xz.y);
             let new_vel = current_vel.move_towards(target_vel, accel_rate * current_speed * dt);
             player.velocity_xz = Vec2::new(new_vel.x, new_vel.z);
+        } else {
+            // Authentic mid-air aerodynamic damping: light air drag when no directional keys held
+            player.velocity_xz *= (1.0 - 0.75 * dt).max(0.0);
         }
-        // In mid-air with no directional keys: zero air friction, full momentum preservation
 
         let horizontal_movement = Vec3::new(player.velocity_xz.x, 0.0, player.velocity_xz.y) * dt;
 

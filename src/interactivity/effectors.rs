@@ -50,6 +50,16 @@ pub fn handle_tag_activations(
                             *auto_close_timer = Some(*auto_close_delay);
                         }
                     }
+                    EffectorKind::PivotRotatingSector { is_open, .. } => {
+                        *is_open = !*is_open;
+                    }
+                    EffectorKind::Earthquake { is_triggered, elapsed, .. } => {
+                        *is_triggered = true;
+                        *elapsed = 0.0;
+                    }
+                    EffectorKind::StretchCeiling { is_stretched, .. } => {
+                        *is_stretched = !*is_stretched;
+                    }
                     _ => {}
                 }
             }
@@ -278,6 +288,146 @@ pub fn update_sector_effectors(
                 let delta_z = *current_ceil_z - *orig_ceil_z;
                 let delta_y = -(delta_z as f32) / (1024.0 * 16.0);
                 transforms.insert(sector_idx, EffectorTransform::Elevate { delta_y });
+            }
+
+            EffectorKind::PivotRotatingSector {
+                pivot,
+                orig_ang,
+                target_ang,
+                current_ang,
+                speed,
+                is_open,
+            } => {
+                let dest = if *is_open { *target_ang } else { *orig_ang };
+                let step = *speed * dt;
+                if (*current_ang - dest).abs() <= step {
+                    *current_ang = dest;
+                    should_deactivate = true;
+                } else {
+                    *current_ang += step * (dest - *current_ang).signum();
+                }
+
+                transforms.insert(
+                    sector_idx,
+                    EffectorTransform::Rotate {
+                        pivot: *pivot,
+                        rot_ang: *current_ang,
+                    },
+                );
+            }
+
+            EffectorKind::Earthquake {
+                duration,
+                elapsed,
+                is_triggered,
+                ..
+            } => {
+                if *is_triggered {
+                    *elapsed += dt;
+                    if *elapsed >= *duration {
+                        *is_triggered = false;
+                        should_deactivate = true;
+                    }
+                }
+            }
+
+            EffectorKind::RandomFlicker { timer, is_buzz, .. } => {
+                *timer += dt * if *is_buzz { 30.0 } else { 10.0 };
+            }
+
+            EffectorKind::ContinuousRotation {
+                pivot,
+                current_ang,
+                angular_speed,
+            } => {
+                *current_ang += *angular_speed * dt;
+                transforms.insert(
+                    sector_idx,
+                    EffectorTransform::Rotate {
+                        pivot: *pivot,
+                        rot_ang: *current_ang,
+                    },
+                );
+            }
+
+            EffectorKind::GlowGradient {
+                min_shade,
+                max_shade,
+                current_shade,
+                rate,
+                increasing,
+            } => {
+                let step = *rate * dt;
+                if *increasing {
+                    *current_shade += step;
+                    if *current_shade >= *max_shade as f32 {
+                        *current_shade = *max_shade as f32;
+                        *increasing = false;
+                    }
+                } else {
+                    *current_shade -= step;
+                    if *current_shade <= *min_shade as f32 {
+                        *current_shade = *min_shade as f32;
+                        *increasing = true;
+                    }
+                }
+            }
+
+            EffectorKind::StretchCeiling {
+                orig_ceil_z,
+                target_ceil_z,
+                current_ceil_z,
+                speed,
+                is_stretched,
+            } => {
+                let target = if *is_stretched { *target_ceil_z } else { *orig_ceil_z };
+                let step = (*speed as f32 * dt * 1024.0) as i32;
+                let diff = target - *current_ceil_z;
+                if diff.abs() <= step {
+                    *current_ceil_z = target;
+                    should_deactivate = true;
+                } else {
+                    *current_ceil_z += diff.signum() * step;
+                }
+                let delta_y = -((*current_ceil_z - *orig_ceil_z) as f32) / (1024.0 * 16.0);
+                transforms.insert(sector_idx, EffectorTransform::Elevate { delta_y });
+            }
+
+            EffectorKind::ConveyorBelt { .. } => {
+                // Conveyor velocity handled by platform / player controller
+            }
+
+            EffectorKind::CrusherSector {
+                min_z,
+                max_z,
+                current_z,
+                speed,
+                moving_down,
+                ..
+            } => {
+                let step = (*speed as f32 * dt * 1024.0) as i32;
+                if *moving_down {
+                    *current_z += step;
+                    if *current_z >= *max_z {
+                        *current_z = *max_z;
+                        *moving_down = false;
+                    }
+                } else {
+                    *current_z -= step;
+                    if *current_z <= *min_z {
+                        *current_z = *min_z;
+                        *moving_down = true;
+                    }
+                }
+                let delta_y = -((*current_z - *min_z) as f32) / (1024.0 * 16.0);
+                transforms.insert(sector_idx, EffectorTransform::Elevate { delta_y });
+            }
+
+            EffectorKind::ShootingGlassPane { health, is_shattered } => {
+                if *health <= 0 && !*is_shattered {
+                    *is_shattered = true;
+                    should_deactivate = true;
+                }
             }
 
             _ => {}

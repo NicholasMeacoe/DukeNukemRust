@@ -11,6 +11,7 @@ use crate::animation::AnimatedTileMaterial;
 use crate::art::PicAnm;
 use crate::map::{Map, Wall};
 use crate::palette::Palette;
+use crate::names::*;
 
 pub struct MapMeshBuilder<'a> {
     pub map: &'a Map,
@@ -661,7 +662,7 @@ impl<'a> MapMeshBuilder<'a> {
                 // Attach Phase 4 Interactive Components directly to visual entities!
                 match sprite.picnum {
                     // SWITCHES
-                    134 | 136 | 162 | 712 | 860 | 1111 | 1122 => {
+                    LIGHTSWITCH | SPACEDOORSWITCH | DIPSWITCH | LIGHTSWITCH2 | POWERSWITCH1 | HANDSWITCH | PULLSWITCH => {
                         entity_cmds.insert(crate::interactivity::InteractiveSwitch {
                             switch_type: crate::interactivity::SwitchType::LightSwitch,
                             on_tile: sprite.picnum + 1,
@@ -673,8 +674,8 @@ impl<'a> MapMeshBuilder<'a> {
                             material_handle: Some(sprite_mat.clone()),
                         });
                     }
-                    // KEYCARDS (Tiles 175 = Blue, 176 = Red, 177 = Yellow)
-                    175 => {
+                    // KEYCARDS (Tiles ACCESSCARD..=177: Blue, Red, Yellow)
+                    ACCESSCARD | 175 => {
                         entity_cmds.insert(crate::interactivity::KeycardPickup { key_type: 1 });
                     }
                     176 => {
@@ -684,201 +685,213 @@ impl<'a> MapMeshBuilder<'a> {
                         entity_cmds.insert(crate::interactivity::KeycardPickup { key_type: 3 });
                     }
                     // HEALTH & ARMOR PICKUPS
-                    51 => {
+                    COLA => {
                         entity_cmds.insert(crate::interactivity::ItemPickup {
                             kind: crate::interactivity::PickupKind::SmallMedkit,
                             respawn_timer: None,
                         });
                     }
-                    52 => {
+                    SIXPAK => {
                         entity_cmds.insert(crate::interactivity::ItemPickup {
                             kind: crate::interactivity::PickupKind::LargeMedkit,
                             respawn_timer: None,
                         });
                     }
-                    55 => {
+                    ATOMICHEALTH => {
                         entity_cmds.insert(crate::interactivity::ItemPickup {
                             kind: crate::interactivity::PickupKind::AtomicHealth,
                             respawn_timer: None,
                         });
                     }
-                    56 => {
+                    SHIELD => {
                         entity_cmds.insert(crate::interactivity::ItemPickup {
                             kind: crate::interactivity::PickupKind::ArmorVest,
                             respawn_timer: None,
                         });
                     }
                     // AMMO PICKUPS
-                    40 => {
+                    AMMO => {
                         entity_cmds.insert(crate::interactivity::ItemPickup {
                             kind: crate::interactivity::PickupKind::PistolClip,
                             respawn_timer: None,
                         });
                     }
-                    44 => {
+                    RPGAMMO => {
                         entity_cmds.insert(crate::interactivity::ItemPickup {
                             kind: crate::interactivity::PickupKind::ChaingunBox,
                             respawn_timer: None,
                         });
                     }
-                    47 => {
+                    HBOMBAMMO => {
                         entity_cmds.insert(crate::interactivity::ItemPickup {
                             kind: crate::interactivity::PickupKind::RpgRocket,
                             respawn_timer: None,
                         });
                     }
-                    48 => {
+                    AMMOLOTS => {
                         entity_cmds.insert(crate::interactivity::ItemPickup {
                             kind: crate::interactivity::PickupKind::PipebombBox,
                             respawn_timer: None,
                         });
                     }
-                    49 => {
+                    SHOTGUNAMMO => {
                         entity_cmds.insert(crate::interactivity::ItemPickup {
                             kind: crate::interactivity::PickupKind::ShotgunBox,
                             respawn_timer: None,
                         });
                     }
-                    42 => {
+                    DEVISTATORAMMO => {
                         entity_cmds.insert(crate::interactivity::ItemPickup {
                             kind: crate::interactivity::PickupKind::ShrinkerAmmo,
                             respawn_timer: None,
                         });
                     }
-                    45 => {
+                    GROWAMMO => {
                         entity_cmds.insert(crate::interactivity::ItemPickup {
                             kind: crate::interactivity::PickupKind::DevastatorBox,
                             respawn_timer: None,
                         });
                     }
-                    46 => {
+                    CRYSTALAMMO | FREEZEAMMO => {
                         entity_cmds.insert(crate::interactivity::ItemPickup {
                             kind: crate::interactivity::PickupKind::FreezeAmmo,
                             respawn_timer: None,
                         });
                     }
                     // INVENTORY ITEM PICKUPS
-                    57 => {
+                    STEROIDS => {
                         entity_cmds.insert(crate::interactivity::ItemPickup {
                             kind: crate::interactivity::PickupKind::Steroids,
                             respawn_timer: None,
                         });
                     }
-                    58 => {
-                        entity_cmds.insert(crate::interactivity::ItemPickup {
-                            kind: crate::interactivity::PickupKind::Jetpack,
-                            respawn_timer: None,
-                        });
-                    }
-                    59 => {
+                    AIRTANK => {
                         entity_cmds.insert(crate::interactivity::ItemPickup {
                             kind: crate::interactivity::PickupKind::ScubaTank,
                             respawn_timer: None,
                         });
                     }
-                    60 => {
+                    JETPACK => {
+                        entity_cmds.insert(crate::interactivity::ItemPickup {
+                            kind: crate::interactivity::PickupKind::Jetpack,
+                            respawn_timer: None,
+                        });
+                    }
+                    HEATSENSOR | 58 => {
                         entity_cmds.insert(crate::interactivity::ItemPickup {
                             kind: crate::interactivity::PickupKind::NightvisionGoggles,
                             respawn_timer: None,
                         });
                     }
-                    61 => {
+                    BOOTS => {
                         entity_cmds.insert(crate::interactivity::ItemPickup {
                             kind: crate::interactivity::PickupKind::ProtectiveBoots,
                             respawn_timer: None,
                         });
                     }
-                    62 => {
+                    HOLODUKE | 62 => {
                         entity_cmds.insert(crate::interactivity::ItemPickup {
                             kind: crate::interactivity::PickupKind::Holoduke,
                             respawn_timer: None,
                         });
                     }
                     // WEAPONS ON GROUND
-                    21 => {
+                    FIRSTGUNSPRITE => {
                         entity_cmds.insert(crate::interactivity::ItemPickup {
                             kind: crate::interactivity::PickupKind::WeaponPistol,
                             respawn_timer: None,
                         });
                     }
-                    22 => {
-                        entity_cmds.insert(crate::interactivity::ItemPickup {
-                            kind: crate::interactivity::PickupKind::WeaponShotgun,
-                            respawn_timer: None,
-                        });
-                    }
-                    23 => {
+                    CHAINGUNSPRITE => {
                         entity_cmds.insert(crate::interactivity::ItemPickup {
                             kind: crate::interactivity::PickupKind::WeaponChaingun,
                             respawn_timer: None,
                         });
                     }
-                    24 => {
+                    RPGSPRITE => {
                         entity_cmds.insert(crate::interactivity::ItemPickup {
                             kind: crate::interactivity::PickupKind::WeaponRpg,
                             respawn_timer: None,
                         });
                     }
-                    25 => {
-                        entity_cmds.insert(crate::interactivity::ItemPickup {
-                            kind: crate::interactivity::PickupKind::WeaponPipebomb,
-                            respawn_timer: None,
-                        });
-                    }
-                    26 => {
-                        entity_cmds.insert(crate::interactivity::ItemPickup {
-                            kind: crate::interactivity::PickupKind::WeaponShrinker,
-                            respawn_timer: None,
-                        });
-                    }
-                    27 => {
-                        entity_cmds.insert(crate::interactivity::ItemPickup {
-                            kind: crate::interactivity::PickupKind::WeaponDevastator,
-                            respawn_timer: None,
-                        });
-                    }
-                    28 => {
-                        entity_cmds.insert(crate::interactivity::ItemPickup {
-                            kind: crate::interactivity::PickupKind::WeaponTripbomb,
-                            respawn_timer: None,
-                        });
-                    }
-                    29 => {
+                    FREEZESPRITE => {
                         entity_cmds.insert(crate::interactivity::ItemPickup {
                             kind: crate::interactivity::PickupKind::WeaponFreezer,
                             respawn_timer: None,
                         });
                     }
+                    SHRINKERSPRITE => {
+                        entity_cmds.insert(crate::interactivity::ItemPickup {
+                            kind: crate::interactivity::PickupKind::WeaponShrinker,
+                            respawn_timer: None,
+                        });
+                    }
+                    HEAVYHBOMB => {
+                        entity_cmds.insert(crate::interactivity::ItemPickup {
+                            kind: crate::interactivity::PickupKind::WeaponPipebomb,
+                            respawn_timer: None,
+                        });
+                    }
+                    TRIPBOMBSPRITE => {
+                        entity_cmds.insert(crate::interactivity::ItemPickup {
+                            kind: crate::interactivity::PickupKind::WeaponTripbomb,
+                            respawn_timer: None,
+                        });
+                    }
+                    SHOTGUNSPRITE => {
+                        entity_cmds.insert(crate::interactivity::ItemPickup {
+                            kind: crate::interactivity::PickupKind::WeaponShotgun,
+                            respawn_timer: None,
+                        });
+                    }
+                    FIRSTAID => {
+                        entity_cmds.insert(crate::interactivity::ItemPickup {
+                            kind: crate::interactivity::PickupKind::PortableMedkit,
+                            respawn_timer: None,
+                        });
+                    }
+                    DEVISTATORSPRITE => {
+                        entity_cmds.insert(crate::interactivity::ItemPickup {
+                            kind: crate::interactivity::PickupKind::WeaponDevastator,
+                            respawn_timer: None,
+                        });
+                    }
+                    GROWSPRITEICON => {
+                        entity_cmds.insert(crate::interactivity::ItemPickup {
+                            kind: crate::interactivity::PickupKind::WeaponExpander,
+                            respawn_timer: None,
+                        });
+                    }
                     // WATER FOUNTAIN
-                    564 | 565 => {
+                    WATERFOUNTAIN | 564 | 565 => {
                         entity_cmds.insert(crate::interactivity::WaterFountain {
                             uses_left: 10,
                             is_broken: false,
-                            broken_tile: 567,
+                            broken_tile: WATERFOUNTAINBROKE,
                         });
                     }
                     // TOILET / STALL
-                    569 | 571 => {
+                    TOILET | STALL => {
                         entity_cmds.insert(crate::interactivity::ToiletProp {
                             is_broken: false,
-                            broken_tile: if sprite.picnum == 569 { 615 } else { 573 },
-                            water_tile: 921,
+                            broken_tile: if sprite.picnum == TOILET { TOILETBROKE } else { STALLBROKE },
+                            water_tile: TOILETWATER,
                             last_used_time: 0.0,
                             cooldown_timer: 0.0,
                         });
                     }
                     // VIEWSCREEN CRT MONITOR
-                    499 | 502 => {
+                    VIEWSCREEN2 | VIEWSCREEN => {
                         entity_cmds.insert(crate::interactivity::ViewscreenProp {
                             camera_tag: sprite.hitag,
                             is_active: true,
                             is_broken: false,
-                            broken_tile: 501,
+                            broken_tile: VIEWSCREENBROKE,
                             scanline_timer: 0.0,
                         });
                     }
                     // SECURITY CAMERA (CAMERA1)
-                    500 => {
+                    CAMERA1 | 500 => {
                         entity_cmds.insert(crate::interactivity::SecurityCamera {
                             tag: sprite.hitag,
                             sweep_angle: 0.0,
@@ -887,7 +900,7 @@ impl<'a> MapMeshBuilder<'a> {
                         });
                     }
                     // EXPLODING BARREL
-                    1238 | 1240 | 1242 => {
+                    EXPLODINGBARREL | EXPLODINGBARREL2 | FIREBARREL => {
                         entity_cmds.insert(crate::interactivity::ExplodingBarrel {
                             health: 20,
                             damage_radius: 6.0,
@@ -896,7 +909,7 @@ impl<'a> MapMeshBuilder<'a> {
                         });
                     }
                     // CRACK WALL
-                    546..=549 => {
+                    CRACK1..=CRACK4 => {
                         entity_cmds.insert(crate::interactivity::CrackWall {
                             health: 30,
                             stage: 1,
@@ -905,7 +918,7 @@ impl<'a> MapMeshBuilder<'a> {
                         });
                     }
                     // BREAKABLE GLASS
-                    503 => {
+                    GLASS | GLASS2 => {
                         entity_cmds.insert(crate::interactivity::BreakableGlass {
                             health: 10,
                             is_broken: false,
@@ -914,20 +927,20 @@ impl<'a> MapMeshBuilder<'a> {
                         });
                     }
                     // ENEMIES & BOSSES
-                    // 1. Assault Trooper & Captain (1680..=1744)
-                    1680..=1744 => {
+                    // 1. Assault Trooper & Captain (LIZTROOP..=LIZTROOPDUCKING)
+                    LIZTROOP..=LIZTROOPDUCKING => {
                         let is_captain = sprite.pal == 21;
                         let (enemy, actor_hp) = if is_captain {
                             (crate::combat::EnemyActor::new_captain(), 60)
                         } else {
                             (crate::combat::EnemyActor::new_liztroop(), 30)
                         };
-                        let is_dormant = matches!(sprite.picnum, 1682 | 1741 | 1742 | 1744);
-                        let is_jetpack = sprite.picnum == 1725;
+                        let is_dormant = matches!(sprite.picnum, LIZTROOPSTAYPUT | LIZTROOPONTOILET | LIZTROOPJUSTSIT | LIZTROOPDUCKING);
+                        let is_jetpack = sprite.picnum == LIZTROOPJETPACK;
 
                         entity_cmds.insert((
                             enemy,
-                            crate::scripting::ConActor::new(1680, sprite.sectnum, sprite.ang, actor_hp),
+                            crate::scripting::ConActor::new(LIZTROOP, sprite.sectnum, sprite.ang, actor_hp),
                             crate::combat::SituationalSpawn {
                                 initial_picnum: sprite.picnum,
                                 is_dormant,
@@ -937,120 +950,134 @@ impl<'a> MapMeshBuilder<'a> {
                             entity_cmds.insert(crate::combat::FlyingActor::default());
                         }
                     }
-                    // 2. Pigcop (2000, 2001, 2045)
-                    2000 | 2001 | 2045 => {
+                    // 2. Pigcop (PIGCOP, PIGCOPSTAYPUT, PIGCOPDIVE)
+                    PIGCOP | PIGCOPSTAYPUT | PIGCOPDIVE => {
                         entity_cmds.insert((
                             crate::combat::EnemyActor::new_pigcop(),
-                            crate::scripting::ConActor::new(2000, sprite.sectnum, sprite.ang, 100),
+                            crate::scripting::ConActor::new(PIGCOP, sprite.sectnum, sprite.ang, 100),
                             crate::combat::SituationalSpawn {
                                 initial_picnum: sprite.picnum,
-                                is_dormant: sprite.picnum == 2001,
+                                is_dormant: sprite.picnum == PIGCOPSTAYPUT,
                             },
                         ));
                     }
-                    // 3. Pigcop Recon Car (1960)
-                    1960 => {
+                    // 3. Pigcop Recon Car (RECON)
+                    RECON => {
                         entity_cmds.insert((
                             crate::combat::EnemyActor::new_recon(),
-                            crate::scripting::ConActor::new(1960, sprite.sectnum, sprite.ang, 50),
+                            crate::scripting::ConActor::new(RECON, sprite.sectnum, sprite.ang, 50),
                             crate::combat::FlyingActor::default(),
                         ));
                     }
-                    // 4. Pigcop Riot Tank (1975)
-                    1975 => {
+                    // 4. Pigcop Riot Tank (TANK)
+                    TANK => {
                         entity_cmds.insert((
                             crate::combat::EnemyActor::new_tank(),
-                            crate::scripting::ConActor::new(1975, sprite.sectnum, sprite.ang, 500),
+                            crate::scripting::ConActor::new(TANK, sprite.sectnum, sprite.ang, 500),
                         ));
                     }
-                    // 5. Octabrain (1820, 1821)
-                    1820 | 1821 => {
+                    // 5. Octabrain (OCTABRAIN, OCTABRAINSTAYPUT)
+                    OCTABRAIN | OCTABRAINSTAYPUT => {
                         entity_cmds.insert((
                             crate::combat::EnemyActor::new_octabrain(),
-                            crate::scripting::ConActor::new(1820, sprite.sectnum, sprite.ang, 175),
+                            crate::scripting::ConActor::new(OCTABRAIN, sprite.sectnum, sprite.ang, 175),
                             crate::combat::SituationalSpawn {
                                 initial_picnum: sprite.picnum,
-                                is_dormant: sprite.picnum == 1821,
+                                is_dormant: sprite.picnum == OCTABRAINSTAYPUT,
                             },
                             crate::combat::FlyingActor::default(),
                         ));
                     }
-                    // 6. Protozoid Egg & Slimer (675, 2370)
-                    675 => {
+                    // 6. Protozoid Egg & Slimer (EGG, GREENSLIME)
+                    EGG => {
                         entity_cmds.insert((
                             crate::combat::EnemyActor::new_egg(),
-                            crate::scripting::ConActor::new(675, sprite.sectnum, sprite.ang, 20),
+                            crate::scripting::ConActor::new(EGG, sprite.sectnum, sprite.ang, 20),
                             crate::combat::SituationalSpawn {
-                                initial_picnum: 675,
+                                initial_picnum: EGG,
                                 is_dormant: true,
                             },
                         ));
                     }
-                    2370 => {
+                    GREENSLIME => {
                         entity_cmds.insert((
                             crate::combat::EnemyActor::new_slimer(),
-                            crate::scripting::ConActor::new(2370, sprite.sectnum, sprite.ang, 1),
+                            crate::scripting::ConActor::new(GREENSLIME, sprite.sectnum, sprite.ang, 1),
                         ));
                     }
-                    // 7. Enforcer (2120, 2121, 2150, 2160, 2165)
-                    2120..=2165 => {
+                    // 7. Enforcer (LIZMAN..=LIZMANJUMP)
+                    LIZMAN..=LIZMANJUMP => {
                         entity_cmds.insert((
                             crate::combat::EnemyActor::new_enforcer(),
-                            crate::scripting::ConActor::new(2120, sprite.sectnum, sprite.ang, 120),
+                            crate::scripting::ConActor::new(LIZMAN, sprite.sectnum, sprite.ang, 120),
                             crate::combat::SituationalSpawn {
                                 initial_picnum: sprite.picnum,
-                                is_dormant: sprite.picnum == 2121,
+                                is_dormant: sprite.picnum == LIZMANSTAYPUT,
                             },
                         ));
                     }
-                    // 8. Assault Commander (1920, 1921)
-                    1920 | 1921 => {
+                    // 8. Assault Commander (COMMANDER, COMMANDERSTAYPUT)
+                    COMMANDER | COMMANDERSTAYPUT => {
                         entity_cmds.insert((
                             crate::combat::EnemyActor::new_commander(),
-                            crate::scripting::ConActor::new(1920, sprite.sectnum, sprite.ang, 350),
+                            crate::scripting::ConActor::new(COMMANDER, sprite.sectnum, sprite.ang, 350),
                             crate::combat::SituationalSpawn {
                                 initial_picnum: sprite.picnum,
-                                is_dormant: sprite.picnum == 1921,
+                                is_dormant: sprite.picnum == COMMANDERSTAYPUT,
                             },
                             crate::combat::FlyingActor::default(),
                         ));
                     }
-                    // 9. Sentry Drone (1880)
-                    1880 => {
+                    // 9. Sentry Drone (DRONE)
+                    DRONE => {
                         entity_cmds.insert((
                             crate::combat::EnemyActor::new_drone(),
-                            crate::scripting::ConActor::new(1880, sprite.sectnum, sprite.ang, 150),
+                            crate::scripting::ConActor::new(DRONE, sprite.sectnum, sprite.ang, 150),
                             crate::combat::FlyingActor::default(),
                         ));
                     }
-                    // 10. Shark (1550)
-                    1550 => {
+                    // 10. Shark (SHARK)
+                    SHARK => {
                         entity_cmds.insert((
                             crate::combat::EnemyActor::new_shark(),
-                            crate::scripting::ConActor::new(1550, sprite.sectnum, sprite.ang, 35),
+                            crate::scripting::ConActor::new(SHARK, sprite.sectnum, sprite.ang, 35),
                             crate::combat::FlyingActor::default(),
                         ));
                     }
-                    // 11. Protector Drone (4610, 4611, 4670, 4690)
-                    4610 | 4611 | 4670 | 4690 => {
+                    // 11. Protector Drone (NEWBEAST, NEWBEASTSTAYPUT, NEWBEASTHANG, NEWBEASTJUMP)
+                    NEWBEAST | NEWBEASTSTAYPUT | NEWBEASTHANG | NEWBEASTJUMP => {
                         entity_cmds.insert((
                             crate::combat::EnemyActor::new_protector_drone(),
-                            crate::scripting::ConActor::new(4610, sprite.sectnum, sprite.ang, 300),
+                            crate::scripting::ConActor::new(NEWBEAST, sprite.sectnum, sprite.ang, 300),
                             crate::combat::SituationalSpawn {
                                 initial_picnum: sprite.picnum,
-                                is_dormant: sprite.picnum == 4670 || sprite.picnum == 4611,
+                                is_dormant: sprite.picnum == NEWBEASTHANG || sprite.picnum == NEWBEASTSTAYPUT,
                             },
                         ));
                     }
-                    // 12. Turret (2360)
-                    2360 => {
+                    // 12. Turret (ROTATEGUN)
+                    ROTATEGUN => {
                         entity_cmds.insert((
                             crate::combat::EnemyActor::new_turret(),
-                            crate::scripting::ConActor::new(2360, sprite.sectnum, sprite.ang, 40),
+                            crate::scripting::ConActor::new(ROTATEGUN, sprite.sectnum, sprite.ang, 40),
                         ));
                     }
-                    // 13. Boss 1: Battlelord & Mini-Battlelord (2630, 2631)
-                    2630 | 2631 => {
+                    // 13. Scampering Rat (RAT)
+                    RAT => {
+                        entity_cmds.insert((
+                            crate::combat::EnemyActor::new_rat(),
+                            crate::scripting::ConActor::new(RAT, sprite.sectnum, sprite.ang, 5),
+                        ));
+                    }
+                    // 14. Toxic Slime Hazard (OOZ, OOZ2)
+                    OOZ | OOZ2 => {
+                        entity_cmds.insert((
+                            crate::combat::EnemyActor::new_slime_hazard(),
+                            crate::player::types::HazardSector { damage_per_sec: 20.0 },
+                        ));
+                    }
+                    // 13. Boss 1: Battlelord & Mini-Battlelord (BOSS1, BOSS1STAYPUT)
+                    BOSS1 | BOSS1STAYPUT => {
                         let is_mini = sprite.pal == 21;
                         let (enemy, actor_hp) = if is_mini {
                             (crate::combat::EnemyActor::new_battlelord(true), 1000)
@@ -1059,36 +1086,36 @@ impl<'a> MapMeshBuilder<'a> {
                         };
                         entity_cmds.insert((
                             enemy,
-                            crate::scripting::ConActor::new(2630, sprite.sectnum, sprite.ang, actor_hp),
+                            crate::scripting::ConActor::new(BOSS1, sprite.sectnum, sprite.ang, actor_hp),
                             crate::combat::SituationalSpawn {
                                 initial_picnum: sprite.picnum,
-                                is_dormant: sprite.picnum == 2631,
+                                is_dormant: sprite.picnum == BOSS1STAYPUT,
                             },
                         ));
                     }
-                    // 14. Boss 2: Overlord (2710)
-                    2710 => {
+                    // 14. Boss 2: Overlord (BOSS2)
+                    BOSS2 => {
                         entity_cmds.insert((
                             crate::combat::EnemyActor::new_overlord(),
-                            crate::scripting::ConActor::new(2710, sprite.sectnum, sprite.ang, 4500),
+                            crate::scripting::ConActor::new(BOSS2, sprite.sectnum, sprite.ang, 4500),
                         ));
                     }
-                    // 15. Boss 3: Cycloid Emperor (2760)
-                    2760 => {
+                    // 15. Boss 3: Cycloid Emperor (BOSS3)
+                    BOSS3 => {
                         entity_cmds.insert((
                             crate::combat::EnemyActor::new_cycloid(),
-                            crate::scripting::ConActor::new(2760, sprite.sectnum, sprite.ang, 4500),
+                            crate::scripting::ConActor::new(BOSS3, sprite.sectnum, sprite.ang, 4500),
                         ));
                     }
-                    // 16. Boss 4: Alien Queen (4740)
-                    4740 => {
+                    // 16. Boss 4: Alien Queen (BOSS4, BOSS4STAYPUT)
+                    BOSS4 | BOSS4STAYPUT => {
                         entity_cmds.insert((
                             crate::combat::EnemyActor::new_queen(),
-                            crate::scripting::ConActor::new(4740, sprite.sectnum, sprite.ang, 6000),
+                            crate::scripting::ConActor::new(BOSS4, sprite.sectnum, sprite.ang, 6000),
                         ));
                     }
                     // NUKE BUTTON (Level Exit)
-                    142..=145 => {
+                    NUKEBUTTON..=145 => {
                         entity_cmds.insert(crate::interactivity::NukeExitSwitch {
                             is_activated: false,
                             is_secret: sprite.lotag != 0,

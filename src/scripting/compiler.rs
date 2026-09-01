@@ -79,6 +79,42 @@ impl Compiler {
     pub fn compile(&mut self, source: &str) -> Result<CompiledScript, String> {
         let mut lexer = Lexer::new(source);
         let tokens = lexer.tokenize()?;
+        self.compile_tokens_internal(&tokens, None)?;
+        Ok(self.build_compiled_script())
+    }
+
+    pub fn compile_with_loader<F>(&mut self, source: &str, include_loader: &F) -> Result<CompiledScript, String>
+    where
+        F: Fn(&str) -> Option<String>,
+    {
+        let mut lexer = Lexer::new(source);
+        let tokens = lexer.tokenize()?;
+        self.compile_tokens_internal(&tokens, Some(include_loader))?;
+        Ok(self.build_compiled_script())
+    }
+
+    fn build_compiled_script(&self) -> CompiledScript {
+        CompiledScript {
+            bytecode: self.bytecode.clone(),
+            actor_script_ptrs: self.actor_script_ptrs.clone(),
+            actor_types: self.actor_types.clone(),
+            symbols: self.symbols.clone(),
+            actions: self.actions.clone(),
+            moves: self.moves.clone(),
+            ais: self.ais.clone(),
+            volumes: self.volumes.clone(),
+            skills: self.skills.clone(),
+            levels: self.levels.clone(),
+            quotes: self.quotes.clone(),
+            sounds: self.sounds.clone(),
+        }
+    }
+
+    pub fn compile_tokens_internal(
+        &mut self,
+        tokens: &[Token],
+        include_loader: Option<&dyn Fn(&str) -> Option<String>>,
+    ) -> Result<(), String> {
         let mut pos = 0;
 
         while pos < tokens.len() {
@@ -86,20 +122,31 @@ impl Compiler {
                 Token::Ident(keyword) => {
                     let kw = keyword.to_lowercase();
                     match kw.as_str() {
+                        "include" => {
+                            pos += 1;
+                            let filename = self.expect_ident_or_str(tokens, &mut pos)?;
+                            if let Some(loader) = include_loader {
+                                if let Some(included_content) = loader(&filename) {
+                                    let mut inc_lexer = Lexer::new(&included_content);
+                                    let inc_tokens = inc_lexer.tokenize()?;
+                                    self.compile_tokens_internal(&inc_tokens, Some(loader))?;
+                                }
+                            }
+                        }
                         "define" => {
                             pos += 1;
-                            let name = self.expect_ident(&tokens, &mut pos)?;
-                            let val = self.expect_num_or_symbol(&tokens, &mut pos)?;
+                            let name = self.expect_ident(tokens, &mut pos)?;
+                            let val = self.expect_num_or_symbol(tokens, &mut pos)?;
                             self.symbols.insert(name, val);
                         }
                         "action" => {
                             pos += 1;
-                            let name = self.expect_ident(&tokens, &mut pos)?;
-                            let start = self.expect_num_or_symbol(&tokens, &mut pos)?;
-                            let num = self.expect_num_or_symbol(&tokens, &mut pos)?;
-                            let view = self.expect_num_or_symbol(&tokens, &mut pos)?;
-                            let inc = self.expect_num_or_symbol(&tokens, &mut pos)?;
-                            let delay = self.expect_num_or_symbol(&tokens, &mut pos)?;
+                            let name = self.expect_ident(tokens, &mut pos)?;
+                            let start = self.expect_num_or_symbol(tokens, &mut pos)?;
+                            let num = self.expect_num_or_symbol(tokens, &mut pos)?;
+                            let view = self.expect_num_or_symbol(tokens, &mut pos)?;
+                            let inc = self.expect_num_or_symbol(tokens, &mut pos)?;
+                            let delay = self.expect_num_or_symbol(tokens, &mut pos)?;
 
                             let action_addr = self.bytecode.len();
                             self.bytecode.extend_from_slice(&[start, num, view, inc, delay]);
@@ -350,20 +397,7 @@ impl Compiler {
             }
         }
 
-        Ok(CompiledScript {
-            bytecode: self.bytecode.clone(),
-            actor_script_ptrs: self.actor_script_ptrs.clone(),
-            actor_types: self.actor_types.clone(),
-            symbols: self.symbols.clone(),
-            actions: self.actions.clone(),
-            moves: self.moves.clone(),
-            ais: self.ais.clone(),
-            volumes: self.volumes.clone(),
-            skills: self.skills.clone(),
-            levels: self.levels.clone(),
-            quotes: self.quotes.clone(),
-            sounds: self.sounds.clone(),
-        })
+        Ok(())
     }
 
     fn compile_statement(&mut self, tokens: &[Token], pos: &mut usize) -> Result<(), String> {
@@ -723,7 +757,7 @@ pub fn is_keyword(s: &str) -> bool {
     let kw = s.to_lowercase();
     matches!(
         kw.as_str(),
-        "define" | "definevolumename" | "defineskillname" | "definelevelname" | "definequote" | "definesound"
+        "include" | "define" | "definevolumename" | "defineskillname" | "definelevelname" | "definequote" | "definesound"
         | "action" | "move" | "ai" | "state" | "ends" | "actor" | "useractor" | "enda"
         | "ifpdistl" | "ifpdistg" | "ifcansee" | "ifhitweapon" | "ifdead" | "sound" | "killit"
         | "else" | "{" | "}" | "ifrnd" | "ifcount" | "ifactioncount" | "ifaction" | "ifmove"
@@ -860,5 +894,44 @@ mod tests {
         assert_eq!(compiled.sounds.len(), 1);
         assert_eq!(compiled.sounds[0].sound_id, 78);
         assert_eq!(compiled.sounds[0].filename, "DUKE_LOOKING_GOOD.VOC");
+    }
+
+    #[test]
+    fn test_compiler_include_directive() {
+        let defs_con = r#"
+            define PIGCOP 2000
+            define PIGHEALTH 100
+        "#;
+
+        let user_con = r#"
+            definevolumename 0 SHUDDERS
+            definequote 50 "READY FOR ACTION"
+        "#;
+
+        let game_con = r#"
+            include "DEFS.CON"
+            include "USER.CON"
+
+            actor PIGCOP PIGHEALTH
+                killit
+            enda
+        "#;
+
+        let mut compiler = Compiler::new();
+        let loader = |name: &str| -> Option<String> {
+            match name {
+                "DEFS.CON" => Some(defs_con.to_string()),
+                "USER.CON" => Some(user_con.to_string()),
+                _ => None,
+            }
+        };
+
+        let compiled = compiler.compile_with_loader(game_con, &loader).unwrap();
+        assert_eq!(compiled.symbols.get("PIGCOP"), Some(&2000));
+        assert_eq!(compiled.symbols.get("PIGHEALTH"), Some(&100));
+        assert_eq!(compiled.volumes.len(), 1);
+        assert_eq!(compiled.volumes[0].title, "SHUDDERS");
+        assert_eq!(compiled.quotes.get(&50).map(|s| s.as_str()), Some("READY FOR ACTION"));
+        assert!(compiled.actor_script_ptrs[2000].is_some());
     }
 }

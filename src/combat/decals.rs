@@ -7,6 +7,8 @@ pub enum DecalType {
     BulletHole,
     BloodSplatter,
     ScorchMark,
+    GlassCrack,
+    WaterRipple,
 }
 
 #[derive(Component, Debug, Clone)]
@@ -96,6 +98,8 @@ pub fn handle_spawn_decal_events(
             DecalType::BulletHole => 20.0,
             DecalType::BloodSplatter => 30.0,
             DecalType::ScorchMark => 25.0,
+            DecalType::GlassCrack => 35.0,
+            DecalType::WaterRipple => 2.0,
         };
 
         let normal = ev.normal.normalize_or_zero();

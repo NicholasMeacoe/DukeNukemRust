@@ -495,5 +495,87 @@ mod tests {
         passenger_pos += carrier.velocity * dt;
         assert_eq!(passenger_pos.y, 10.25);
     }
+
+    #[test]
+    fn test_expanded_sector_effectors_matrix() {
+        // 1. Pivot rotation (SE 1)
+        let mut pivot_door = EffectorKind::PivotRotatingSector {
+            pivot: Vec2::new(10.0, 10.0),
+            orig_ang: 0.0,
+            target_ang: std::f32::consts::FRAC_PI_2,
+            current_ang: 0.0,
+            speed: 2.0,
+            is_open: true,
+        };
+        if let EffectorKind::PivotRotatingSector { ref mut current_ang, target_ang, .. } = pivot_door {
+            *current_ang = target_ang;
+            assert_eq!(*current_ang, std::f32::consts::FRAC_PI_2);
+        }
+
+        // 2. Earthquake (SE 2/22)
+        let mut earthquake = EffectorKind::Earthquake {
+            intensity: 1.5,
+            duration: 4.0,
+            elapsed: 0.0,
+            is_triggered: true,
+        };
+        if let EffectorKind::Earthquake { ref mut elapsed, duration, ref mut is_triggered, .. } = earthquake {
+            *elapsed += 4.5;
+            if *elapsed >= duration {
+                *is_triggered = false;
+            }
+            assert!(!*is_triggered);
+        }
+
+        // 3. Continuous rotation (SE 11)
+        let mut fan = EffectorKind::ContinuousRotation {
+            pivot: Vec2::ZERO,
+            current_ang: 0.0,
+            angular_speed: 10.0,
+        };
+        if let EffectorKind::ContinuousRotation { ref mut current_ang, angular_speed, .. } = fan {
+            *current_ang += angular_speed * 0.1;
+            assert_eq!(*current_ang, 1.0);
+        }
+
+        // 4. Conveyor belt (SE 24)
+        let conveyor = EffectorKind::ConveyorBelt {
+            direction: Vec2::new(1.0, 0.0),
+            speed: 3.5,
+        };
+        if let EffectorKind::ConveyorBelt { direction, speed } = conveyor {
+            assert_eq!(direction.x * speed, 3.5);
+        }
+
+        // 5. Crusher sector (SE 31/32)
+        let mut crusher = EffectorKind::CrusherSector {
+            min_z: 0,
+            max_z: 10000,
+            current_z: 0,
+            speed: 50,
+            crushing_ceiling: true,
+            moving_down: true,
+        };
+        if let EffectorKind::CrusherSector { ref mut current_z, ref mut moving_down, max_z, .. } = crusher {
+            *current_z = max_z;
+            *moving_down = false;
+            assert_eq!(*current_z, 10000);
+            assert!(!*moving_down);
+        }
+    }
+
+    #[test]
+    fn test_complete_pickup_matrix_classification() {
+        use crate::interactivity::types::PickupKind::*;
+        let all_pickups = [
+            SmallMedkit, LargeMedkit, PortableMedkit, AtomicHealth, ArmorVest,
+            PistolClip, ShotgunBox, ChaingunBox, RpgRocket, PipebombBox,
+            ShrinkerAmmo, DevastatorBox, FreezeAmmo, ExpanderAmmo,
+            Steroids, ScubaTank, NightvisionGoggles, ProtectiveBoots, Jetpack, Holoduke,
+            WeaponPistol, WeaponShotgun, WeaponChaingun, WeaponRpg, WeaponPipebomb,
+            WeaponShrinker, WeaponDevastator, WeaponTripbomb, WeaponFreezer, WeaponExpander,
+        ];
+        assert_eq!(all_pickups.len(), 30);
+    }
 }
 

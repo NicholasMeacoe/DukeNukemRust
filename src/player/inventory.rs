@@ -191,6 +191,11 @@ pub fn update_player_pickups(
                         message = "MEDKIT PACK (+30 HEALTH)";
                     }
                 }
+                PortableMedkit => {
+                    player.inventory.medkit_amount = (player.inventory.medkit_amount + 100).min(100);
+                    collected = true;
+                    message = "PORTABLE MEDKIT";
+                }
                 AtomicHealth => {
                     if player.health < 200 {
                         player.health = (player.health + 50).min(200);
@@ -252,6 +257,12 @@ pub fn update_player_pickups(
                     player.weapons[WeaponType::Freezethrower as usize].is_unlocked = true;
                     collected = true;
                     message = "FREEZETHROWER AMMO (+25)";
+                }
+                ExpanderAmmo => {
+                    player.weapons[WeaponType::Expander as usize].ammo = (player.weapons[WeaponType::Expander as usize].ammo + 20).min(99);
+                    player.weapons[WeaponType::Expander as usize].is_unlocked = true;
+                    collected = true;
+                    message = "EXPANDER AMMO (+20)";
                 }
                 Steroids => {
                     player.inventory.steroids_amount = (player.inventory.steroids_amount + 400).min(400);
@@ -343,6 +354,13 @@ pub fn update_player_pickups(
                     player.current_weapon = WeaponType::Freezethrower;
                     collected = true;
                     message = "YOU GOT THE FREEZETHROWER!";
+                }
+                WeaponExpander => {
+                    player.weapons[WeaponType::Expander as usize].is_unlocked = true;
+                    player.weapons[WeaponType::Expander as usize].ammo = (player.weapons[WeaponType::Expander as usize].ammo + 20).min(99);
+                    player.current_weapon = WeaponType::Expander;
+                    collected = true;
+                    message = "YOU GOT THE EXPANDER!";
                 }
             }
 

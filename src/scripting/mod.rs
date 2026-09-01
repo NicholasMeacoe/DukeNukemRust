@@ -81,6 +81,25 @@ impl ConScriptEngine {
         Self::from_source(DEFAULT_CORE_CON_SCRIPT)
             .expect("Default core CON script must compile cleanly")
     }
+
+    pub fn from_grp_files(grp: &crate::grp::Grp) -> Result<Self, String> {
+        let game_con_bytes = grp.read_file("GAME.CON")?;
+        let game_con_str = String::from_utf8_lossy(&game_con_bytes);
+
+        let mut compiler = Compiler::new();
+        let loader = |name: &str| -> Option<String> {
+            grp.read_file(name).ok().map(|bytes| String::from_utf8_lossy(&bytes).to_string())
+        };
+
+        let compiled = compiler.compile_with_loader(&game_con_str, &loader)?;
+        let vm = ConVm::new(
+            compiled.bytecode.clone(),
+            compiled.actor_script_ptrs.clone(),
+            compiled.actor_types.clone(),
+        );
+        let trig = TrigTables::new();
+        Ok(Self { vm, trig, compiled })
+    }
 }
 
 pub const DEFAULT_CORE_CON_SCRIPT: &str = r#"

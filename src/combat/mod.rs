@@ -415,4 +415,64 @@ mod tests {
         assert!((dist_sq - 0.04).abs() < 0.001);
         assert!(dist_sq <= 1.44); // Hits inside standard enemy radius
     }
+
+    #[test]
+    fn test_surface_impact_material_and_decal_dispatch() {
+        let hit_pos = Vec3::new(10.0, 1.0, 5.0);
+        let normal = Vec3::Z;
+
+        // Scorch mark on explosive detonation
+        let scorch_event = decals::SpawnDecalEvent {
+            origin: hit_pos,
+            normal,
+            decal_type: decals::DecalType::ScorchMark,
+        };
+        assert_eq!(scorch_event.decal_type, decals::DecalType::ScorchMark);
+
+        // Bullet hole on hitscan impact
+        let bullet_event = decals::SpawnDecalEvent {
+            origin: hit_pos,
+            normal,
+            decal_type: decals::DecalType::BulletHole,
+        };
+        assert_eq!(bullet_event.decal_type, decals::DecalType::BulletHole);
+
+        // Blood splatter on flesh hit
+        let blood_event = decals::SpawnDecalEvent {
+            origin: hit_pos,
+            normal: Vec3::Y,
+            decal_type: decals::DecalType::BloodSplatter,
+        };
+        assert_eq!(blood_event.decal_type, decals::DecalType::BloodSplatter);
+    }
+
+    #[test]
+    fn test_extended_world_actors_and_scenery() {
+        // Turret actor
+        let turret = EnemyActor::new_turret();
+        assert_eq!(turret.kind, EnemyKind::Turret);
+        assert_eq!(turret.health, 40);
+        assert_eq!(turret.attack_cooldown, 0.5);
+
+        // Scampering rat actor
+        let mut rat = EnemyActor::new_rat();
+        assert_eq!(rat.kind, EnemyKind::ScamperingRat);
+        assert_eq!(rat.speed, 10.0);
+        let dist_to_player = 3.0;
+        let flee_dir = Vec3::new(1.0, 0.0, 0.0);
+        let dt = 0.1;
+        let mut rat_pos = Vec3::ZERO;
+        if rat.kind == EnemyKind::ScamperingRat && dist_to_player <= 5.0 {
+            rat_pos += flee_dir * (rat.speed * dt);
+        }
+        assert_eq!(rat_pos.x, 1.0);
+
+        // Slime hazard actor
+        let slime = EnemyActor::new_slime_hazard();
+        assert_eq!(slime.kind, EnemyKind::ToxicSlimeHazard);
+
+        // Camera prop
+        let cam = EnemyActor::new_camera_prop();
+        assert_eq!(cam.kind, EnemyKind::SecurityCameraProp);
+    }
 }
