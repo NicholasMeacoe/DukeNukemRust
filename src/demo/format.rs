@@ -26,7 +26,7 @@ pub mod demo_bits {
     pub const ESCAPE: u32      = 1 << 31;
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct GameticInput {
     pub avel: i8,   // Yaw rotation velocity delta (-127..127)
     pub horz: i8,   // Pitch rotation delta (-127..127)
@@ -59,7 +59,7 @@ impl GameticInput {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct DemoHeader {
     pub total_tics: u32,
     pub version: u8,

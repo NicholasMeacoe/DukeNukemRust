@@ -3,7 +3,7 @@
 use std::io::Cursor;
 use hound::{WavSpec, WavWriter, SampleFormat};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct VocSound {
     pub name: String,
     pub sample_rate: u32,

@@ -9,14 +9,14 @@ pub const KEY_BLUE: i16 = 175;
 pub const KEY_RED: i16 = 176;
 pub const KEY_YELLOW: i16 = 177;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum HudMode {
     ClassicStatusbar,
     FullscreenMini,
     Hidden,
 }
 
-#[derive(Component, Debug, Clone)]
+#[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct StatusbarState {
     pub hud_mode: HudMode,
     pub has_blue_key: bool,

@@ -166,6 +166,7 @@ pub fn update_player_pickups(
     mut sound_events: EventWriter<PlaySoundEvent>,
     mut voice_events: EventWriter<crate::audio::PlayDukeVoiceEvent>,
     mut commands: Commands,
+    mut tint: Option<ResMut<crate::hud::ScreenTintState>>,
 ) {
     let Ok((p_trans, mut player)) = player_query.get_single_mut() else { return; };
     let mut sbar = sbar_query.get_single_mut().ok();
@@ -360,15 +361,21 @@ pub fn update_player_pickups(
                     player.weapons[WeaponType::Expander as usize].ammo = (player.weapons[WeaponType::Expander as usize].ammo + 20).min(99);
                     player.current_weapon = WeaponType::Expander;
                     collected = true;
-                    message = "YOU GOT THE EXPANDER!";
+                    message = "WEAPON: EXPANDER";
                 }
             }
 
             if collected {
-                sound_events.send(PlaySoundEvent { sound_id: 724 }); // ITEM_PICKUP
+                sound_events.send(PlaySoundEvent { sound_id: 39 }); // GET_ITEM
                 if let Some(ref mut sb) = sbar {
                     sb.message_text = message.to_string();
                     sb.message_timer = 2.5;
+                }
+                if let Some(ref mut t) = tint {
+                    t.target_color = Color::srgba(0.8, 0.8, 0.2, 0.5);
+                }
+                if rand::random::<f32>() < 0.15 {
+                    voice_events.send(crate::audio::PlayDukeVoiceEvent { name: Some("LOOKING_GOOD".into()) });
                 }
                 commands.entity(pickup_entity).despawn_recursive();
             }

@@ -6,7 +6,7 @@ pub const BIGALPHANUM: i16 = 2940;
 pub const MINIFONT: i16 = 3072;
 pub const THREE_DIGIT_BASE: i16 = 2472;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum DukeFont {
     BigRed,
     SmallBlue,

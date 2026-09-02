@@ -2,7 +2,7 @@
 
 use bevy::prelude::*;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum EffectorKind {
     /// SE 0: Rotating / Pivot Door
     RotatingDoor {
@@ -156,7 +156,7 @@ pub enum EffectorKind {
     },
 }
 
-#[derive(Component, Debug, Clone)]
+#[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SectorEffectorComponent {
     pub sector_idx: usize,
     pub lotag: i16,
@@ -165,7 +165,7 @@ pub struct SectorEffectorComponent {
     pub active: bool,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum SwitchType {
     LightSwitch,
     SpaceDoorSwitch,
@@ -179,12 +179,12 @@ pub enum SwitchType {
     AccessSwitch { key_required: u8 }, // 1 = Blue, 2 = Red, 3 = Yellow
 }
 
-#[derive(Component, Debug, Clone)]
+#[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct KeycardPickup {
     pub key_type: u8, // 1 = Blue, 2 = Red, 3 = Yellow
 }
 
-#[derive(Component, Debug, Clone)]
+#[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct InteractiveSwitch {
     pub switch_type: SwitchType,
     pub on_tile: i16,
@@ -193,17 +193,18 @@ pub struct InteractiveSwitch {
     pub lotag: i16,
     pub hitag: i16,
     pub sound_id: i32,
+    #[serde(skip)]
     pub material_handle: Option<Handle<StandardMaterial>>,
 }
 
-#[derive(Component, Debug, Clone)]
+#[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct WaterFountain {
     pub uses_left: i32,
     pub is_broken: bool,
     pub broken_tile: i16,
 }
 
-#[derive(Component, Debug, Clone)]
+#[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ToiletProp {
     pub is_broken: bool,
     pub broken_tile: i16,
@@ -224,7 +225,7 @@ impl Default for ToiletProp {
     }
 }
 
-#[derive(Component, Debug, Clone)]
+#[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct BreakableGlass {
     pub health: i32,
     pub is_broken: bool,
@@ -232,7 +233,7 @@ pub struct BreakableGlass {
     pub sector_idx: Option<usize>,
 }
 
-#[derive(Component, Debug, Clone)]
+#[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ExplodingBarrel {
     pub health: i32,
     pub damage_radius: f32,
@@ -240,7 +241,7 @@ pub struct ExplodingBarrel {
     pub is_exploded: bool,
 }
 
-#[derive(Component, Debug, Clone)]
+#[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ViewscreenProp {
     pub camera_tag: i16,
     pub is_active: bool,
@@ -261,7 +262,7 @@ impl Default for ViewscreenProp {
     }
 }
 
-#[derive(Component, Debug, Clone)]
+#[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SecurityCamera {
     pub tag: i16,
     pub sweep_angle: f32,
@@ -280,7 +281,7 @@ impl Default for SecurityCamera {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum PickupKind {
     // Health
     SmallMedkit,       // +10 HP (up to 100) - Tile 51
@@ -318,13 +319,13 @@ pub enum PickupKind {
     WeaponExpander,    // Tile 32
 }
 
-#[derive(Component, Debug, Clone)]
+#[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ItemPickup {
     pub kind: PickupKind,
     pub respawn_timer: Option<f32>,
 }
 
-#[derive(Component, Debug, Clone)]
+#[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CrackWall {
     pub health: i32,
     pub stage: u8,
@@ -332,7 +333,7 @@ pub struct CrackWall {
     pub is_blown: bool,
 }
 
-#[derive(Component, Debug, Clone)]
+#[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Touchplate {
     pub lotag: i16,
     pub hitag: i16,
@@ -340,13 +341,13 @@ pub struct Touchplate {
     pub triggered: bool,
 }
 
-#[derive(Component, Debug, Clone)]
+#[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Activator {
     pub lotag: i16,
     pub hitag: i16,
 }
 
-#[derive(Component, Debug, Clone)]
+#[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct NukeExitSwitch {
     pub is_activated: bool,
     pub is_secret: bool,
@@ -354,7 +355,7 @@ pub struct NukeExitSwitch {
     pub hitag: i16,
 }
 
-#[derive(Component, Debug, Clone)]
+#[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct MasterSwitch {
     pub lotag: i16,
     pub hitag: i16,
@@ -395,7 +396,7 @@ pub struct BarrelExplodeEvent {
     pub damage: i32,
 }
 
-#[derive(Component, Debug, Clone)]
+#[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct MirrorProp {
     pub cooldown_timer: f32,
 }

@@ -81,10 +81,11 @@ impl<'a> MapMeshBuilder<'a> {
         commands: &mut Commands,
         meshes: &mut Assets<Mesh>,
         materials: &mut Assets<StandardMaterial>,
+        skill_level: u8,
     ) {
         self.build_sectors(commands, meshes, materials);
         self.build_walls(commands, meshes, materials);
-        self.build_sprites(commands, meshes, materials);
+        self.build_sprites(commands, meshes, materials, skill_level);
     }
 
     fn build_sectors(
@@ -626,8 +627,24 @@ impl<'a> MapMeshBuilder<'a> {
         commands: &mut Commands,
         meshes: &mut Assets<Mesh>,
         materials: &mut Assets<StandardMaterial>,
+        skill_level: u8,
     ) {
         for sprite in &self.map.sprites {
+            // Difficulty filtering (only affects enemies, items, etc. mapped to lotag > 0)
+            if sprite.lotag > 0 && sprite.lotag <= 4 && sprite.lotag > (skill_level as i16 + 1) {
+                // If it's a known monster or item, we should skip it.
+                // In Duke 3D, lotag 1-4 is exclusively for difficulty on these actors.
+                // We'll skip spawning them entirely.
+                match sprite.picnum {
+                    // Items & Monsters
+                    2000 | 1680 | 1820 | 2120 | 1960 | 2370 | 2710 | 4610 |
+                    21 | 22 | 23 | 27 | 28 | 29 | 33 | 37 | 40 | 44 | 51 | 52 | 53 | 54 | 55 | 56 | 57 | 60 | 61 => {
+                        continue;
+                    },
+                    _ => {} // Other things with lotag (like sector effectors) are logic IDs!
+                }
+            }
+
             if self.tile_textures.contains_key(&sprite.picnum) {
                 let (tw, th) = self.get_tile_size(sprite.picnum);
                 let pos = Vec3::new(
@@ -644,14 +661,14 @@ impl<'a> MapMeshBuilder<'a> {
 
                 let mut entity_cmds = commands.spawn((
                     PbrBundle {
-                        mesh: meshes.add(Rectangle::new(scale_x, scale_y)),
+                        mesh: meshes.add(Rectangle::new(1.0, 1.0)),
                         material: sprite_mat.clone(),
-                        transform: Transform::from_translation(pos),
+                        transform: Transform::from_translation(pos).with_scale(Vec3::new(scale_x, scale_y, 1.0)),
                         ..default()
                     },
                     crate::SpriteBillboard,
                     RigidBody::Fixed,
-                    Collider::cuboid(scale_x / 2.0, scale_y / 2.0, 0.1),
+                    Collider::cuboid(0.5, 0.5, 0.1),
                     crate::Destructible {
                         health: if is_enemy { 100 } else { 10 },
                         _picnum: sprite.picnum,

@@ -2,7 +2,7 @@
 
 use bevy::prelude::*;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum ProjectileType {
     HitscanBullet,
     ShotgunPellet,
@@ -29,7 +29,7 @@ pub struct SpawnProjectileEvent {
     pub is_player_source: bool,
 }
 
-#[derive(Component, Debug, Clone)]
+#[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Projectile {
     pub projectile_type: ProjectileType,
     pub velocity: Vec3,
@@ -39,7 +39,7 @@ pub struct Projectile {
     pub bounces: u8,
 }
 
-#[derive(Component, Debug, Clone)]
+#[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct LaserTripbomb {
     pub normal: Vec3,
     pub arm_timer: f32,
@@ -49,26 +49,26 @@ pub struct LaserTripbomb {
     pub damage_radius: f32,
 }
 
-#[derive(Component, Debug, Clone, Default)]
+#[derive(Component, Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct FlyingActor {
     pub current_z_vel: f32,
     pub target_altitude: f32,
 }
 
-#[derive(Component, Debug, Clone)]
+#[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SituationalSpawn {
     pub initial_picnum: i16,
     pub is_dormant: bool,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum SpriteViewType {
     SingleView,
     FiveViewMirror,
     EightView,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum EnemyKind {
     Liztroop,
     AssaultCaptain,
@@ -94,7 +94,7 @@ pub enum EnemyKind {
     Boss4Queen,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum EnemyAiState {
     Idle,
     Patrol,
@@ -107,7 +107,7 @@ pub enum EnemyAiState {
     Gibbed,
 }
 
-#[derive(Component, Debug, Clone)]
+#[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct EnemyActor {
     pub kind: EnemyKind,
     pub state: EnemyAiState,
@@ -559,7 +559,7 @@ pub struct GibEvent {
     pub gib_count: usize,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum DamageSource {
     PlayerWeapon(ProjectileType),
     EnemyWeapon(ProjectileType),

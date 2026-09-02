@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 use std::io::{Read, Cursor};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Sector {
     pub wallptr: i16,
     pub wallnum: i16,
@@ -28,7 +28,7 @@ pub struct Sector {
     pub extra: i16,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Wall {
     pub x: i32,
     pub y: i32,
@@ -49,7 +49,7 @@ pub struct Wall {
     pub extra: i16,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Sprite {
     pub x: i32,
     pub y: i32,

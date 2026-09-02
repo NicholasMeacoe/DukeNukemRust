@@ -4,7 +4,7 @@ use bevy::prelude::*;
 use std::collections::HashMap;
 use crate::interactivity::types::*;
 
-#[derive(Component, Debug, Clone)]
+#[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct DynamicSectorMesh {
     pub sector_idx: usize,
     pub orig_translation: Vec3,

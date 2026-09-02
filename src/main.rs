@@ -103,7 +103,7 @@ fn main() {
             (player_look, cursor_grab, emit_player_interaction).in_set(GameSet::Input),
             (play_duke_quotes, update_weapon).in_set(GameSet::Combat),
             (animation::update_engine_clock, animation::update_tile_animations).in_set(GameSet::Animation),
-            (update_billboards, sky::update_skybox, capture_debug_screenshot).in_set(GameSet::RenderSync),
+            (update_billboards, update_directional_sprites, sky::update_skybox, capture_debug_screenshot).in_set(GameSet::RenderSync),
         ))
         .run();
 }
@@ -226,57 +226,13 @@ fn setup(
         grp_path: grp_path.clone(),
     });
 
-    let mut start_pos = Vec3::new(0.0, 1.5, 5.0);
-    let mut start_yaw = 0.0;
+    let start_pos = Vec3::new(0.0, 1.5, 5.0);
+    let start_yaw = 0.0;
 
-    let map_name = "E1L1.MAP";
-    println!("Attempting to load map {} from GRP", map_name);
-    
+    // Initialize CON Scripting Engine from GRP (or built-in fallback)
     if let Ok(grp) = Grp::open(&grp_path) {
-        // Initialize CON Scripting Engine from GRP (or built-in fallback)
         let con_engine = scripting::ConScriptEngine::from_grp(&grp);
         commands.insert_resource(con_engine);
-
-        if let Ok(map_data) = grp.read_file(map_name) {
-            if let Ok(map) = Map::from_bytes(&map_data) {
-                println!("Map loaded successfully: {} sectors, {} walls, {} sprites", map.sectors.len(), map.walls.len(), map.sprites.len());
-            
-                // Build units to meters: 1024 units ~= 1 meter (approx)
-                let floor_y = if (map.cursectnum as usize) < map.sectors.len() {
-                    map.sectors[map.cursectnum as usize].get_floor_y_at(&map.walls, map.posx, map.posy)
-                } else {
-                    -(map.posz as f32) / (1024.0 * 16.0) - 0.85
-                };
-
-                start_pos = Vec3::new(
-                    map.posx as f32 / 1024.0,
-                    floor_y + 0.85,
-                    map.posy as f32 / 1024.0,
-                );
-                start_yaw = -(map.ang as f32 / 2048.0) * std::f32::consts::TAU + std::f32::consts::FRAC_PI_2;
-                println!("Player start position: {:?}", start_pos);
-
-                // Build map geometry with Phase 1 & 2 portal compiler, slope tessellation, shading and animations
-                let mesh_builder = MapMeshBuilder::new(
-                    &map,
-                    &tile_textures,
-                    &tile_sizes,
-                    &picanm_map,
-                    default_material.clone(),
-                );
-                mesh_builder.build(&mut commands, &mut meshes, &mut materials);
-
-                // Spawn Phase 4 interactive sector effectors, switches, touchplates, and props
-                interactivity::spawn_interactive_elements_from_map(&mut commands, &map);
-
-                // Check for parallax sky
-                let has_sky = map.sectors.iter().any(|s| s.is_ceiling_parallax());
-                if has_sky {
-                    // Tile 80 is MOONSKY1 (Episode 1 Hollywood Holocaust sky)
-                    sky::spawn_skybox(&mut commands, &mut meshes, &mut materials, &tile_textures, 80);
-                }
-            }
-        }
     } else {
         let con_engine = scripting::ConScriptEngine::from_source(scripting::DEFAULT_CORE_CON_SCRIPT).unwrap();
         commands.insert_resource(con_engine);
@@ -334,10 +290,22 @@ fn setup(
         },
     )).id();
 
-    let _camera_entity = commands.spawn(Camera3dBundle {
-        transform: Transform::from_xyz(0.0, 0.4, 0.0).with_rotation(Quat::from_rotation_y(start_yaw)),
-        ..default()
-    }).set_parent(player_entity).id();
+    let _camera_entity = commands.spawn((
+        Camera3dBundle {
+            transform: Transform::from_xyz(0.0, 0.4, 0.0).with_rotation(Quat::from_rotation_y(start_yaw)),
+            ..default()
+        },
+        bevy::pbr::FogSettings {
+            color: Color::srgb(0.02, 0.0, 0.02),
+            directional_light_color: Color::NONE,
+            directional_light_exponent: 30.0,
+            falloff: bevy::pbr::FogFalloff::Linear {
+                start: 5.0,
+                end: 35.0,
+            },
+        },
+        bevy::audio::SpatialListener::new(0.35),
+    )).set_parent(player_entity).id();
 
     // Spawn First Person Weapon (Pistol) using UI
     // The shareware version might not have 2524, let's try 2524 (FIRSTGUN) or fallback to something else, or a colored block
@@ -405,6 +373,63 @@ fn update_billboards(
             target.y = transform.translation.y; 
             if target.xz().distance_squared(transform.translation.xz()) > 0.001 {
                 transform.look_at(target, Vec3::Y);
+            }
+        }
+    }
+}
+
+fn update_directional_sprites(
+    camera_query: Query<&Transform, (With<Camera>, Without<crate::scripting::ConActor>)>,
+    mut query: Query<(&mut Handle<StandardMaterial>, &crate::scripting::ConActor, &Transform)>,
+    game_assets: Res<crate::GameAssets>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    if let Ok(camera_transform) = camera_query.get_single() {
+        let cam_pos = camera_transform.translation.xz();
+        
+        for (mut material_handle, con_actor, trans) in query.iter_mut() {
+            let sprite_pos = trans.translation.xz();
+            
+            // Build engine angles map 0 = right, 512 = down, 1024 = left, 1536 = up
+            let heading_rad = (con_actor.ang as f32 / 2048.0) * std::f32::consts::TAU;
+            let sprite_dir = Vec2::new(heading_rad.cos(), heading_rad.sin());
+            
+            let to_cam = (cam_pos - sprite_pos).normalize_or_zero();
+            
+            let mut rel_angle = sprite_dir.angle_between(to_cam);
+            if rel_angle < 0.0 {
+                rel_angle += std::f32::consts::TAU;
+            }
+            
+            // Quantize into 8 octants
+            let octant = ((rel_angle / std::f32::consts::TAU) * 8.0 + 0.5).floor() as i32 % 8;
+            
+            // Note: Not all sprites have 8 angles. We assume ones that do are 8 contiguous frames.
+            // Some sprites only have 5 frames and use mirrored flags. For this implementation,
+            // we will just add the octant to the current picnum.
+            // Certain items are not directional (like items, debris). ConActor includes Enemies and some interactive items.
+            // For enemies, they typically have 5 frames. We'll map octant 5,6,7 to 3,2,1 for a 5-frame set.
+            let offset = match octant {
+                0 => 0, // front
+                1 => 1, // front-right
+                2 => 2, // right
+                3 => 3, // back-right
+                4 => 4, // back
+                5 => 3, // back-left (mirrored back-right)
+                6 => 2, // left (mirrored right)
+                7 => 1, // front-left (mirrored front-right)
+                _ => 0,
+            };
+
+            let display_picnum = con_actor.picnum + offset;
+            
+            if let Some(tex) = game_assets.tile_textures.get(&display_picnum) {
+                *material_handle = materials.add(StandardMaterial {
+                    base_color_texture: Some(tex.clone()),
+                    alpha_mode: AlphaMode::Mask(0.5),
+                    unlit: true,
+                    ..default()
+                });
             }
         }
     }

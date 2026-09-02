@@ -13,7 +13,7 @@ pub use compiler::{Compiler, CompiledScript};
 pub use vm::{ConVm, VmActorContext};
 pub use physics::TrigTables;
 
-#[derive(Component, Debug, Clone)]
+#[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ConActor {
     pub picnum: i16,
     pub sectnum: i16,

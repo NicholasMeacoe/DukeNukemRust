@@ -35,7 +35,7 @@ impl Default for CampaignProgression {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum LevelAdvanceResult {
     NextLevel { episode: usize, level: usize },
     SecretLevel { episode: usize, level: usize },

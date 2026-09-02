@@ -464,7 +464,7 @@ pub fn update_laser_tripbombs(
     }
 }
 
-#[derive(Component, Debug, Clone)]
+#[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct FirstPersonViewModel {
     pub current_weapon: WeaponType,
     pub anim_frame: u32,

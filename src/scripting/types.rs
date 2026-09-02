@@ -4,7 +4,7 @@ pub const NUM_KEYWORDS: usize = 112;
 pub const MAX_TILES: usize = 6144;
 pub const TICSPERFRAME: i32 = 3;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[repr(i32)]
 pub enum Opcode {
     DefineLevelName = 0,
@@ -273,7 +273,7 @@ pub struct AiDef {
 
 pub const NULL_PTR: usize = 0;
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct ActorRegisters {
     pub count: i32,                  // T1: temp_data[0]
     pub move_ptr: Option<usize>,     // T2: temp_data[1]

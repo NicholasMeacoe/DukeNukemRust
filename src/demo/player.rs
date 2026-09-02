@@ -5,7 +5,7 @@ use std::io::Read;
 use std::path::Path;
 use crate::demo::format::*;
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct DemoPlayer {
     pub is_playing: bool,
     pub header: Option<DemoHeader>,

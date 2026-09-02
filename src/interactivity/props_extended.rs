@@ -20,7 +20,7 @@ impl ToiletProp {
     }
 }
 
-#[derive(Component, Debug, Clone, Default)]
+#[derive(Component, Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct FountainProp;
 
 impl FountainProp {
@@ -34,13 +34,13 @@ impl FountainProp {
     }
 }
 
-#[derive(Component, Debug, Clone)]
+#[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SecurityCameraMonitor {
     pub camera_tag: i16,
     pub is_viewing: bool,
 }
 
-#[derive(Component, Debug, Clone)]
+#[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct DancerProp {
     pub tip_timer: f32,
     pub total_tips: usize,
@@ -64,7 +64,7 @@ impl DancerProp {
     }
 }
 
-#[derive(Component, Debug, Clone)]
+#[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct MoneyItem {
     pub velocity: Vec3,
     pub flutter_timer: f32,

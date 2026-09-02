@@ -22,7 +22,7 @@ pub struct IntermissionAnimationState {
     pub speech_played: bool,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct IntermissionStats {
     pub kill_percentage: i32,
     pub secret_percentage: i32,

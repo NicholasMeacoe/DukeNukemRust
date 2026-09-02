@@ -4,16 +4,16 @@ use bevy::prelude::*;
 
 #[derive(States, Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum GamePhase {
+    #[default]
     MainMenu,
     EpisodeSelect,
     SkillSelect,
-    #[default]
     Playing,
     Intermission,
     Paused,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum SkillLevel {
     PieceOfCake = 0,
     LetsRock = 1,
@@ -21,7 +21,7 @@ pub enum SkillLevel {
     DamnImGood = 3,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Episode {
     LAMeltdown = 1,
     LunarApocalypse = 2,
@@ -85,7 +85,7 @@ impl LevelProgress {
 #[derive(Event, Debug, Clone)]
 pub struct LevelCompletedEvent;
 
-#[derive(Component, Debug, Clone)]
+#[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct LevelEntity;
 
 #[derive(Event, Debug, Clone)]

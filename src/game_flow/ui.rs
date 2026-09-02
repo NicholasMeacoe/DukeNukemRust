@@ -142,6 +142,7 @@ pub fn update_menu_ui(
     cursor: Res<MenuCursor>,
     cursor_anim: Res<CursorAnimTimer>,
     progress: Res<LevelProgress>,
+    anim_state: Res<crate::game_flow::intermission::IntermissionAnimationState>,
     mut root_query: Query<(&mut Style, &mut BackgroundColor), With<MenuUiRoot>>,
     mut header_query: Query<&mut Text, (With<MenuHeaderTitle>, Without<MenuSubheaderText>, Without<MenuItemText>, Without<MenuCursorIndicator>, Without<MenuFooterText>)>,
     mut subheader_query: Query<&mut Text, (With<MenuSubheaderText>, Without<MenuHeaderTitle>, Without<MenuItemText>, Without<MenuCursorIndicator>, Without<MenuFooterText>)>,
@@ -243,9 +244,15 @@ pub fn update_menu_ui(
         let idx = item.0;
         if current_phase == GamePhase::Intermission {
             text.sections[0].value = match idx {
-                0 => format!("KILLS:    {:>3}% ({}/{})", stats.kill_percentage, progress.kills_count, progress.total_monsters),
-                1 => format!("SECRETS:  {:>3}% ({}/{})", stats.secret_percentage, progress.secrets_found, progress.total_secrets),
-                2 => format!("TIME:     {:02}:{:02} (PAR {:02}:{:02})", min, sec, par_min, par_sec),
+                0 => if anim_state.stage as u8 >= crate::game_flow::intermission::IntermissionStage::KillsTally as u8 {
+                         format!("KILLS:    {:>3}%", anim_state.displayed_kills)
+                     } else { "".to_string() },
+                1 => if anim_state.stage as u8 >= crate::game_flow::intermission::IntermissionStage::SecretsTally as u8 {
+                         format!("SECRETS:  {:>3}%", anim_state.displayed_secrets)
+                     } else { "".to_string() },
+                2 => if anim_state.stage as u8 >= crate::game_flow::intermission::IntermissionStage::TimeReveal as u8 {
+                         format!("TIME:     {:02}:{:02} (PAR {:02}:{:02})", min, sec, par_min, par_sec)
+                     } else { "".to_string() },
                 _ => "".to_string(),
             };
             text.sections[0].style.color = DUKE_WHITE;

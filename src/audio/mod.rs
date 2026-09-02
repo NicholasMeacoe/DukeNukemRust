@@ -3,10 +3,12 @@
 pub mod voc;
 pub mod midi;
 pub mod rts;
+pub mod synth_stream;
 
 pub use voc::*;
 pub use midi::*;
 pub use rts::*;
+pub use synth_stream::*;
 
 use bevy::prelude::*;
 use std::collections::HashMap;
@@ -16,21 +18,27 @@ pub struct DukeAudioPlugin;
 
 impl Plugin for DukeAudioPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<DukeAudioAssets>()
+        app.init_asset::<MidiAudioStream>()
+            .init_resource::<DukeAudioAssets>()
             .init_resource::<DynamicMusicState>()
             .init_resource::<DukeVoiceQueue>()
             .add_event::<PlaySoundEvent>()
+            .add_event::<PlaySpatialSoundEvent>()
             .add_event::<PlayNamedSoundEvent>()
             .add_event::<PlayDukeVoiceEvent>()
+            .add_event::<PlayMusicTrackEvent>()
             .add_systems(Startup, setup_duke_audio)
             .add_systems(
                 Update,
                 (
                     handle_play_sound_events,
+                    handle_play_spatial_sound_events,
                     handle_play_named_sound_events,
                     handle_play_duke_voice_events,
+                    handle_play_music_track_events,
                     update_dynamic_audio_state,
-                ).in_set(crate::GameSet::Combat),
+                    sync_music_volume_system,
+                ),
             );
     }
 }
@@ -51,6 +59,13 @@ pub struct PlaySoundEvent {
 }
 
 #[derive(Event, Debug, Clone)]
+pub struct PlaySpatialSoundEvent {
+    pub sound_id: i32,
+    pub volume: f32,
+    pub position: Vec3,
+}
+
+#[derive(Event, Debug, Clone)]
 pub struct PlayNamedSoundEvent {
     pub name: String,
     pub volume: f32,
@@ -62,6 +77,14 @@ pub struct PlayDukeVoiceEvent {
     pub name: Option<String>,
 }
 
+#[derive(Event, Debug, Clone)]
+pub struct PlayMusicTrackEvent {
+    pub track: LevelMidiTrack,
+}
+
+#[derive(Component)]
+pub struct MusicTrackEmitter;
+
 #[derive(Resource, Debug, Clone)]
 pub struct DynamicMusicState {
     pub current_state: MusicState,
@@ -69,6 +92,7 @@ pub struct DynamicMusicState {
     pub base_volume: f32,
     pub ducking_timer: f32,
     pub is_underwater: bool,
+    pub current_volume: f32,
 }
 
 impl Default for DynamicMusicState {
@@ -79,12 +103,13 @@ impl Default for DynamicMusicState {
             base_volume: 0.8,
             ducking_timer: 0.0,
             is_underwater: false,
+            current_volume: 0.8,
         }
     }
 }
 
 impl DynamicMusicState {
-    pub fn get_effective_volume(&self) -> f32 {
+    pub fn get_target_volume(&self) -> f32 {
         let mut vol = self.base_volume;
         if self.ducking_timer > 0.0 {
             vol *= 0.6; // Duck by 40% during voice lines
@@ -102,6 +127,20 @@ impl DynamicMusicState {
     }
 }
 
+pub fn sync_music_volume_system(
+    time: Res<Time>,
+    mut music_state: ResMut<DynamicMusicState>,
+    sink_query: Query<&bevy::audio::AudioSink, With<MusicTrackEmitter>>,
+) {
+    let target = music_state.get_target_volume();
+    // Smooth lerp to prevent popping
+    music_state.current_volume = music_state.current_volume + (target - music_state.current_volume) * (time.delta_seconds() * 5.0).min(1.0);
+    
+    for sink in &sink_query {
+        sink.set_volume(music_state.current_volume);
+    }
+}
+
 #[derive(Resource, Debug, Clone, Default)]
 pub struct DukeVoiceQueue {
     pub active_priority: u8,
@@ -110,7 +149,8 @@ pub struct DukeVoiceQueue {
 
 impl DukeVoiceQueue {
     pub fn should_play(&mut self, priority: u8) -> bool {
-        if self.cooldown_timer <= 0.0 || priority >= self.active_priority {
+        // FIXED: Used `>` instead of `>=` to prevent overlapping equal-priority lines
+        if self.cooldown_timer <= 0.0 || priority > self.active_priority {
             self.active_priority = priority;
             self.cooldown_timer = 2.0;
             true
@@ -134,7 +174,7 @@ pub struct DukeAudioAssets {
     pub sounds_by_name: HashMap<String, Handle<AudioSource>>,
     pub sounds_by_id: HashMap<i32, Handle<AudioSource>>,
     pub sound_id_to_file: HashMap<i32, String>,
-    pub music_tracks: HashMap<LevelMidiTrack, Handle<AudioSource>>,
+    pub music_tracks: HashMap<LevelMidiTrack, Handle<MidiAudioStream>>,
     pub duke_quotes: Vec<Handle<AudioSource>>,
     pub all_sounds: Vec<Handle<AudioSource>>,
 }
@@ -218,6 +258,7 @@ fn find_grp_path() -> String {
 pub fn setup_duke_audio(
     mut commands: Commands,
     mut audio_sources: ResMut<Assets<AudioSource>>,
+    mut midi_sources: ResMut<Assets<MidiAudioStream>>,
     mut audio_assets: ResMut<DukeAudioAssets>,
 ) {
     let grp_path = find_grp_path();
@@ -295,32 +336,48 @@ pub fn setup_duke_audio(
         }
     }
 
-    // 5. Synthesize and load background MIDI music from GRP
-    let synth = MidiSynth::new(22050);
-    let tracks_to_load = [
-        (LevelMidiTrack::E1L1Stalker, "STALKER.MID"),
-        (LevelMidiTrack::TitleGrabbag, "GRABBAG.MID"),
-    ];
+    // 5. Setup streaming MIDI music via SoundFont
+    let soundfont_data = std::fs::read("assets/TimGM6mb.sf2").unwrap_or_default();
+    let sf2_soundfont = if !soundfont_data.is_empty() {
+        let mut reader = std::io::Cursor::new(soundfont_data);
+        if let Ok(sf) = rustysynth::SoundFont::new(&mut reader) {
+            Some(std::sync::Arc::new(sf))
+        } else {
+            None
+        }
+    } else {
+        println!("DukeAudioPlugin: Warning - assets/TimGM6mb.sf2 not found! Music will not play.");
+        None
+    };
 
-    for (track_enum, midi_filename) in &tracks_to_load {
-        if let Ok(midi_data) = grp.read_file(midi_filename) {
-            if let Ok(wav_bytes) = synth.midi_to_wav(&midi_data) {
-                let music_source = AudioSource {
-                    bytes: wav_bytes.into(),
+    if let Some(soundfont) = sf2_soundfont {
+        let tracks_to_load = [
+            (LevelMidiTrack::E1L1Stalker, "STALKER.MID"),
+            (LevelMidiTrack::TitleGrabbag, "GRABBAG.MID"),
+        ];
+
+        for (track_enum, midi_filename) in &tracks_to_load {
+            if let Ok(midi_data) = grp.read_file(midi_filename) {
+                let stream = MidiAudioStream {
+                    midi_data: std::sync::Arc::new(midi_data),
+                    sf2_soundfont: soundfont.clone(),
                 };
-                let music_handle = audio_sources.add(music_source);
+                let music_handle = midi_sources.add(stream);
                 audio_assets.music_tracks.insert(*track_enum, music_handle);
-                println!("DukeAudioPlugin: Loaded & synthesized background music: {}", midi_filename);
+                println!("DukeAudioPlugin: Loaded background music: {}", midi_filename);
             }
         }
     }
 
     // 6. Start playing the iconic E1L1 soundtrack (STALKER.MID) in background loop
     if let Some(e1l1_music) = audio_assets.music_tracks.get(&LevelMidiTrack::E1L1Stalker) {
-        commands.spawn(AudioBundle {
-            source: e1l1_music.clone(),
-            settings: PlaybackSettings::LOOP.with_volume(bevy::audio::Volume::new(0.6)),
-        });
+        commands.spawn((
+            bevy::audio::AudioSourceBundle {
+                source: e1l1_music.clone(),
+                settings: PlaybackSettings::LOOP.with_volume(bevy::audio::Volume::new(0.6)),
+            },
+            MusicTrackEmitter,
+        ));
         println!("DukeAudioPlugin: Background music playing (STALKER.MID - Episode 1 Level 1)");
     }
 
@@ -348,30 +405,77 @@ pub fn handle_play_sound_events(
     }
 }
 
+pub fn handle_play_spatial_sound_events(
+    mut events: EventReader<PlaySpatialSoundEvent>,
+    audio_assets: Res<DukeAudioAssets>,
+    mut commands: Commands,
+) {
+    for ev in events.read() {
+        if let Some(handle) = audio_assets.get_sound_by_id(ev.sound_id) {
+            let settings = PlaybackSettings::default().with_volume(bevy::audio::Volume::new(ev.volume)).with_spatial(true);
+            commands.spawn((
+                AudioBundle {
+                    source: handle,
+                    settings,
+                },
+                TransformBundle::from_transform(Transform::from_translation(ev.position)),
+            ));
+        }
+    }
+}
+
 pub fn handle_play_named_sound_events(
     mut events: EventReader<PlayNamedSoundEvent>,
     audio_assets: Res<DukeAudioAssets>,
-    camera_query: Query<&Transform, With<Camera>>,
     mut commands: Commands,
 ) {
-    let cam_trans = camera_query.get_single().ok();
     for ev in events.read() {
         if let Some(handle) = audio_assets.get_sound_by_name(&ev.name) {
-            let mut volume = ev.volume;
-            if let (Some(cam), Some(pos)) = (cam_trans, ev.position) {
-                let dist = cam.translation.distance(pos);
-                // Inverse distance rolloff for authentic 3D spatial falloff
-                let attenuation = (1.0 / (1.0 + (dist / 8.0).powi(2))).clamp(0.05, 1.0);
-                volume *= attenuation;
+            let mut settings = PlaybackSettings::default().with_volume(bevy::audio::Volume::new(ev.volume));
+            
+            if let Some(pos) = ev.position {
+                settings = settings.with_spatial(true);
+                commands.spawn((
+                    AudioBundle {
+                        source: handle,
+                        settings,
+                    },
+                    TransformBundle::from_transform(Transform::from_translation(pos)),
+                ));
+            } else {
+                commands.spawn(AudioBundle {
+                    source: handle,
+                    settings,
+                });
+            }
+        }
+    }
+}
+
+pub fn handle_play_music_track_events(
+    mut events: EventReader<PlayMusicTrackEvent>,
+    audio_assets: Res<DukeAudioAssets>,
+    mut music_state: ResMut<DynamicMusicState>,
+    old_music: Query<Entity, With<MusicTrackEmitter>>,
+    mut commands: Commands,
+) {
+    for ev in events.read() {
+        if let Some(music_handle) = audio_assets.music_tracks.get(&ev.track) {
+            // Despawn old tracks
+            for entity in &old_music {
+                commands.entity(entity).despawn_recursive();
             }
 
-            commands.spawn(AudioBundle {
-                source: handle,
-                settings: PlaybackSettings {
-                    volume: bevy::audio::Volume::new(volume),
-                    ..default()
+            music_state.current_track = ev.track.filename().to_string();
+
+            // Spawn new track
+            commands.spawn((
+                bevy::audio::AudioSourceBundle {
+                    source: music_handle.clone(),
+                    settings: PlaybackSettings::LOOP.with_volume(bevy::audio::Volume::new(music_state.current_volume)),
                 },
-            });
+                MusicTrackEmitter,
+            ));
         }
     }
 }
@@ -607,13 +711,13 @@ mod tests {
     #[test]
     fn test_dynamic_music_and_voice_queue_priority() {
         let mut music = DynamicMusicState::default();
-        assert_eq!(music.get_effective_volume(), 0.8);
+        assert_eq!(music.get_target_volume(), 0.8);
 
         music.ducking_timer = 2.0;
-        assert!((music.get_effective_volume() - 0.48).abs() < 0.001); // 0.8 * 0.6 = 0.48
+        assert!((music.get_target_volume() - 0.48).abs() < 0.001); // 0.8 * 0.6 = 0.48
 
         music.is_underwater = true;
-        assert!((music.get_effective_volume() - 0.336).abs() < 0.001); // 0.48 * 0.7 = 0.336
+        assert!((music.get_target_volume() - 0.336).abs() < 0.001); // 0.48 * 0.7 = 0.336
 
         let mut voice = DukeVoiceQueue::default();
         assert!(voice.should_play(5)); // Low priority plays when idle

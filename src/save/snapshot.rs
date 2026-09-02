@@ -25,7 +25,7 @@ pub fn write_save_to_disk(path: &Path, snapshot: &SaveGameSnapshot) -> Result<()
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
-    let bytes = snapshot.to_bytes();
+    let bytes = bincode::serialize(snapshot).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
     let mut file = File::create(path)?;
     file.write_all(&bytes)?;
     file.flush()?;
@@ -36,5 +36,5 @@ pub fn read_save_from_disk(path: &Path) -> Result<SaveGameSnapshot, &'static str
     let mut file = File::open(path).map_err(|_| "Failed to open save file")?;
     let mut buffer = Vec::new();
     file.read_to_end(&mut buffer).map_err(|_| "Failed to read save file")?;
-    SaveGameSnapshot::from_bytes(&buffer)
+    bincode::deserialize(&buffer).map_err(|_| "Failed to deserialize save file")
 }

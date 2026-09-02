@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct RtsLump {
     pub name: String,
     pub data: Vec<u8>,

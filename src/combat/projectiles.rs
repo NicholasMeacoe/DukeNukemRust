@@ -311,6 +311,7 @@ pub fn apply_damage_events(
     mut gib_events: EventWriter<GibEvent>,
     mut sound_events: EventWriter<crate::audio::PlaySoundEvent>,
     mut duke_voice_events: EventWriter<crate::audio::PlayDukeVoiceEvent>,
+    mut tint: Option<ResMut<crate::hud::ScreenTintState>>,
 ) {
     for ev in damage_events.read() {
         if let Ok((enemy_trans, mut enemy)) = enemies.get_mut(ev.target) {
@@ -384,6 +385,9 @@ pub fn apply_damage_events(
                 sound_events.send(crate::audio::PlaySoundEvent { sound_id: 41 }); // DUKE_DEAD
             } else {
                 sound_events.send(crate::audio::PlaySoundEvent { sound_id: 37 }); // DUKE_PAIN
+            }
+            if let Some(ref mut t) = tint {
+                t.target_color = Color::srgba(0.8, 0.0, 0.0, 0.6);
             }
         }
     }

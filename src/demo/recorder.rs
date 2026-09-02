@@ -5,7 +5,7 @@ use std::io::Write;
 use std::path::Path;
 use crate::demo::format::*;
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct DemoRecorder {
     pub is_recording: bool,
     pub episode: u8,

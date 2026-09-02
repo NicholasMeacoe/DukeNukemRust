@@ -16,6 +16,7 @@ pub fn update_player_movement(
     )>,
     camera_query: Query<&Transform, (With<Camera>, Without<PlayerController>)>,
     mut sound_events: EventWriter<PlaySoundEvent>,
+    mut tint: Option<ResMut<crate::hud::ScreenTintState>>,
 ) {
     let Ok(camera_transform) = camera_query.get_single() else { return; };
     let dt = time.delta_seconds();
@@ -80,6 +81,9 @@ pub fn update_player_movement(
         let is_swimming = matches!(player.movement_mode, PlayerMovementMode::Swimming | PlayerMovementMode::Diving);
         if is_swimming {
             speed_multiplier *= 0.7;
+            if let Some(ref mut t) = tint {
+                t.target_color = Color::srgba(0.0, 0.2, 0.7, 0.4);
+            }
         }
 
         let current_speed = player.speed * speed_multiplier;

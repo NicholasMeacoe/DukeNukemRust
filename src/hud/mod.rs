@@ -51,12 +51,22 @@ impl Default for EngineProfilerMetrics {
     }
 }
 
+#[derive(Component)]
+pub struct ScreenTintOverlay;
+
+#[derive(Resource, Default)]
+pub struct ScreenTintState {
+    pub current_color: Color,
+    pub target_color: Color,
+}
+
 pub struct DukeHudPlugin;
 
 impl Plugin for DukeHudPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(automap::AutomapPlugin)
             .init_resource::<EngineProfilerMetrics>()
+            .init_resource::<ScreenTintState>()
             .add_systems(Startup, setup_hud_ui)
             .add_systems(
                 Update,
@@ -64,8 +74,29 @@ impl Plugin for DukeHudPlugin {
                     toggle_hud_mode,
                     update_hud_display,
                     update_profiler_metrics_system,
+                    update_screen_tint,
                 ).run_if(in_state(crate::game_flow::GamePhase::Playing)),
             );
+    }
+}
+
+pub fn update_screen_tint(
+    time: Res<Time>,
+    mut state: ResMut<ScreenTintState>,
+    mut query: Query<&mut BackgroundColor, With<ScreenTintOverlay>>,
+) {
+    // Fade out target color towards transparent
+    if state.target_color.alpha() > 0.0 {
+        let alpha = (state.target_color.alpha() - time.delta_seconds() * 1.5).max(0.0);
+        state.target_color.set_alpha(alpha);
+    }
+
+    // Lerp current towards target
+    // We can just set current to target since we are fading the target itself
+    state.current_color = state.target_color;
+
+    for mut bg in &mut query {
+        bg.0 = state.current_color;
     }
 }
 
@@ -88,6 +119,21 @@ pub fn update_profiler_metrics_system(
 }
 
 pub fn setup_hud_ui(mut commands: Commands) {
+    // 0. Screen Tint Overlay (Full screen, transparent by default)
+    commands.spawn((
+        NodeBundle {
+            style: Style {
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                position_type: PositionType::Absolute,
+                ..default()
+            },
+            background_color: BackgroundColor(Color::NONE),
+            z_index: ZIndex::Global(-1), // Behind HUD text but above 3D game
+            ..default()
+        },
+        ScreenTintOverlay,
+    ));
     commands.spawn((
         NodeBundle {
             style: Style {

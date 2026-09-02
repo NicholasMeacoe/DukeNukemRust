@@ -16,7 +16,7 @@ pub fn handle_load_level_events(
     mut materials: ResMut<Assets<StandardMaterial>>,
     assets: Option<Res<crate::GameAssets>>,
     mut progress: ResMut<LevelProgress>,
-    mut sound_events: EventWriter<crate::audio::PlayNamedSoundEvent>,
+    mut sound_events: EventWriter<crate::audio::PlayMusicTrackEvent>,
 ) {
     let Some(ref game_assets) = assets else { return; };
 
@@ -90,7 +90,7 @@ pub fn handle_load_level_events(
                         &game_assets.picanm_map,
                         game_assets.default_material.clone(),
                     );
-                    mesh_builder.build(&mut commands, &mut meshes, &mut materials);
+                    mesh_builder.build(&mut commands, &mut meshes, &mut materials, progress.skill as u8);
 
                     // 7. Spawn interactive effectors, props, and enemies
                     crate::interactivity::spawn_interactive_elements_from_map(&mut commands, &map);
@@ -108,10 +108,8 @@ pub fn handle_load_level_events(
 
                     // 9. Play authentic level music track
                     let track = crate::audio::LevelMidiTrack::for_level(event.episode, event.level);
-                    sound_events.send(crate::audio::PlayNamedSoundEvent {
-                        name: track.filename().to_string(),
-                        volume: 0.8,
-                        position: None,
+                    sound_events.send(crate::audio::PlayMusicTrackEvent {
+                        track,
                     });
                 }
             } else {

@@ -2,7 +2,7 @@
 
 use bevy::prelude::*;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum DecalType {
     BulletHole,
     BloodSplatter,
@@ -11,7 +11,7 @@ pub enum DecalType {
     WaterRipple,
 }
 
-#[derive(Component, Debug, Clone)]
+#[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SurfaceDecal {
     pub decal_type: DecalType,
     pub lifetime: f32,
@@ -19,7 +19,7 @@ pub struct SurfaceDecal {
     pub alpha: f32,
 }
 
-#[derive(Component, Debug, Clone)]
+#[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SteamVent {
     pub interval: f32,
     pub timer: f32,
@@ -36,7 +36,7 @@ impl Default for SteamVent {
     }
 }
 
-#[derive(Component, Debug, Clone)]
+#[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct WaterDrip {
     pub interval: f32,
     pub timer: f32,
@@ -51,7 +51,7 @@ impl Default for WaterDrip {
     }
 }
 
-#[derive(Component, Debug, Clone)]
+#[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ChimneySmoke {
     pub interval: f32,
     pub timer: f32,

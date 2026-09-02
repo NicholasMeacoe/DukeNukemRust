@@ -220,6 +220,9 @@ pub fn update_con_actors(
 
         if let Some(_delay) = end_of_game {
             duke_voice_events.send(crate::audio::PlayDukeVoiceEvent { name: None });
+            commands.add(|world: &mut World| {
+                world.send_event(crate::game_flow::LevelCompletedEvent);
+            });
         }
 
         // Apply death / killit
