@@ -98,6 +98,16 @@ pub fn handle_load_level_events(
                     progress.is_level_completed = false;
 
                     // 6. Build map geometry & colliders
+                    println!("STARTING SECTOR: {}", map.cursectnum);
+                    let sec = &map.sectors[map.cursectnum as usize];
+                    println!("Floor parallax: {}", sec.is_floor_parallax());
+                    println!("Ceiling parallax: {}", sec.is_ceiling_parallax());
+                    println!("Floor picnum: {}", sec.floorpicnum);
+                    println!("Ceiling picnum: {}", sec.ceilingpicnum);
+                    for i in 0..sec.wallnum {
+                        let w = &map.walls[(sec.wallptr + i) as usize];
+                        println!("Wall {}: picnum={}, nextsect={}, is_portal={}, is_masked={}", i, w.picnum, w.nextsector, w.is_portal(), w.is_masked());
+                    }
                     let mesh_builder = MapMeshBuilder::new(
                         &map,
                         &game_assets.tile_textures,

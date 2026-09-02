@@ -59,6 +59,7 @@ impl<'a> MapMeshBuilder<'a> {
                 },
                 unlit: true,
                 double_sided: true,
+                perceptual_roughness: 1.0,
                 ..default()
             })
         } else {
@@ -593,10 +594,17 @@ impl<'a> MapMeshBuilder<'a> {
             [0, 3, 2], // Double-sided wall collision
         ];
 
+        let visibility = if wall.yrepeat == 0 || picnum == 79 || picnum == 89 || picnum == 97 {
+            Visibility::Hidden
+        } else {
+            Visibility::Inherited
+        };
+
         let mut entity_cmds = commands.spawn((
             PbrBundle {
                 mesh: meshes.add(wall_mesh),
                 material: mat.clone(),
+                visibility,
                 ..default()
             },
             crate::interactivity::DynamicSectorMesh {
