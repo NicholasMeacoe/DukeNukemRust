@@ -124,6 +124,7 @@ pub struct EnemyActor {
     pub freeze_timer: f32,
     pub is_expanding: bool,
     pub expand_timer: f32,
+    pub velocity: Vec3,
 }
 
 impl EnemyActor {
@@ -144,6 +145,7 @@ impl EnemyActor {
             freeze_timer: 0.0,
             is_expanding: false,
             expand_timer: 0.0,
+            velocity: Vec3::ZERO,
         }
     }
 
@@ -164,6 +166,7 @@ impl EnemyActor {
             freeze_timer: 0.0,
             is_expanding: false,
             expand_timer: 0.0,
+            velocity: Vec3::ZERO,
         }
     }
 
@@ -184,6 +187,7 @@ impl EnemyActor {
             freeze_timer: 0.0,
             is_expanding: false,
             expand_timer: 0.0,
+            velocity: Vec3::ZERO,
         }
     }
 
@@ -204,6 +208,7 @@ impl EnemyActor {
             freeze_timer: 0.0,
             is_expanding: false,
             expand_timer: 0.0,
+            velocity: Vec3::ZERO,
         }
     }
 
@@ -224,6 +229,7 @@ impl EnemyActor {
             freeze_timer: 0.0,
             is_expanding: false,
             expand_timer: 0.0,
+            velocity: Vec3::ZERO,
         }
     }
 
@@ -244,6 +250,7 @@ impl EnemyActor {
             freeze_timer: 0.0,
             is_expanding: false,
             expand_timer: 0.0,
+            velocity: Vec3::ZERO,
         }
     }
 
@@ -264,6 +271,7 @@ impl EnemyActor {
             freeze_timer: 0.0,
             is_expanding: false,
             expand_timer: 0.0,
+            velocity: Vec3::ZERO,
         }
     }
 
@@ -284,6 +292,7 @@ impl EnemyActor {
             freeze_timer: 0.0,
             is_expanding: false,
             expand_timer: 0.0,
+            velocity: Vec3::ZERO,
         }
     }
 
@@ -304,6 +313,7 @@ impl EnemyActor {
             freeze_timer: 0.0,
             is_expanding: false,
             expand_timer: 0.0,
+            velocity: Vec3::ZERO,
         }
     }
 
@@ -324,6 +334,7 @@ impl EnemyActor {
             freeze_timer: 0.0,
             is_expanding: false,
             expand_timer: 0.0,
+            velocity: Vec3::ZERO,
         }
     }
 
@@ -344,6 +355,7 @@ impl EnemyActor {
             freeze_timer: 0.0,
             is_expanding: false,
             expand_timer: 0.0,
+            velocity: Vec3::ZERO,
         }
     }
 
@@ -364,6 +376,7 @@ impl EnemyActor {
             freeze_timer: 0.0,
             is_expanding: false,
             expand_timer: 0.0,
+            velocity: Vec3::ZERO,
         }
     }
 
@@ -384,6 +397,7 @@ impl EnemyActor {
             freeze_timer: 0.0,
             is_expanding: false,
             expand_timer: 0.0,
+            velocity: Vec3::ZERO,
         }
     }
 
@@ -404,6 +418,7 @@ impl EnemyActor {
             freeze_timer: 0.0,
             is_expanding: false,
             expand_timer: 0.0,
+            velocity: Vec3::ZERO,
         }
     }
 
@@ -424,6 +439,7 @@ impl EnemyActor {
             freeze_timer: 0.0,
             is_expanding: false,
             expand_timer: 0.0,
+            velocity: Vec3::ZERO,
         }
     }
 
@@ -444,6 +460,7 @@ impl EnemyActor {
             freeze_timer: 0.0,
             is_expanding: false,
             expand_timer: 0.0,
+            velocity: Vec3::ZERO,
         }
     }
 
@@ -464,6 +481,7 @@ impl EnemyActor {
             freeze_timer: 0.0,
             is_expanding: false,
             expand_timer: 0.0,
+            velocity: Vec3::ZERO,
         }
     }
 
@@ -489,6 +507,7 @@ impl EnemyActor {
             freeze_timer: 0.0,
             is_expanding: false,
             expand_timer: 0.0,
+            velocity: Vec3::ZERO,
         }
     }
 
@@ -509,6 +528,7 @@ impl EnemyActor {
             freeze_timer: 0.0,
             is_expanding: false,
             expand_timer: 0.0,
+            velocity: Vec3::ZERO,
         }
     }
 
@@ -529,6 +549,7 @@ impl EnemyActor {
             freeze_timer: 0.0,
             is_expanding: false,
             expand_timer: 0.0,
+            velocity: Vec3::ZERO,
         }
     }
 
@@ -549,6 +570,7 @@ impl EnemyActor {
             freeze_timer: 0.0,
             is_expanding: false,
             expand_timer: 0.0,
+            velocity: Vec3::ZERO,
         }
     }
 }

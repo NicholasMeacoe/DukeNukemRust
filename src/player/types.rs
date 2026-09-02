@@ -44,18 +44,18 @@ pub enum InventoryItemType {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct InventoryState {
-    pub steroids_amount: i32,      // 0..400
+    pub steroids_amount: i32, // 0..400
     pub steroids_active: bool,
-    pub medkit_amount: i32,        // 0..100
-    pub nightvision_amount: i32,   // 0..100
+    pub medkit_amount: i32,      // 0..100
+    pub nightvision_amount: i32, // 0..100
     pub nightvision_active: bool,
-    pub scuba_amount: i32,         // 0..100
-    pub boots_amount: i32,         // 0..100
-    pub holoduke_amount: i32,      // 0..100
+    pub scuba_amount: i32,    // 0..100
+    pub boots_amount: i32,    // 0..100
+    pub holoduke_amount: i32, // 0..100
     pub holoduke_active: bool,
-    pub jetpack_amount: i32,       // 0..100
+    pub jetpack_amount: i32, // 0..100
     pub jetpack_active: bool,
-    pub air_supply: f32,           // 0..100.0 (suffocation when 0)
+    pub air_supply: f32, // 0..100.0 (suffocation when 0)
     pub inventory_accumulator: f32,
     pub drowning_damage_timer: f32,
 }
@@ -131,18 +131,138 @@ pub struct PlayerController {
 impl Default for PlayerController {
     fn default() -> Self {
         let weapons = [
-            WeaponData { weapon_type: WeaponType::Knee, name: String::from("Mighty Boot"), ammo: 0, max_ammo: 0, base_tile: 2524, fire_delay: 0.4, fire_timer: 0.0, reload_timer: 0.0, is_unlocked: true },
-            WeaponData { weapon_type: WeaponType::Pistol, name: String::from("Pistol"), ammo: 48, max_ammo: 200, base_tile: 2524, fire_delay: 0.3, fire_timer: 0.0, reload_timer: 0.0, is_unlocked: true },
-            WeaponData { weapon_type: WeaponType::Shotgun, name: String::from("Shotgun"), ammo: 20, max_ammo: 50, base_tile: 2613, fire_delay: 0.8, fire_timer: 0.0, reload_timer: 0.0, is_unlocked: true },
-            WeaponData { weapon_type: WeaponType::Chaingun, name: String::from("Chaingun Cannon"), ammo: 50, max_ammo: 200, base_tile: 2548, fire_delay: 0.1, fire_timer: 0.0, reload_timer: 0.0, is_unlocked: false },
-            WeaponData { weapon_type: WeaponType::Rpg, name: String::from("RPG"), ammo: 5, max_ammo: 50, base_tile: 2562, fire_delay: 1.0, fire_timer: 0.0, reload_timer: 0.0, is_unlocked: false },
-            WeaponData { weapon_type: WeaponType::Pipebomb, name: String::from("Pipebomb"), ammo: 5, max_ammo: 50, base_tile: 2570, fire_delay: 0.6, fire_timer: 0.0, reload_timer: 0.0, is_unlocked: false },
-            WeaponData { weapon_type: WeaponType::Shrinker, name: String::from("Shrinker"), ammo: 10, max_ammo: 50, base_tile: 2580, fire_delay: 0.8, fire_timer: 0.0, reload_timer: 0.0, is_unlocked: false },
-            WeaponData { weapon_type: WeaponType::Devastator, name: String::from("Devastator"), ammo: 20, max_ammo: 99, base_tile: 2590, fire_delay: 0.15, fire_timer: 0.0, reload_timer: 0.0, is_unlocked: false },
-            WeaponData { weapon_type: WeaponType::Tripbomb, name: String::from("Laser Tripbomb"), ammo: 3, max_ammo: 10, base_tile: 2600, fire_delay: 0.8, fire_timer: 0.0, reload_timer: 0.0, is_unlocked: false },
-            WeaponData { weapon_type: WeaponType::Freezethrower, name: String::from("Freezethrower"), ammo: 25, max_ammo: 99, base_tile: 2610, fire_delay: 0.2, fire_timer: 0.0, reload_timer: 0.0, is_unlocked: false },
-            WeaponData { weapon_type: WeaponType::HandRemote, name: String::from("Pipebomb Detonator"), ammo: 0, max_ammo: 0, base_tile: 2575, fire_delay: 0.3, fire_timer: 0.0, reload_timer: 0.0, is_unlocked: true },
-            WeaponData { weapon_type: WeaponType::Expander, name: String::from("Expander"), ammo: 20, max_ammo: 99, base_tile: 2585, fire_delay: 0.4, fire_timer: 0.0, reload_timer: 0.0, is_unlocked: false },
+            WeaponData {
+                weapon_type: WeaponType::Knee,
+                name: String::from("Mighty Boot"),
+                ammo: 0,
+                max_ammo: 0,
+                base_tile: 2524,
+                fire_delay: 0.4,
+                fire_timer: 0.0,
+                reload_timer: 0.0,
+                is_unlocked: true,
+            },
+            WeaponData {
+                weapon_type: WeaponType::Pistol,
+                name: String::from("Pistol"),
+                ammo: 48,
+                max_ammo: 200,
+                base_tile: 2524,
+                fire_delay: 0.3,
+                fire_timer: 0.0,
+                reload_timer: 0.0,
+                is_unlocked: true,
+            },
+            WeaponData {
+                weapon_type: WeaponType::Shotgun,
+                name: String::from("Shotgun"),
+                ammo: 20,
+                max_ammo: 50,
+                base_tile: 2613,
+                fire_delay: 0.8,
+                fire_timer: 0.0,
+                reload_timer: 0.0,
+                is_unlocked: true,
+            },
+            WeaponData {
+                weapon_type: WeaponType::Chaingun,
+                name: String::from("Chaingun Cannon"),
+                ammo: 50,
+                max_ammo: 200,
+                base_tile: 2548,
+                fire_delay: 0.1,
+                fire_timer: 0.0,
+                reload_timer: 0.0,
+                is_unlocked: false,
+            },
+            WeaponData {
+                weapon_type: WeaponType::Rpg,
+                name: String::from("RPG"),
+                ammo: 5,
+                max_ammo: 50,
+                base_tile: 2562,
+                fire_delay: 1.0,
+                fire_timer: 0.0,
+                reload_timer: 0.0,
+                is_unlocked: false,
+            },
+            WeaponData {
+                weapon_type: WeaponType::Pipebomb,
+                name: String::from("Pipebomb"),
+                ammo: 5,
+                max_ammo: 50,
+                base_tile: 2570,
+                fire_delay: 0.6,
+                fire_timer: 0.0,
+                reload_timer: 0.0,
+                is_unlocked: false,
+            },
+            WeaponData {
+                weapon_type: WeaponType::Shrinker,
+                name: String::from("Shrinker"),
+                ammo: 10,
+                max_ammo: 50,
+                base_tile: 2580,
+                fire_delay: 0.8,
+                fire_timer: 0.0,
+                reload_timer: 0.0,
+                is_unlocked: false,
+            },
+            WeaponData {
+                weapon_type: WeaponType::Devastator,
+                name: String::from("Devastator"),
+                ammo: 20,
+                max_ammo: 99,
+                base_tile: 2590,
+                fire_delay: 0.15,
+                fire_timer: 0.0,
+                reload_timer: 0.0,
+                is_unlocked: false,
+            },
+            WeaponData {
+                weapon_type: WeaponType::Tripbomb,
+                name: String::from("Laser Tripbomb"),
+                ammo: 3,
+                max_ammo: 10,
+                base_tile: 2600,
+                fire_delay: 0.8,
+                fire_timer: 0.0,
+                reload_timer: 0.0,
+                is_unlocked: false,
+            },
+            WeaponData {
+                weapon_type: WeaponType::Freezethrower,
+                name: String::from("Freezethrower"),
+                ammo: 25,
+                max_ammo: 99,
+                base_tile: 2610,
+                fire_delay: 0.2,
+                fire_timer: 0.0,
+                reload_timer: 0.0,
+                is_unlocked: false,
+            },
+            WeaponData {
+                weapon_type: WeaponType::HandRemote,
+                name: String::from("Pipebomb Detonator"),
+                ammo: 0,
+                max_ammo: 0,
+                base_tile: 2575,
+                fire_delay: 0.3,
+                fire_timer: 0.0,
+                reload_timer: 0.0,
+                is_unlocked: true,
+            },
+            WeaponData {
+                weapon_type: WeaponType::Expander,
+                name: String::from("Expander"),
+                ammo: 20,
+                max_ammo: 99,
+                base_tile: 2585,
+                fire_delay: 0.4,
+                fire_timer: 0.0,
+                reload_timer: 0.0,
+                is_unlocked: false,
+            },
         ];
 
         Self {

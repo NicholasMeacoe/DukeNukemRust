@@ -1,8 +1,8 @@
 #![allow(dead_code)]
 
-use bevy::prelude::*;
+use crate::game_flow::menu::{CursorAnimTimer, MenuCursor};
 use crate::game_flow::state::*;
-use crate::game_flow::menu::{MenuCursor, CursorAnimTimer};
+use bevy::prelude::*;
 
 #[derive(Component)]
 pub struct MenuUiRoot;
@@ -28,113 +28,120 @@ const DUKE_GREY: Color = Color::srgb(0.65, 0.65, 0.70);
 const DUKE_WHITE: Color = Color::srgb(1.0, 1.0, 1.0);
 
 pub fn setup_menu_ui(mut commands: Commands) {
-    commands.spawn((
-        NodeBundle {
-            style: Style {
-                width: Val::Percent(100.0),
-                height: Val::Percent(100.0),
-                position_type: PositionType::Absolute,
-                flex_direction: FlexDirection::Column,
-                align_items: AlignItems::Center,
-                justify_content: JustifyContent::Center,
-                display: Display::Flex,
+    commands
+        .spawn((
+            NodeBundle {
+                style: Style {
+                    width: Val::Percent(100.0),
+                    height: Val::Percent(100.0),
+                    position_type: PositionType::Absolute,
+                    flex_direction: FlexDirection::Column,
+                    align_items: AlignItems::Center,
+                    justify_content: JustifyContent::Center,
+                    display: Display::Flex,
+                    ..default()
+                },
+                background_color: BackgroundColor(Color::srgba(0.05, 0.05, 0.08, 0.85)),
                 ..default()
             },
-            background_color: BackgroundColor(Color::srgba(0.05, 0.05, 0.08, 0.85)),
-            ..default()
-        },
-        MenuUiRoot,
-    )).with_children(|parent| {
-        // Main Title Header
-        parent.spawn((
-            TextBundle::from_section(
-                "DUKE NUKEM 3D",
-                TextStyle {
-                    font_size: 48.0,
-                    color: DUKE_GOLD,
-                    ..default()
-                },
-            ),
-            MenuHeaderTitle,
-        ));
-
-        // Subheader (Phase title)
-        parent.spawn((
-            TextBundle::from_section(
-                "MAIN MENU",
-                TextStyle {
-                    font_size: 26.0,
-                    color: DUKE_RED,
-                    ..default()
-                },
-            ).with_style(Style {
-                margin: UiRect::new(Val::Px(0.0), Val::Px(0.0), Val::Px(10.0), Val::Px(30.0)),
-                ..default()
-            }),
-            MenuSubheaderText,
-        ));
-
-        // Menu items container (4 rows)
-        for i in 0..4 {
-            parent.spawn(NodeBundle {
-                style: Style {
-                    flex_direction: FlexDirection::Row,
-                    align_items: AlignItems::Center,
-                    justify_content: JustifyContent::FlexStart,
-                    width: Val::Px(450.0),
-                    height: Val::Px(42.0),
-                    margin: UiRect::vertical(Val::Px(4.0)),
-                    ..default()
-                },
-                ..default()
-            }).with_children(|row| {
-                // Cursor symbol
-                row.spawn((
-                    TextBundle::from_section(
-                        "► ",
-                        TextStyle {
-                            font_size: 28.0,
-                            color: DUKE_RED,
-                            ..default()
-                        },
-                    ).with_style(Style {
-                        width: Val::Px(40.0),
+            MenuUiRoot,
+        ))
+        .with_children(|parent| {
+            // Main Title Header
+            parent.spawn((
+                TextBundle::from_section(
+                    "DUKE NUKEM 3D",
+                    TextStyle {
+                        font_size: 48.0,
+                        color: DUKE_GOLD,
                         ..default()
-                    }),
-                    MenuCursorIndicator(i),
-                ));
+                    },
+                ),
+                MenuHeaderTitle,
+            ));
 
-                // Item Text
-                row.spawn((
-                    TextBundle::from_section(
-                        "",
-                        TextStyle {
-                            font_size: 26.0,
-                            color: DUKE_GREY,
+            // Subheader (Phase title)
+            parent.spawn((
+                TextBundle::from_section(
+                    "MAIN MENU",
+                    TextStyle {
+                        font_size: 26.0,
+                        color: DUKE_RED,
+                        ..default()
+                    },
+                )
+                .with_style(Style {
+                    margin: UiRect::new(Val::Px(0.0), Val::Px(0.0), Val::Px(10.0), Val::Px(30.0)),
+                    ..default()
+                }),
+                MenuSubheaderText,
+            ));
+
+            // Menu items container (4 rows)
+            for i in 0..4 {
+                parent
+                    .spawn(NodeBundle {
+                        style: Style {
+                            flex_direction: FlexDirection::Row,
+                            align_items: AlignItems::Center,
+                            justify_content: JustifyContent::FlexStart,
+                            width: Val::Px(450.0),
+                            height: Val::Px(42.0),
+                            margin: UiRect::vertical(Val::Px(4.0)),
                             ..default()
                         },
-                    ),
-                    MenuItemText(i),
-                ));
-            });
-        }
+                        ..default()
+                    })
+                    .with_children(|row| {
+                        // Cursor symbol
+                        row.spawn((
+                            TextBundle::from_section(
+                                "► ",
+                                TextStyle {
+                                    font_size: 28.0,
+                                    color: DUKE_RED,
+                                    ..default()
+                                },
+                            )
+                            .with_style(Style {
+                                width: Val::Px(40.0),
+                                ..default()
+                            }),
+                            MenuCursorIndicator(i),
+                        ));
 
-        // Footer instructions
-        parent.spawn((
-            TextBundle::from_section(
-                "ARROWS / W/S TO MOVE • ENTER TO SELECT • ESC TO BACK",
-                TextStyle {
-                    font_size: 16.0,
-                    color: Color::srgb(0.5, 0.5, 0.55),
+                        // Item Text
+                        row.spawn((
+                            TextBundle::from_section(
+                                "",
+                                TextStyle {
+                                    font_size: 26.0,
+                                    color: DUKE_GREY,
+                                    ..default()
+                                },
+                            ),
+                            MenuItemText(i),
+                        ));
+                    });
+            }
+
+            // Footer instructions
+            parent.spawn((
+                TextBundle::from_section(
+                    "ARROWS / W/S TO MOVE • ENTER TO SELECT • ESC TO BACK",
+                    TextStyle {
+                        font_size: 16.0,
+                        color: Color::srgb(0.5, 0.5, 0.55),
+                        ..default()
+                    },
+                )
+                .with_style(Style {
+                    margin: UiRect::top(Val::Px(40.0)),
                     ..default()
-                },
-            ).with_style(Style {
-                margin: UiRect::top(Val::Px(40.0)),
-                ..default()
-            }),
-            MenuFooterText,
-        ));
-    });
+                }),
+                MenuFooterText,
+            ));
+        });
 }
 
 pub fn update_menu_ui(
@@ -144,16 +151,61 @@ pub fn update_menu_ui(
     progress: Res<LevelProgress>,
     anim_state: Res<crate::game_flow::intermission::IntermissionAnimationState>,
     mut root_query: Query<(&mut Style, &mut BackgroundColor), With<MenuUiRoot>>,
-    mut header_query: Query<&mut Text, (With<MenuHeaderTitle>, Without<MenuSubheaderText>, Without<MenuItemText>, Without<MenuCursorIndicator>, Without<MenuFooterText>)>,
-    mut subheader_query: Query<&mut Text, (With<MenuSubheaderText>, Without<MenuHeaderTitle>, Without<MenuItemText>, Without<MenuCursorIndicator>, Without<MenuFooterText>)>,
-    mut footer_query: Query<&mut Text, (With<MenuFooterText>, Without<MenuHeaderTitle>, Without<MenuSubheaderText>, Without<MenuItemText>, Without<MenuCursorIndicator>)>,
-    mut items_query: Query<(&mut Text, &MenuItemText), (Without<MenuHeaderTitle>, Without<MenuSubheaderText>, Without<MenuCursorIndicator>, Without<MenuFooterText>)>,
-    mut cursor_indicators: Query<(&mut Text, &MenuCursorIndicator), (Without<MenuHeaderTitle>, Without<MenuSubheaderText>, Without<MenuItemText>, Without<MenuFooterText>)>,
+    mut header_query: Query<
+        &mut Text,
+        (
+            With<MenuHeaderTitle>,
+            Without<MenuSubheaderText>,
+            Without<MenuItemText>,
+            Without<MenuCursorIndicator>,
+            Without<MenuFooterText>,
+        ),
+    >,
+    mut subheader_query: Query<
+        &mut Text,
+        (
+            With<MenuSubheaderText>,
+            Without<MenuHeaderTitle>,
+            Without<MenuItemText>,
+            Without<MenuCursorIndicator>,
+            Without<MenuFooterText>,
+        ),
+    >,
+    mut footer_query: Query<
+        &mut Text,
+        (
+            With<MenuFooterText>,
+            Without<MenuHeaderTitle>,
+            Without<MenuSubheaderText>,
+            Without<MenuItemText>,
+            Without<MenuCursorIndicator>,
+        ),
+    >,
+    mut items_query: Query<
+        (&mut Text, &MenuItemText),
+        (
+            Without<MenuHeaderTitle>,
+            Without<MenuSubheaderText>,
+            Without<MenuCursorIndicator>,
+            Without<MenuFooterText>,
+        ),
+    >,
+    mut cursor_indicators: Query<
+        (&mut Text, &MenuCursorIndicator),
+        (
+            Without<MenuHeaderTitle>,
+            Without<MenuSubheaderText>,
+            Without<MenuItemText>,
+            Without<MenuFooterText>,
+        ),
+    >,
 ) {
     let current_phase = *state.get();
     let is_menu_active = current_phase != GamePhase::Playing;
 
-    let Ok((mut root_style, mut root_bg)) = root_query.get_single_mut() else { return; };
+    let Ok((mut root_style, mut root_bg)) = root_query.get_single_mut() else {
+        return;
+    };
 
     if !is_menu_active {
         root_style.display = Display::None;
@@ -172,7 +224,10 @@ pub fn update_menu_ui(
     // Update Header & Subheader
     if let Ok(mut header) = header_query.get_single_mut() {
         header.sections[0].value = match current_phase {
-            GamePhase::Intermission => format!("E{}L{}: LEVEL COMPLETED", progress.current_episode, progress.current_level),
+            GamePhase::Intermission => format!(
+                "E{}L{}: LEVEL COMPLETED",
+                progress.current_episode, progress.current_level
+            ),
             GamePhase::Paused => "PAUSED".to_string(),
             _ => "DUKE NUKEM 3D".to_string(),
         };
@@ -206,12 +261,7 @@ pub fn update_menu_ui(
     let par_sec = (stats.par_time_seconds % 60.0) as i32;
 
     let item_labels: [&str; 4] = match current_phase {
-        GamePhase::MainMenu => [
-            "NEW GAME",
-            "OPTIONS",
-            "LOAD GAME",
-            "QUIT",
-        ],
+        GamePhase::MainMenu => ["NEW GAME", "OPTIONS", "LOAD GAME", "QUIT"],
         GamePhase::EpisodeSelect => [
             "1: L.A. MELTDOWN",
             "2: LUNAR APOCALYPSE",
@@ -224,18 +274,8 @@ pub fn update_menu_ui(
             "COME GET SOME",
             "DAMN I'M GOOD",
         ],
-        GamePhase::Paused => [
-            "RESUME GAME",
-            "OPTIONS",
-            "MAIN MENU",
-            "QUIT TO DESKTOP",
-        ],
-        GamePhase::Intermission => [
-            "",
-            "",
-            "",
-            "",
-        ],
+        GamePhase::Paused => ["RESUME GAME", "OPTIONS", "MAIN MENU", "QUIT TO DESKTOP"],
+        GamePhase::Intermission => ["", "", "", ""],
         _ => ["", "", "", ""],
     };
 
@@ -244,15 +284,36 @@ pub fn update_menu_ui(
         let idx = item.0;
         if current_phase == GamePhase::Intermission {
             text.sections[0].value = match idx {
-                0 => if anim_state.stage as u8 >= crate::game_flow::intermission::IntermissionStage::KillsTally as u8 {
-                         format!("KILLS:    {:>3}%", anim_state.displayed_kills)
-                     } else { "".to_string() },
-                1 => if anim_state.stage as u8 >= crate::game_flow::intermission::IntermissionStage::SecretsTally as u8 {
-                         format!("SECRETS:  {:>3}%", anim_state.displayed_secrets)
-                     } else { "".to_string() },
-                2 => if anim_state.stage as u8 >= crate::game_flow::intermission::IntermissionStage::TimeReveal as u8 {
-                         format!("TIME:     {:02}:{:02} (PAR {:02}:{:02})", min, sec, par_min, par_sec)
-                     } else { "".to_string() },
+                0 => {
+                    if anim_state.stage as u8
+                        >= crate::game_flow::intermission::IntermissionStage::KillsTally as u8
+                    {
+                        format!("KILLS:    {:>3}%", anim_state.displayed_kills)
+                    } else {
+                        "".to_string()
+                    }
+                }
+                1 => {
+                    if anim_state.stage as u8
+                        >= crate::game_flow::intermission::IntermissionStage::SecretsTally as u8
+                    {
+                        format!("SECRETS:  {:>3}%", anim_state.displayed_secrets)
+                    } else {
+                        "".to_string()
+                    }
+                }
+                2 => {
+                    if anim_state.stage as u8
+                        >= crate::game_flow::intermission::IntermissionStage::TimeReveal as u8
+                    {
+                        format!(
+                            "TIME:     {:02}:{:02} (PAR {:02}:{:02})",
+                            min, sec, par_min, par_sec
+                        )
+                    } else {
+                        "".to_string()
+                    }
+                }
                 _ => "".to_string(),
             };
             text.sections[0].style.color = DUKE_WHITE;

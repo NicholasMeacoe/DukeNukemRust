@@ -1,8 +1,8 @@
 #![allow(dead_code)]
 
-use bevy::prelude::*;
 use crate::game_flow::state::GamePhase;
 use crate::player::types::PlayerController;
+use bevy::prelude::*;
 
 #[derive(Resource, Debug, Clone, Default)]
 pub struct CheatState {
@@ -20,8 +20,10 @@ pub struct CheatsPlugin;
 
 impl Plugin for CheatsPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<CheatState>()
-            .add_systems(Update, handle_cheat_input.run_if(in_state(GamePhase::Playing)));
+        app.init_resource::<CheatState>().add_systems(
+            Update,
+            handle_cheat_input.run_if(in_state(GamePhase::Playing)),
+        );
     }
 }
 
@@ -33,7 +35,9 @@ pub fn handle_cheat_input(
     mut sbar_query: Query<&mut crate::hud::StatusbarState>,
     mut sound_events: EventWriter<crate::audio::PlaySoundEvent>,
 ) {
-    let Ok(mut player) = player_query.get_single_mut() else { return; };
+    let Ok(mut player) = player_query.get_single_mut() else {
+        return;
+    };
 
     for &key in keys.get_just_pressed() {
         if let Some(ch) = key_to_char(key) {
@@ -107,25 +111,29 @@ pub fn evaluate_cheats(
     if buffer.ends_with("dnkroz") || buffer.ends_with("dncornholio") {
         cheat_state.god_mode = !cheat_state.god_mode;
         player.health = 100;
-        return Some(if cheat_state.god_mode { "GOD MODE ON" } else { "GOD MODE OFF" });
+        return Some(if cheat_state.god_mode {
+            "GOD MODE ON"
+        } else {
+            "GOD MODE OFF"
+        });
     }
 
     if buffer.ends_with("dnstuff") {
         for (i, w) in player.weapons.iter_mut().enumerate() {
             w.is_unlocked = true;
             w.ammo = match i {
-                0 => 0,      // Foot
-                1 => 200,    // Pistol
-                2 => 50,     // Shotgun
-                3 => 200,    // Chaingun
-                4 => 50,     // RPG
-                5 => 50,     // Pipebomb
-                6 => 50,     // Shrinker
-                7 => 99,     // Devastator
-                8 => 10,     // Tripbomb
-                9 => 99,     // Freezethrower
-                10 => 0,     // HandRemote
-                11 => 50,    // Expander
+                0 => 0,   // Foot
+                1 => 200, // Pistol
+                2 => 50,  // Shotgun
+                3 => 200, // Chaingun
+                4 => 50,  // RPG
+                5 => 50,  // Pipebomb
+                6 => 50,  // Shrinker
+                7 => 99,  // Devastator
+                8 => 10,  // Tripbomb
+                9 => 99,  // Freezethrower
+                10 => 0,  // HandRemote
+                11 => 50, // Expander
                 _ => 50,
             };
         }
@@ -160,12 +168,20 @@ pub fn evaluate_cheats(
 
     if buffer.ends_with("dnclip") {
         cheat_state.no_clip = !cheat_state.no_clip;
-        return Some(if cheat_state.no_clip { "NO CLIPPING ON" } else { "NO CLIPPING OFF" });
+        return Some(if cheat_state.no_clip {
+            "NO CLIPPING ON"
+        } else {
+            "NO CLIPPING OFF"
+        });
     }
 
     if buffer.ends_with("dncashman") {
         cheat_state.cashman = !cheat_state.cashman;
-        return Some(if cheat_state.cashman { "CASHMAN ON" } else { "CASHMAN OFF" });
+        return Some(if cheat_state.cashman {
+            "CASHMAN ON"
+        } else {
+            "CASHMAN OFF"
+        });
     }
 
     if buffer.ends_with("dnhyper") {
@@ -176,22 +192,38 @@ pub fn evaluate_cheats(
 
     if buffer.ends_with("dnshowmap") {
         cheat_state.show_all_map = !cheat_state.show_all_map;
-        return Some(if cheat_state.show_all_map { "SHOW ALL MAP ON" } else { "SHOW ALL MAP OFF" });
+        return Some(if cheat_state.show_all_map {
+            "SHOW ALL MAP ON"
+        } else {
+            "SHOW ALL MAP OFF"
+        });
     }
 
     if buffer.ends_with("dnmonsters") {
         cheat_state.monsters_disabled = !cheat_state.monsters_disabled;
-        return Some(if cheat_state.monsters_disabled { "MONSTERS OFF" } else { "MONSTERS ON" });
+        return Some(if cheat_state.monsters_disabled {
+            "MONSTERS OFF"
+        } else {
+            "MONSTERS ON"
+        });
     }
 
     if buffer.ends_with("dnrate") {
         cheat_state.show_fps = !cheat_state.show_fps;
-        return Some(if cheat_state.show_fps { "TICK RATE ON" } else { "TICK RATE OFF" });
+        return Some(if cheat_state.show_fps {
+            "TICK RATE ON"
+        } else {
+            "TICK RATE OFF"
+        });
     }
 
     if buffer.ends_with("dncoords") {
         cheat_state.show_coords = !cheat_state.show_coords;
-        return Some(if cheat_state.show_coords { "SHOW COORDS ON" } else { "SHOW COORDS OFF" });
+        return Some(if cheat_state.show_coords {
+            "SHOW COORDS ON"
+        } else {
+            "SHOW COORDS OFF"
+        });
     }
 
     if buffer.ends_with("dnkeys") {
@@ -205,9 +237,19 @@ pub fn evaluate_cheats(
         for (i, w) in player.weapons.iter_mut().enumerate() {
             w.is_unlocked = true;
             w.ammo = match i {
-                0 => 0, 1 => 200, 2 => 50, 3 => 200, 4 => 50,
-                5 => 50, 6 => 50, 7 => 99, 8 => 10, 9 => 99,
-                10 => 0, 11 => 50, _ => 50,
+                0 => 0,
+                1 => 200,
+                2 => 50,
+                3 => 200,
+                4 => 50,
+                5 => 50,
+                6 => 50,
+                7 => 99,
+                8 => 10,
+                9 => 99,
+                10 => 0,
+                11 => 50,
+                _ => 50,
             };
         }
         return Some("ALL WEAPONS GIVEN");
@@ -266,8 +308,8 @@ mod tests {
         let res3 = evaluate_cheats("dnstuff", &mut cheat_state, &mut player, &mut progress);
         assert_eq!(res3, Some("ALL WEAPONS, ITEMS, KEYS"));
         assert_eq!(player.weapons[1].ammo, 200); // Pistol ammo
-        assert_eq!(player.weapons[2].ammo, 50);  // Shotgun ammo
-        assert_eq!(player.weapons[4].ammo, 50);  // RPG ammo
+        assert_eq!(player.weapons[2].ammo, 50); // Shotgun ammo
+        assert_eq!(player.weapons[4].ammo, 50); // RPG ammo
         assert!(player.has_blue_key);
         assert!(player.has_red_key);
         assert!(player.has_yellow_key);

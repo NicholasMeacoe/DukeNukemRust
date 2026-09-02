@@ -1,11 +1,11 @@
 #![allow(dead_code)]
 
-use bevy::prelude::*;
 use crate::builder::MapMeshBuilder;
 use crate::game_flow::state::*;
 use crate::grp::Grp;
 use crate::map::Map;
 use crate::player::PlayerController;
+use bevy::prelude::*;
 
 pub fn handle_load_level_events(
     mut events: EventReader<LoadLevelEvent>,
@@ -18,11 +18,16 @@ pub fn handle_load_level_events(
     mut progress: ResMut<LevelProgress>,
     mut sound_events: EventWriter<crate::audio::PlayMusicTrackEvent>,
 ) {
-    let Some(ref game_assets) = assets else { return; };
+    let Some(ref game_assets) = assets else {
+        return;
+    };
 
     for event in events.read() {
         let map_name = format!("E{}L{}.MAP", event.episode, event.level);
-        println!("Loading level {} (Episode {}, Level {})...", map_name, event.episode, event.level);
+        println!(
+            "Loading level {} (Episode {}, Level {})...",
+            map_name, event.episode, event.level
+        );
 
         // 1. Teardown all previous level entities
         let mut despawned_count = 0;
@@ -36,12 +41,18 @@ pub fn handle_load_level_events(
         if let Ok(grp) = Grp::open(&game_assets.grp_path) {
             if let Ok(map_data) = grp.read_file(&map_name) {
                 if let Ok(map) = Map::from_bytes(&map_data) {
-                    println!("Map {} loaded successfully: {} sectors, {} walls, {} sprites",
-                        map_name, map.sectors.len(), map.walls.len(), map.sprites.len());
+                    println!(
+                        "Map {} loaded successfully: {} sectors, {} walls, {} sprites",
+                        map_name,
+                        map.sectors.len(),
+                        map.walls.len(),
+                        map.sprites.len()
+                    );
 
                     // 3. Compute spawn position & orientation
                     let floor_y = if (map.cursectnum as usize) < map.sectors.len() {
-                        map.sectors[map.cursectnum as usize].get_floor_y_at(&map.walls, map.posx, map.posy)
+                        map.sectors[map.cursectnum as usize]
+                            .get_floor_y_at(&map.walls, map.posx, map.posy)
                     } else {
                         -(map.posz as f32) / (1024.0 * 16.0) - 0.85
                     };
@@ -51,7 +62,8 @@ pub fn handle_load_level_events(
                         floor_y + 0.85,
                         map.posy as f32 / 1024.0,
                     );
-                    let start_yaw = -(map.ang as f32 / 2048.0) * std::f32::consts::TAU + std::f32::consts::FRAC_PI_2;
+                    let start_yaw = -(map.ang as f32 / 2048.0) * std::f32::consts::TAU
+                        + std::f32::consts::FRAC_PI_2;
 
                     // 4. Reposition player
                     if let Ok((mut p_trans, mut p_ctrl)) = player_query.get_single_mut() {
@@ -63,13 +75,16 @@ pub fn handle_load_level_events(
                     }
 
                     // 5. Update level statistics (monsters & secrets)
-                    let monster_count = map.sprites.iter()
+                    let monster_count = map
+                        .sprites
+                        .iter()
                         .filter(|s| matches!(s.picnum, 2000 | 1680 | 1820 | 2120))
                         .count() as i32;
-                    let secret_count = map.sectors.iter()
-                        .filter(|s| s.lotag == 32767)
-                        .count() as i32
-                        + map.sprites.iter()
+                    let secret_count = map.sectors.iter().filter(|s| s.lotag == 32767).count()
+                        as i32
+                        + map
+                            .sprites
+                            .iter()
                             .filter(|s| s.lotag != 0 && matches!(s.picnum, 142..=145))
                             .count() as i32;
 
@@ -90,7 +105,12 @@ pub fn handle_load_level_events(
                         &game_assets.picanm_map,
                         game_assets.default_material.clone(),
                     );
-                    mesh_builder.build(&mut commands, &mut meshes, &mut materials, progress.skill as u8);
+                    mesh_builder.build(
+                        &mut commands,
+                        &mut meshes,
+                        &mut materials,
+                        progress.skill as u8,
+                    );
 
                     // 7. Spawn interactive effectors, props, and enemies
                     crate::interactivity::spawn_interactive_elements_from_map(&mut commands, &map);
@@ -99,18 +119,22 @@ pub fn handle_load_level_events(
                     let has_sky = map.sectors.iter().any(|s| s.is_ceiling_parallax());
                     if has_sky {
                         let sky_tile = match event.episode {
-                            1 => 80,  // MOONSKY1
-                            2 => 84,  // BIGORBIT1
-                            _ => 89,  // LA_SKY
+                            1 => 80, // MOONSKY1
+                            2 => 84, // BIGORBIT1
+                            _ => 89, // LA_SKY
                         };
-                        crate::sky::spawn_skybox(&mut commands, &mut meshes, &mut materials, &game_assets.tile_textures, sky_tile);
+                        crate::sky::spawn_skybox(
+                            &mut commands,
+                            &mut meshes,
+                            &mut materials,
+                            &game_assets.tile_textures,
+                            sky_tile,
+                        );
                     }
 
                     // 9. Play authentic level music track
                     let track = crate::audio::LevelMidiTrack::for_level(event.episode, event.level);
-                    sound_events.send(crate::audio::PlayMusicTrackEvent {
-                        track,
-                    });
+                    sound_events.send(crate::audio::PlayMusicTrackEvent { track });
                 }
             } else {
                 eprintln!("Failed to read {} from GRP!", map_name);

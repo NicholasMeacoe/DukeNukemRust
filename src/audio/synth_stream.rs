@@ -1,10 +1,10 @@
-use bevy::prelude::*;
 use bevy::audio::Decodable;
+use bevy::prelude::*;
 use bevy::reflect::TypePath;
 use rodio::Source;
-use rustysynth::{Synthesizer, SynthesizerSettings, MidiFile, MidiFileSequencer, SoundFont};
-use std::sync::Arc;
+use rustysynth::{MidiFile, MidiFileSequencer, SoundFont, Synthesizer, SynthesizerSettings};
 use std::io::Cursor;
+use std::sync::Arc;
 
 #[derive(TypePath, Asset, Clone)]
 pub struct MidiAudioStream {
@@ -20,7 +20,7 @@ impl Decodable for MidiAudioStream {
         let sample_rate = 44100;
         let mut settings = SynthesizerSettings::new(sample_rate as i32);
         settings.maximum_polyphony = 64;
-        
+
         let sequencer = match Synthesizer::new(&self.sf2_soundfont, &settings) {
             Ok(synthesizer) => {
                 let mut seq = MidiFileSequencer::new(synthesizer);
@@ -28,7 +28,7 @@ impl Decodable for MidiAudioStream {
                     seq.play(&Arc::new(midi_file), true);
                 }
                 Some(seq)
-            },
+            }
             Err(_) => None,
         };
 

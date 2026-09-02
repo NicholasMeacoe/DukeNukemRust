@@ -1,12 +1,12 @@
 #![allow(dead_code)]
 
+pub mod automap;
 pub mod font;
 pub mod statusbar;
-pub mod automap;
 
+pub use automap::*;
 pub use font::*;
 pub use statusbar::*;
-pub use automap::*;
 
 use bevy::prelude::*;
 
@@ -75,7 +75,8 @@ impl Plugin for DukeHudPlugin {
                     update_hud_display,
                     update_profiler_metrics_system,
                     update_screen_tint,
-                ).run_if(in_state(crate::game_flow::GamePhase::Playing)),
+                )
+                    .run_if(in_state(crate::game_flow::GamePhase::Playing)),
             );
     }
 }
@@ -134,81 +135,83 @@ pub fn setup_hud_ui(mut commands: Commands) {
         },
         ScreenTintOverlay,
     ));
-    commands.spawn((
-        NodeBundle {
-            style: Style {
-                position_type: PositionType::Absolute,
-                left: Val::Px(0.0),
-                right: Val::Px(0.0),
-                bottom: Val::Px(0.0),
-                height: Val::Px(50.0),
-                justify_content: JustifyContent::SpaceBetween,
-                align_items: AlignItems::Center,
-                padding: UiRect::horizontal(Val::Px(20.0)),
-                display: Display::Flex,
+    commands
+        .spawn((
+            NodeBundle {
+                style: Style {
+                    position_type: PositionType::Absolute,
+                    left: Val::Px(0.0),
+                    right: Val::Px(0.0),
+                    bottom: Val::Px(0.0),
+                    height: Val::Px(50.0),
+                    justify_content: JustifyContent::SpaceBetween,
+                    align_items: AlignItems::Center,
+                    padding: UiRect::horizontal(Val::Px(20.0)),
+                    display: Display::Flex,
+                    ..default()
+                },
+                background_color: BackgroundColor(Color::srgba(0.05, 0.05, 0.08, 0.85)),
                 ..default()
             },
-            background_color: BackgroundColor(Color::srgba(0.05, 0.05, 0.08, 0.85)),
-            ..default()
-        },
-        HudRoot,
-    )).with_children(|parent| {
-        // Health
-        parent.spawn((
-            TextBundle::from_section(
-                "HEALTH: 100",
-                TextStyle {
-                    font_size: 24.0,
-                    color: Color::srgb(1.0, 0.2, 0.2),
-                    ..default()
-                },
-            ),
-            HudHealthText,
-        ));
+            HudRoot,
+        ))
+        .with_children(|parent| {
+            // Health
+            parent.spawn((
+                TextBundle::from_section(
+                    "HEALTH: 100",
+                    TextStyle {
+                        font_size: 24.0,
+                        color: Color::srgb(1.0, 0.2, 0.2),
+                        ..default()
+                    },
+                ),
+                HudHealthText,
+            ));
 
-        // Armor
-        parent.spawn((
-            TextBundle::from_section(
-                "ARMOR: 0",
-                TextStyle {
-                    font_size: 24.0,
-                    color: Color::srgb(0.2, 0.6, 1.0),
-                    ..default()
-                },
-            ),
-            HudArmorText,
-        ));
+            // Armor
+            parent.spawn((
+                TextBundle::from_section(
+                    "ARMOR: 0",
+                    TextStyle {
+                        font_size: 24.0,
+                        color: Color::srgb(0.2, 0.6, 1.0),
+                        ..default()
+                    },
+                ),
+                HudArmorText,
+            ));
 
-        // Ammo
-        parent.spawn((
-            TextBundle::from_section(
-                "AMMO: 48",
-                TextStyle {
-                    font_size: 24.0,
-                    color: Color::srgb(1.0, 0.9, 0.2),
-                    ..default()
-                },
-            ),
-            HudAmmoText,
-        ));
+            // Ammo
+            parent.spawn((
+                TextBundle::from_section(
+                    "AMMO: 48",
+                    TextStyle {
+                        font_size: 24.0,
+                        color: Color::srgb(1.0, 0.9, 0.2),
+                        ..default()
+                    },
+                ),
+                HudAmmoText,
+            ));
 
-        // Keys
-        parent.spawn((
-            TextBundle::from_section(
-                "KEYS: -",
-                TextStyle {
-                    font_size: 20.0,
-                    color: Color::srgb(0.9, 0.9, 0.9),
-                    ..default()
-                },
-            ),
-            HudKeysText,
-        ));
-    });
+            // Keys
+            parent.spawn((
+                TextBundle::from_section(
+                    "KEYS: -",
+                    TextStyle {
+                        font_size: 20.0,
+                        color: Color::srgb(0.9, 0.9, 0.9),
+                        ..default()
+                    },
+                ),
+                HudKeysText,
+            ));
+        });
 
     // Top message text
-    commands.spawn((
-        NodeBundle {
+    commands
+        .spawn((NodeBundle {
             style: Style {
                 position_type: PositionType::Absolute,
                 left: Val::Px(20.0),
@@ -217,20 +220,20 @@ pub fn setup_hud_ui(mut commands: Commands) {
                 ..default()
             },
             ..default()
-        },
-    )).with_children(|parent| {
-        parent.spawn((
-            TextBundle::from_section(
-                "",
-                TextStyle {
-                    font_size: 22.0,
-                    color: Color::srgb(0.4, 0.8, 1.0),
-                    ..default()
-                },
-            ),
-            HudMessageText,
-        ));
-    });
+        },))
+        .with_children(|parent| {
+            parent.spawn((
+                TextBundle::from_section(
+                    "",
+                    TextStyle {
+                        font_size: 22.0,
+                        color: Color::srgb(0.4, 0.8, 1.0),
+                        ..default()
+                    },
+                ),
+                HudMessageText,
+            ));
+        });
 
     commands.spawn(StatusbarState::default());
 }
@@ -238,16 +241,65 @@ pub fn setup_hud_ui(mut commands: Commands) {
 pub fn update_hud_display(
     mut sbar_query: Query<&mut StatusbarState>,
     player_query: Query<&crate::player::PlayerController>,
-    mut health_text: Query<&mut Text, (With<HudHealthText>, Without<HudArmorText>, Without<HudAmmoText>, Without<HudKeysText>, Without<HudMessageText>)>,
-    mut armor_text: Query<&mut Text, (With<HudArmorText>, Without<HudHealthText>, Without<HudAmmoText>, Without<HudKeysText>, Without<HudMessageText>)>,
-    mut ammo_text: Query<&mut Text, (With<HudAmmoText>, Without<HudHealthText>, Without<HudArmorText>, Without<HudKeysText>, Without<HudMessageText>)>,
-    mut keys_text: Query<&mut Text, (With<HudKeysText>, Without<HudHealthText>, Without<HudArmorText>, Without<HudAmmoText>, Without<HudMessageText>)>,
-    mut msg_text: Query<&mut Text, (With<HudMessageText>, Without<HudHealthText>, Without<HudArmorText>, Without<HudAmmoText>, Without<HudKeysText>)>,
+    mut health_text: Query<
+        &mut Text,
+        (
+            With<HudHealthText>,
+            Without<HudArmorText>,
+            Without<HudAmmoText>,
+            Without<HudKeysText>,
+            Without<HudMessageText>,
+        ),
+    >,
+    mut armor_text: Query<
+        &mut Text,
+        (
+            With<HudArmorText>,
+            Without<HudHealthText>,
+            Without<HudAmmoText>,
+            Without<HudKeysText>,
+            Without<HudMessageText>,
+        ),
+    >,
+    mut ammo_text: Query<
+        &mut Text,
+        (
+            With<HudAmmoText>,
+            Without<HudHealthText>,
+            Without<HudArmorText>,
+            Without<HudKeysText>,
+            Without<HudMessageText>,
+        ),
+    >,
+    mut keys_text: Query<
+        &mut Text,
+        (
+            With<HudKeysText>,
+            Without<HudHealthText>,
+            Without<HudArmorText>,
+            Without<HudAmmoText>,
+            Without<HudMessageText>,
+        ),
+    >,
+    mut msg_text: Query<
+        &mut Text,
+        (
+            With<HudMessageText>,
+            Without<HudHealthText>,
+            Without<HudArmorText>,
+            Without<HudAmmoText>,
+            Without<HudKeysText>,
+        ),
+    >,
     mut hud_root: Query<&mut Style, With<HudRoot>>,
     time: Res<Time>,
 ) {
-    let Ok(player) = player_query.get_single() else { return; };
-    let Ok(mut sbar) = sbar_query.get_single_mut() else { return; };
+    let Ok(player) = player_query.get_single() else {
+        return;
+    };
+    let Ok(mut sbar) = sbar_query.get_single_mut() else {
+        return;
+    };
 
     // Sync keys
     sbar.has_blue_key = player.has_blue_key;
@@ -275,16 +327,28 @@ pub fn update_hud_display(
 
     if let Ok(mut txt) = ammo_text.get_single_mut() {
         let cur_idx = player.current_weapon as usize;
-        let ammo = if cur_idx < player.weapons.len() { player.weapons[cur_idx].ammo } else { 0 };
+        let ammo = if cur_idx < player.weapons.len() {
+            player.weapons[cur_idx].ammo
+        } else {
+            0
+        };
         txt.sections[0].value = format!("AMMO: {:>3}", ammo.clamp(0, 999));
     }
 
     if let Ok(mut txt) = keys_text.get_single_mut() {
         let mut keys_str = String::new();
-        if player.has_blue_key { keys_str.push_str("[B] "); }
-        if player.has_red_key { keys_str.push_str("[R] "); }
-        if player.has_yellow_key { keys_str.push_str("[Y] "); }
-        if keys_str.is_empty() { keys_str = "-".to_string(); }
+        if player.has_blue_key {
+            keys_str.push_str("[B] ");
+        }
+        if player.has_red_key {
+            keys_str.push_str("[R] ");
+        }
+        if player.has_yellow_key {
+            keys_str.push_str("[Y] ");
+        }
+        if keys_str.is_empty() {
+            keys_str = "-".to_string();
+        }
         txt.sections[0].value = format!("KEYS: {}", keys_str);
     }
 
@@ -297,10 +361,7 @@ pub fn update_hud_display(
     }
 }
 
-pub fn toggle_hud_mode(
-    keys: Res<ButtonInput<KeyCode>>,
-    mut query: Query<&mut StatusbarState>,
-) {
+pub fn toggle_hud_mode(keys: Res<ButtonInput<KeyCode>>, mut query: Query<&mut StatusbarState>) {
     if keys.just_pressed(KeyCode::F5) || keys.just_pressed(KeyCode::Minus) {
         for mut sbar in query.iter_mut() {
             sbar.hud_mode = match sbar.hud_mode {

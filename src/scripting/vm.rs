@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 use crate::scripting::types::*;
+use rand_chacha::rand_core::Rng;
 
 pub const MAX_CALL_DEPTH: usize = 64;
 
@@ -16,6 +17,7 @@ pub struct VmActorContext<'a> {
     pub dist_to_player: i32,
     pub can_see_player: bool,
     pub hit_by_weapon: bool,
+    pub rng: &'a mut crate::net::DeterministicRng,
     pub registers: &'a mut ActorRegisters,
     pub sprite_x: &'a mut i32,
     pub sprite_y: &'a mut i32,
@@ -94,7 +96,6 @@ pub struct VmActorContext<'a> {
     pub shoot_events: Vec<(i16, i32, i32, i32, i16)>,
 }
 
-
 impl ConVm {
     pub fn new(
         bytecode: Vec<i32>,
@@ -131,8 +132,8 @@ impl ConVm {
         if let Some(action_ptr) = ctx.registers.action_ptr {
             if action_ptr + 4 < self.bytecode.len() {
                 let num_frames = self.bytecode[action_ptr + 1];
-                let inc_val    = self.bytecode[action_ptr + 3];
-                let delay      = self.bytecode[action_ptr + 4];
+                let inc_val = self.bytecode[action_ptr + 3];
+                let delay = self.bytecode[action_ptr + 4];
 
                 ctx.registers.action_delay_timer += TICSPERFRAME as i16;
                 if (ctx.registers.action_delay_timer as i32) > delay {
@@ -188,7 +189,10 @@ impl ConVm {
                 // Subroutine Invocation
                 Opcode::State => {
                     let target_state = self.get_word(ip + 1).unwrap_or(0) as usize;
-                    if call_stack.len() < MAX_CALL_DEPTH && target_state > 0 && target_state < self.bytecode.len() {
+                    if call_stack.len() < MAX_CALL_DEPTH
+                        && target_state > 0
+                        && target_state < self.bytecode.len()
+                    {
                         call_stack.push(ip + 2);
                         ip = target_state;
                     } else {
@@ -205,8 +209,8 @@ impl ConVm {
                 Opcode::IfRnd => {
                     let threshold = self.get_word(ip + 1).unwrap_or(0);
                     let fail_target = self.get_word(ip + 2).unwrap_or(0) as usize;
-                    let rand_val = (rand::random::<u16>() >> 8) as i32;
-                    let cond = rand_val >= (255 - threshold);
+                    let rand_val = (ctx.rng.rng.next_u32() & 0xFF) as i32;
+                    let cond = rand_val < threshold;
                     self.handle_if_else(cond, &mut ip, 3, fail_target);
                 }
 
@@ -342,23 +346,47 @@ impl ConVm {
                     let fail_target = self.get_word(ip + 2).unwrap_or(0) as usize;
                     let mut j = false;
 
-                    if (flags & 1) != 0 && ctx.player_xvel >= 0 && ctx.player_xvel < 8 { j = true; }
-                    else if (flags & 2) != 0 && ctx.player_xvel >= 8 && !ctx.player_running { j = true; }
-                    else if (flags & 4) != 0 && ctx.player_xvel >= 8 && ctx.player_running { j = true; }
-                    else if (flags & 8) != 0 && ctx.player_on_ground && ctx.player_crouching { j = true; }
-                    else if (flags & 16) != 0 && !ctx.player_on_ground && ctx.player_posz_velocity > 2048 { j = true; }
-                    else if (flags & 32) != 0 && ctx.player_jumping_counter > 348 { j = true; }
-                    else if (flags & 64) != 0 && ctx.player_health > 0 { j = true; }
-                    else if (flags & 128) != 0 && ctx.player_xvel <= -8 && !ctx.player_running { j = true; }
-                    else if (flags & 256) != 0 && ctx.player_xvel <= -8 && ctx.player_running { j = true; }
-                    else if (flags & 512) != 0 && (ctx.player_quick_kick > 0 || (ctx.player_weapon == 0 && ctx.player_kickback > 0)) { j = true; }
-                    else if (flags & 1024) != 0 && ctx.player_shrunk { j = true; }
-                    else if (flags & 2048) != 0 && ctx.player_jetpack_on { j = true; }
-                    else if (flags & 4096) != 0 && ctx.player_steroids_active { j = true; }
-                    else if (flags & 8192) != 0 && ctx.player_on_ground { j = true; }
-                    else if (flags & 16384) != 0 && !ctx.player_shrunk && ctx.player_health > 0 { j = true; }
-                    else if (flags & 32768) != 0 && ctx.player_dead { j = true; }
-                    else if (flags & 65536) != 0 && ctx.player_facing_actor { j = true; }
+                    if (flags & 1) != 0 && ctx.player_xvel >= 0 && ctx.player_xvel < 8 {
+                        j = true;
+                    } else if (flags & 2) != 0 && ctx.player_xvel >= 8 && !ctx.player_running {
+                        j = true;
+                    } else if (flags & 4) != 0 && ctx.player_xvel >= 8 && ctx.player_running {
+                        j = true;
+                    } else if (flags & 8) != 0 && ctx.player_on_ground && ctx.player_crouching {
+                        j = true;
+                    } else if (flags & 16) != 0
+                        && !ctx.player_on_ground
+                        && ctx.player_posz_velocity > 2048
+                    {
+                        j = true;
+                    } else if (flags & 32) != 0 && ctx.player_jumping_counter > 348 {
+                        j = true;
+                    } else if (flags & 64) != 0 && ctx.player_health > 0 {
+                        j = true;
+                    } else if (flags & 128) != 0 && ctx.player_xvel <= -8 && !ctx.player_running {
+                        j = true;
+                    } else if (flags & 256) != 0 && ctx.player_xvel <= -8 && ctx.player_running {
+                        j = true;
+                    } else if (flags & 512) != 0
+                        && (ctx.player_quick_kick > 0
+                            || (ctx.player_weapon == 0 && ctx.player_kickback > 0))
+                    {
+                        j = true;
+                    } else if (flags & 1024) != 0 && ctx.player_shrunk {
+                        j = true;
+                    } else if (flags & 2048) != 0 && ctx.player_jetpack_on {
+                        j = true;
+                    } else if (flags & 4096) != 0 && ctx.player_steroids_active {
+                        j = true;
+                    } else if (flags & 8192) != 0 && ctx.player_on_ground {
+                        j = true;
+                    } else if (flags & 16384) != 0 && !ctx.player_shrunk && ctx.player_health > 0 {
+                        j = true;
+                    } else if (flags & 32768) != 0 && ctx.player_dead {
+                        j = true;
+                    } else if (flags & 65536) != 0 && ctx.player_facing_actor {
+                        j = true;
+                    }
 
                     self.handle_if_else(j, &mut ip, 3, fail_target);
                 }
@@ -514,7 +542,7 @@ impl ConVm {
                     *ctx.sprite_hitag = flags;
                     ctx.registers.count = 0;
                     if (flags as i32 & move_flags::RANDOM_ANGLE) != 0 {
-                        *ctx.sprite_ang = (rand::random::<u16>() & 2047) as i16;
+                        *ctx.sprite_ang = (ctx.rng.next_f32() * 2048.0) as i16;
                     }
                     ip += 3;
                 }
@@ -524,7 +552,7 @@ impl ConVm {
                     ctx.registers.ai_ptr = Some(ai_ptr);
                     if ai_ptr + 2 < self.bytecode.len() {
                         ctx.registers.action_ptr = Some(self.bytecode[ai_ptr] as usize);
-                        ctx.registers.move_ptr   = Some(self.bytecode[ai_ptr + 1] as usize);
+                        ctx.registers.move_ptr = Some(self.bytecode[ai_ptr + 1] as usize);
                         let flags = self.bytecode[ai_ptr + 2] as i16;
                         *ctx.sprite_hitag = flags;
                         ctx.registers.count = 0;
@@ -532,7 +560,7 @@ impl ConVm {
                         ctx.registers.frame_offset = 0;
                         ctx.registers.action_delay_timer = 0;
                         if (flags as i32 & move_flags::RANDOM_ANGLE) != 0 {
-                            *ctx.sprite_ang = (rand::random::<u16>() & 2047) as i16;
+                            *ctx.sprite_ang = (ctx.rng.next_f32() * 2048.0) as i16;
                         }
                     }
                     ip += 2;
@@ -635,13 +663,20 @@ impl ConVm {
 
                 Opcode::Spawn => {
                     let tile = self.get_word(ip + 1).unwrap_or(0) as i16;
-                    ctx.spawned_sprites.push((tile, *ctx.sprite_x, *ctx.sprite_y, *ctx.sprite_z));
+                    ctx.spawned_sprites
+                        .push((tile, *ctx.sprite_x, *ctx.sprite_y, *ctx.sprite_z));
                     ip += 2;
                 }
 
                 Opcode::Shoot => {
                     let tile = self.get_word(ip + 1).unwrap_or(0) as i16;
-                    ctx.shoot_events.push((tile, *ctx.sprite_x, *ctx.sprite_y, *ctx.sprite_z, *ctx.sprite_ang));
+                    ctx.shoot_events.push((
+                        tile,
+                        *ctx.sprite_x,
+                        *ctx.sprite_y,
+                        *ctx.sprite_z,
+                        *ctx.sprite_ang,
+                    ));
                     ip += 2;
                 }
 
@@ -722,9 +757,17 @@ impl ConVm {
                     ip += 2;
                 }
 
-                Opcode::Fall | Opcode::ResetPlayer | Opcode::PStomp | Opcode::WackPlayer
-                | Opcode::Operate | Opcode::RespawnHitag | Opcode::Tip | Opcode::GetLastPal
-                | Opcode::PKick | Opcode::MikeSnd | Opcode::TossWeapon => {
+                Opcode::Fall
+                | Opcode::ResetPlayer
+                | Opcode::PStomp
+                | Opcode::WackPlayer
+                | Opcode::Operate
+                | Opcode::RespawnHitag
+                | Opcode::Tip
+                | Opcode::GetLastPal
+                | Opcode::PKick
+                | Opcode::MikeSnd
+                | Opcode::TossWeapon => {
                     ip += 1;
                 }
 
@@ -746,7 +789,13 @@ impl ConVm {
     }
 
     #[inline(always)]
-    fn handle_if_else(&self, condition: bool, ip: &mut usize, advance_if_true: usize, fail_target: usize) {
+    fn handle_if_else(
+        &self,
+        condition: bool,
+        ip: &mut usize,
+        advance_if_true: usize,
+        fail_target: usize,
+    ) {
         if condition {
             *ip += advance_if_true;
         } else {
@@ -762,6 +811,7 @@ impl ConVm {
 mod tests {
     use super::*;
     use crate::scripting::compiler::Compiler;
+    use crate::scripting::types::*;
 
     fn create_test_context<'a>(
         reg: &'a mut ActorRegisters,
@@ -788,6 +838,7 @@ mod tests {
             dist_to_player: 500,
             can_see_player: true,
             hit_by_weapon: false,
+            rng: Box::leak(Box::new(crate::net::DeterministicRng::default())),
             registers: reg,
             sprite_x: x,
             sprite_y: y,
@@ -868,22 +919,48 @@ mod tests {
 
         let mut compiler = Compiler::new();
         let compiled = compiler.compile(script).unwrap();
-        let vm = ConVm::new(compiled.bytecode, compiled.actor_script_ptrs, compiled.actor_types);
+        let vm = ConVm::new(
+            compiled.bytecode,
+            compiled.actor_script_ptrs,
+            compiled.actor_types,
+        );
 
         let mut reg = ActorRegisters::default();
-        let mut x = 0; let mut y = 0; let mut z = 0;
-        let mut ang = 0; let mut xvel = 0; let mut zvel = 0;
+        let mut x = 0;
+        let mut y = 0;
+        let mut z = 0;
+        let mut ang = 0;
+        let mut xvel = 0;
+        let mut zvel = 0;
         let mut extra = 100; // Alive
         let mut picnum = 1680;
         let mut sectnum = 0;
-        let mut cstat = 0; let mut pal = 0;
-        let mut xrepeat = 64; let mut yrepeat = 64;
-        let mut clipdist = 32; let mut lotag = 0; let mut hitag = 0;
+        let mut cstat = 0;
+        let mut pal = 0;
+        let mut xrepeat = 64;
+        let mut yrepeat = 64;
+        let mut clipdist = 32;
+        let mut lotag = 0;
+        let mut hitag = 0;
 
         let mut ctx = create_test_context(
-            &mut reg, &mut x, &mut y, &mut z, &mut ang, &mut xvel, &mut zvel,
-            &mut extra, &mut picnum, &mut sectnum, &mut cstat, &mut pal,
-            &mut xrepeat, &mut yrepeat, &mut clipdist, &mut lotag, &mut hitag,
+            &mut reg,
+            &mut x,
+            &mut y,
+            &mut z,
+            &mut ang,
+            &mut xvel,
+            &mut zvel,
+            &mut extra,
+            &mut picnum,
+            &mut sectnum,
+            &mut cstat,
+            &mut pal,
+            &mut xrepeat,
+            &mut yrepeat,
+            &mut clipdist,
+            &mut lotag,
+            &mut hitag,
         );
 
         // First tick: extra 100 -> enters else branch -> subtracts 10
@@ -913,22 +990,48 @@ mod tests {
 
         let mut compiler = Compiler::new();
         let compiled = compiler.compile(script).unwrap();
-        let vm = ConVm::new(compiled.bytecode, compiled.actor_script_ptrs, compiled.actor_types);
+        let vm = ConVm::new(
+            compiled.bytecode,
+            compiled.actor_script_ptrs,
+            compiled.actor_types,
+        );
 
         let mut reg = ActorRegisters::default();
-        let mut x = 0; let mut y = 0; let mut z = 0;
-        let mut ang = 0; let mut xvel = 0; let mut zvel = 0;
+        let mut x = 0;
+        let mut y = 0;
+        let mut z = 0;
+        let mut ang = 0;
+        let mut xvel = 0;
+        let mut zvel = 0;
         let mut extra = 100;
         let mut picnum = 2000;
         let mut sectnum = 0;
-        let mut cstat = 0; let mut pal = 0;
-        let mut xrepeat = 64; let mut yrepeat = 64;
-        let mut clipdist = 32; let mut lotag = 0; let mut hitag = 0;
+        let mut cstat = 0;
+        let mut pal = 0;
+        let mut xrepeat = 64;
+        let mut yrepeat = 64;
+        let mut clipdist = 32;
+        let mut lotag = 0;
+        let mut hitag = 0;
 
         let mut ctx = create_test_context(
-            &mut reg, &mut x, &mut y, &mut z, &mut ang, &mut xvel, &mut zvel,
-            &mut extra, &mut picnum, &mut sectnum, &mut cstat, &mut pal,
-            &mut xrepeat, &mut yrepeat, &mut clipdist, &mut lotag, &mut hitag,
+            &mut reg,
+            &mut x,
+            &mut y,
+            &mut z,
+            &mut ang,
+            &mut xvel,
+            &mut zvel,
+            &mut extra,
+            &mut picnum,
+            &mut sectnum,
+            &mut cstat,
+            &mut pal,
+            &mut xrepeat,
+            &mut yrepeat,
+            &mut clipdist,
+            &mut lotag,
+            &mut hitag,
         );
         ctx.dist_to_player = 500; // < 1024
 
@@ -957,25 +1060,50 @@ mod tests {
 
         let mut compiler = Compiler::new();
         let compiled = compiler.compile(script).unwrap();
-        let vm = ConVm::new(compiled.bytecode, compiled.actor_script_ptrs, compiled.actor_types);
+        let vm = ConVm::new(
+            compiled.bytecode,
+            compiled.actor_script_ptrs,
+            compiled.actor_types,
+        );
 
         let mut reg = ActorRegisters::default();
         reg.action_ptr = compiled.symbols.get("ARECONWALK").map(|&p| p as usize);
 
-        let mut x = 0; let mut y = 0; let mut z = 0;
-        let mut ang = 0; let mut xvel = 0; let mut zvel = 0;
+        let mut x = 0;
+        let mut y = 0;
+        let mut z = 0;
+        let mut ang = 0;
+        let mut xvel = 0;
+        let mut zvel = 0;
         let mut extra = 100;
         let mut picnum = 2400;
         let mut sectnum = 0;
-        let mut cstat = 0; let mut pal = 0;
-        let mut xrepeat = 64; let mut yrepeat = 64;
-        let mut clipdist = 32; let mut lotag = 777; // Ensure lotag is untouched!
+        let mut cstat = 0;
+        let mut pal = 0;
+        let mut xrepeat = 64;
+        let mut yrepeat = 64;
+        let mut clipdist = 32;
+        let mut lotag = 777; // Ensure lotag is untouched!
         let mut hitag = 888;
 
         let mut ctx = create_test_context(
-            &mut reg, &mut x, &mut y, &mut z, &mut ang, &mut xvel, &mut zvel,
-            &mut extra, &mut picnum, &mut sectnum, &mut cstat, &mut pal,
-            &mut xrepeat, &mut yrepeat, &mut clipdist, &mut lotag, &mut hitag,
+            &mut reg,
+            &mut x,
+            &mut y,
+            &mut z,
+            &mut ang,
+            &mut xvel,
+            &mut zvel,
+            &mut extra,
+            &mut picnum,
+            &mut sectnum,
+            &mut cstat,
+            &mut pal,
+            &mut xrepeat,
+            &mut yrepeat,
+            &mut clipdist,
+            &mut lotag,
+            &mut hitag,
         );
 
         // Tick 1: count is 0 -> enters else branch -> sets count to 5
@@ -1012,22 +1140,48 @@ mod tests {
 
         let mut compiler = Compiler::new();
         let compiled = compiler.compile(script).unwrap();
-        let vm = ConVm::new(compiled.bytecode, compiled.actor_script_ptrs, compiled.actor_types);
+        let vm = ConVm::new(
+            compiled.bytecode,
+            compiled.actor_script_ptrs,
+            compiled.actor_types,
+        );
 
         let mut reg = ActorRegisters::default();
-        let mut x = 0; let mut y = 0; let mut z = 0;
-        let mut ang = 0; let mut xvel = 0; let mut zvel = 0;
+        let mut x = 0;
+        let mut y = 0;
+        let mut z = 0;
+        let mut ang = 0;
+        let mut xvel = 0;
+        let mut zvel = 0;
         let mut extra = 500;
         let mut picnum = 2600;
         let mut sectnum = 0;
-        let mut cstat = 0; let mut pal = 0;
-        let mut xrepeat = 64; let mut yrepeat = 64;
-        let mut clipdist = 32; let mut lotag = 0; let mut hitag = 0;
+        let mut cstat = 0;
+        let mut pal = 0;
+        let mut xrepeat = 64;
+        let mut yrepeat = 64;
+        let mut clipdist = 32;
+        let mut lotag = 0;
+        let mut hitag = 0;
 
         let mut ctx = create_test_context(
-            &mut reg, &mut x, &mut y, &mut z, &mut ang, &mut xvel, &mut zvel,
-            &mut extra, &mut picnum, &mut sectnum, &mut cstat, &mut pal,
-            &mut xrepeat, &mut yrepeat, &mut clipdist, &mut lotag, &mut hitag,
+            &mut reg,
+            &mut x,
+            &mut y,
+            &mut z,
+            &mut ang,
+            &mut xvel,
+            &mut zvel,
+            &mut extra,
+            &mut picnum,
+            &mut sectnum,
+            &mut cstat,
+            &mut pal,
+            &mut xrepeat,
+            &mut yrepeat,
+            &mut clipdist,
+            &mut lotag,
+            &mut hitag,
         );
 
         vm.execute(&mut ctx);
@@ -1058,22 +1212,48 @@ mod tests {
         "#;
         let mut compiler = Compiler::new();
         let compiled = compiler.compile(script).unwrap();
-        let vm = ConVm::new(compiled.bytecode, compiled.actor_script_ptrs, compiled.actor_types);
+        let vm = ConVm::new(
+            compiled.bytecode,
+            compiled.actor_script_ptrs,
+            compiled.actor_types,
+        );
 
         let mut reg = ActorRegisters::default();
-        let mut x = 0; let mut y = 0; let mut z = 0;
-        let mut ang = 0; let mut xvel = 0; let mut zvel = 0;
+        let mut x = 0;
+        let mut y = 0;
+        let mut z = 0;
+        let mut ang = 0;
+        let mut xvel = 0;
+        let mut zvel = 0;
         let mut extra = 100;
         let mut picnum = 2700;
         let mut sectnum = 0;
-        let mut cstat = 0; let mut pal = 0;
-        let mut xrepeat = 64; let mut yrepeat = 64;
-        let mut clipdist = 32; let mut lotag = 0; let mut hitag = 0;
+        let mut cstat = 0;
+        let mut pal = 0;
+        let mut xrepeat = 64;
+        let mut yrepeat = 64;
+        let mut clipdist = 32;
+        let mut lotag = 0;
+        let mut hitag = 0;
 
         let mut ctx = create_test_context(
-            &mut reg, &mut x, &mut y, &mut z, &mut ang, &mut xvel, &mut zvel,
-            &mut extra, &mut picnum, &mut sectnum, &mut cstat, &mut pal,
-            &mut xrepeat, &mut yrepeat, &mut clipdist, &mut lotag, &mut hitag,
+            &mut reg,
+            &mut x,
+            &mut y,
+            &mut z,
+            &mut ang,
+            &mut xvel,
+            &mut zvel,
+            &mut extra,
+            &mut picnum,
+            &mut sectnum,
+            &mut cstat,
+            &mut pal,
+            &mut xrepeat,
+            &mut yrepeat,
+            &mut clipdist,
+            &mut lotag,
+            &mut hitag,
         );
 
         // VM terminates safely without hanging the process
@@ -1094,22 +1274,48 @@ mod tests {
         "#;
         let mut compiler = Compiler::new();
         let compiled = compiler.compile(script).unwrap();
-        let vm = ConVm::new(compiled.bytecode, compiled.actor_script_ptrs, compiled.actor_types);
+        let vm = ConVm::new(
+            compiled.bytecode,
+            compiled.actor_script_ptrs,
+            compiled.actor_types,
+        );
 
         let mut reg = ActorRegisters::default();
-        let mut x = 0; let mut y = 0; let mut z = 0;
-        let mut ang = 0; let mut xvel = 0; let mut zvel = 0;
+        let mut x = 0;
+        let mut y = 0;
+        let mut z = 0;
+        let mut ang = 0;
+        let mut xvel = 0;
+        let mut zvel = 0;
         let mut extra = 100;
         let mut picnum = 2800;
         let mut sectnum = 0;
-        let mut cstat = 0; let mut pal = 0;
-        let mut xrepeat = 64; let mut yrepeat = 64;
-        let mut clipdist = 32; let mut lotag = 0; let mut hitag = 0;
+        let mut cstat = 0;
+        let mut pal = 0;
+        let mut xrepeat = 64;
+        let mut yrepeat = 64;
+        let mut clipdist = 32;
+        let mut lotag = 0;
+        let mut hitag = 0;
 
         let mut ctx = create_test_context(
-            &mut reg, &mut x, &mut y, &mut z, &mut ang, &mut xvel, &mut zvel,
-            &mut extra, &mut picnum, &mut sectnum, &mut cstat, &mut pal,
-            &mut xrepeat, &mut yrepeat, &mut clipdist, &mut lotag, &mut hitag,
+            &mut reg,
+            &mut x,
+            &mut y,
+            &mut z,
+            &mut ang,
+            &mut xvel,
+            &mut zvel,
+            &mut extra,
+            &mut picnum,
+            &mut sectnum,
+            &mut cstat,
+            &mut pal,
+            &mut xrepeat,
+            &mut yrepeat,
+            &mut clipdist,
+            &mut lotag,
+            &mut hitag,
         );
 
         // Health 30 < 50 -> should play sound 10
@@ -1139,23 +1345,48 @@ mod tests {
         "#;
         let mut compiler = Compiler::new();
         let compiled = compiler.compile(script).unwrap();
-        let vm = ConVm::new(compiled.bytecode, compiled.actor_script_ptrs, compiled.actor_types);
+        let vm = ConVm::new(
+            compiled.bytecode,
+            compiled.actor_script_ptrs,
+            compiled.actor_types,
+        );
 
         let mut reg = ActorRegisters::default();
-        let mut x = 0; let mut y = 0; let mut z = 0;
+        let mut x = 0;
+        let mut y = 0;
+        let mut z = 0;
         let mut ang = 50; // Actor facing angle 50
-        let mut xvel = 0; let mut zvel = 0;
+        let mut xvel = 0;
+        let mut zvel = 0;
         let mut extra = 100;
         let mut picnum = 2801;
         let mut sectnum = 0;
-        let mut cstat = 0; let mut pal = 0;
-        let mut xrepeat = 64; let mut yrepeat = 64;
-        let mut clipdist = 32; let mut lotag = 0; let mut hitag = 0;
+        let mut cstat = 0;
+        let mut pal = 0;
+        let mut xrepeat = 64;
+        let mut yrepeat = 64;
+        let mut clipdist = 32;
+        let mut lotag = 0;
+        let mut hitag = 0;
 
         let mut ctx = create_test_context(
-            &mut reg, &mut x, &mut y, &mut z, &mut ang, &mut xvel, &mut zvel,
-            &mut extra, &mut picnum, &mut sectnum, &mut cstat, &mut pal,
-            &mut xrepeat, &mut yrepeat, &mut clipdist, &mut lotag, &mut hitag,
+            &mut reg,
+            &mut x,
+            &mut y,
+            &mut z,
+            &mut ang,
+            &mut xvel,
+            &mut zvel,
+            &mut extra,
+            &mut picnum,
+            &mut sectnum,
+            &mut cstat,
+            &mut pal,
+            &mut xrepeat,
+            &mut yrepeat,
+            &mut clipdist,
+            &mut lotag,
+            &mut hitag,
         );
 
         // Player angle 80 -> diff is 30 <= 128 -> sound 100
@@ -1185,22 +1416,48 @@ mod tests {
         "#;
         let mut compiler = Compiler::new();
         let compiled = compiler.compile(script).unwrap();
-        let vm = ConVm::new(compiled.bytecode, compiled.actor_script_ptrs, compiled.actor_types);
+        let vm = ConVm::new(
+            compiled.bytecode,
+            compiled.actor_script_ptrs,
+            compiled.actor_types,
+        );
 
         let mut reg = ActorRegisters::default();
-        let mut x = 0; let mut y = 0; let mut z = 0;
-        let mut ang = 0; let mut xvel = 0; let mut zvel = 0;
+        let mut x = 0;
+        let mut y = 0;
+        let mut z = 0;
+        let mut ang = 0;
+        let mut xvel = 0;
+        let mut zvel = 0;
         let mut extra = 100;
         let mut picnum = 2802;
         let mut sectnum = 0;
-        let mut cstat = 0; let mut pal = 0;
-        let mut xrepeat = 64; let mut yrepeat = 64;
-        let mut clipdist = 32; let mut lotag = 0; let mut hitag = 0;
+        let mut cstat = 0;
+        let mut pal = 0;
+        let mut xrepeat = 64;
+        let mut yrepeat = 64;
+        let mut clipdist = 32;
+        let mut lotag = 0;
+        let mut hitag = 0;
 
         let mut ctx = create_test_context(
-            &mut reg, &mut x, &mut y, &mut z, &mut ang, &mut xvel, &mut zvel,
-            &mut extra, &mut picnum, &mut sectnum, &mut cstat, &mut pal,
-            &mut xrepeat, &mut yrepeat, &mut clipdist, &mut lotag, &mut hitag,
+            &mut reg,
+            &mut x,
+            &mut y,
+            &mut z,
+            &mut ang,
+            &mut xvel,
+            &mut zvel,
+            &mut extra,
+            &mut picnum,
+            &mut sectnum,
+            &mut cstat,
+            &mut pal,
+            &mut xrepeat,
+            &mut yrepeat,
+            &mut clipdist,
+            &mut lotag,
+            &mut hitag,
         );
 
         ctx.player_jetpack_on = true;
@@ -1228,22 +1485,48 @@ mod tests {
         "#;
         let mut compiler = Compiler::new();
         let compiled = compiler.compile(script).unwrap();
-        let vm = ConVm::new(compiled.bytecode, compiled.actor_script_ptrs, compiled.actor_types);
+        let vm = ConVm::new(
+            compiled.bytecode,
+            compiled.actor_script_ptrs,
+            compiled.actor_types,
+        );
 
         let mut reg = ActorRegisters::default();
-        let mut x = 0; let mut y = 0; let mut z = 0;
-        let mut ang = 0; let mut xvel = 0; let mut zvel = 0;
+        let mut x = 0;
+        let mut y = 0;
+        let mut z = 0;
+        let mut ang = 0;
+        let mut xvel = 0;
+        let mut zvel = 0;
         let mut extra = 100;
         let mut picnum = 2803;
         let mut sectnum = 0;
-        let mut cstat = 0; let mut pal = 0; // Blue keycard
-        let mut xrepeat = 64; let mut yrepeat = 64;
-        let mut clipdist = 32; let mut lotag = 0; let mut hitag = 0;
+        let mut cstat = 0;
+        let mut pal = 0; // Blue keycard
+        let mut xrepeat = 64;
+        let mut yrepeat = 64;
+        let mut clipdist = 32;
+        let mut lotag = 0;
+        let mut hitag = 0;
 
         let mut ctx = create_test_context(
-            &mut reg, &mut x, &mut y, &mut z, &mut ang, &mut xvel, &mut zvel,
-            &mut extra, &mut picnum, &mut sectnum, &mut cstat, &mut pal,
-            &mut xrepeat, &mut yrepeat, &mut clipdist, &mut lotag, &mut hitag,
+            &mut reg,
+            &mut x,
+            &mut y,
+            &mut z,
+            &mut ang,
+            &mut xvel,
+            &mut zvel,
+            &mut extra,
+            &mut picnum,
+            &mut sectnum,
+            &mut cstat,
+            &mut pal,
+            &mut xrepeat,
+            &mut yrepeat,
+            &mut clipdist,
+            &mut lotag,
+            &mut hitag,
         );
 
         // Player has blue keycard (got_access = 1)
@@ -1273,22 +1556,48 @@ mod tests {
         "#;
         let mut compiler = Compiler::new();
         let compiled = compiler.compile(script).unwrap();
-        let vm = ConVm::new(compiled.bytecode, compiled.actor_script_ptrs, compiled.actor_types);
+        let vm = ConVm::new(
+            compiled.bytecode,
+            compiled.actor_script_ptrs,
+            compiled.actor_types,
+        );
 
         let mut reg = ActorRegisters::default();
-        let mut x = 0; let mut y = 0; let mut z = 0;
-        let mut ang = 0; let mut xvel = 0; let mut zvel = 0;
+        let mut x = 0;
+        let mut y = 0;
+        let mut z = 0;
+        let mut ang = 0;
+        let mut xvel = 0;
+        let mut zvel = 0;
         let mut extra = 100;
         let mut picnum = 2804;
         let mut sectnum = 0;
-        let mut cstat = 0; let mut pal = 0;
-        let mut xrepeat = 64; let mut yrepeat = 64;
-        let mut clipdist = 32; let mut lotag = 0; let mut hitag = 0;
+        let mut cstat = 0;
+        let mut pal = 0;
+        let mut xrepeat = 64;
+        let mut yrepeat = 64;
+        let mut clipdist = 32;
+        let mut lotag = 0;
+        let mut hitag = 0;
 
         let mut ctx = create_test_context(
-            &mut reg, &mut x, &mut y, &mut z, &mut ang, &mut xvel, &mut zvel,
-            &mut extra, &mut picnum, &mut sectnum, &mut cstat, &mut pal,
-            &mut xrepeat, &mut yrepeat, &mut clipdist, &mut lotag, &mut hitag,
+            &mut reg,
+            &mut x,
+            &mut y,
+            &mut z,
+            &mut ang,
+            &mut xvel,
+            &mut zvel,
+            &mut extra,
+            &mut picnum,
+            &mut sectnum,
+            &mut cstat,
+            &mut pal,
+            &mut xrepeat,
+            &mut yrepeat,
+            &mut clipdist,
+            &mut lotag,
+            &mut hitag,
         );
 
         // Sector lotag = 2 -> in water
@@ -1316,23 +1625,48 @@ mod tests {
         "#;
         let mut compiler = Compiler::new();
         let compiled = compiler.compile(script).unwrap();
-        let vm = ConVm::new(compiled.bytecode, compiled.actor_script_ptrs, compiled.actor_types);
+        let vm = ConVm::new(
+            compiled.bytecode,
+            compiled.actor_script_ptrs,
+            compiled.actor_types,
+        );
 
         let mut reg = ActorRegisters::default();
-        let mut x = 100; let mut y = 200; let mut z = 300;
+        let mut x = 100;
+        let mut y = 200;
+        let mut z = 300;
         let mut ang = 512; // Facing right (512 in Build 0-2047)
-        let mut xvel = 0; let mut zvel = 0;
+        let mut xvel = 0;
+        let mut zvel = 0;
         let mut extra = 100;
         let mut picnum = 2805;
         let mut sectnum = 0;
-        let mut cstat = 0; let mut pal = 0;
-        let mut xrepeat = 64; let mut yrepeat = 64;
-        let mut clipdist = 32; let mut lotag = 0; let mut hitag = 0;
+        let mut cstat = 0;
+        let mut pal = 0;
+        let mut xrepeat = 64;
+        let mut yrepeat = 64;
+        let mut clipdist = 32;
+        let mut lotag = 0;
+        let mut hitag = 0;
 
         let mut ctx = create_test_context(
-            &mut reg, &mut x, &mut y, &mut z, &mut ang, &mut xvel, &mut zvel,
-            &mut extra, &mut picnum, &mut sectnum, &mut cstat, &mut pal,
-            &mut xrepeat, &mut yrepeat, &mut clipdist, &mut lotag, &mut hitag,
+            &mut reg,
+            &mut x,
+            &mut y,
+            &mut z,
+            &mut ang,
+            &mut xvel,
+            &mut zvel,
+            &mut extra,
+            &mut picnum,
+            &mut sectnum,
+            &mut cstat,
+            &mut pal,
+            &mut xrepeat,
+            &mut yrepeat,
+            &mut clipdist,
+            &mut lotag,
+            &mut hitag,
         );
 
         vm.execute(&mut ctx);
@@ -1351,22 +1685,48 @@ mod tests {
         "#;
         let mut compiler = Compiler::new();
         let compiled = compiler.compile(script).unwrap();
-        let vm = ConVm::new(compiled.bytecode, compiled.actor_script_ptrs, compiled.actor_types);
+        let vm = ConVm::new(
+            compiled.bytecode,
+            compiled.actor_script_ptrs,
+            compiled.actor_types,
+        );
 
         let mut reg = ActorRegisters::default();
-        let mut x = 0; let mut y = 0; let mut z = 0;
-        let mut ang = 0; let mut xvel = 0; let mut zvel = 0;
+        let mut x = 0;
+        let mut y = 0;
+        let mut z = 0;
+        let mut ang = 0;
+        let mut xvel = 0;
+        let mut zvel = 0;
         let mut extra = 100;
         let mut picnum = 2806;
         let mut sectnum = 0;
-        let mut cstat = 0; let mut pal = 0;
-        let mut xrepeat = 64; let mut yrepeat = 64;
-        let mut clipdist = 32; let mut lotag = 0; let mut hitag = 0;
+        let mut cstat = 0;
+        let mut pal = 0;
+        let mut xrepeat = 64;
+        let mut yrepeat = 64;
+        let mut clipdist = 32;
+        let mut lotag = 0;
+        let mut hitag = 0;
 
         let mut ctx = create_test_context(
-            &mut reg, &mut x, &mut y, &mut z, &mut ang, &mut xvel, &mut zvel,
-            &mut extra, &mut picnum, &mut sectnum, &mut cstat, &mut pal,
-            &mut xrepeat, &mut yrepeat, &mut clipdist, &mut lotag, &mut hitag,
+            &mut reg,
+            &mut x,
+            &mut y,
+            &mut z,
+            &mut ang,
+            &mut xvel,
+            &mut zvel,
+            &mut extra,
+            &mut picnum,
+            &mut sectnum,
+            &mut cstat,
+            &mut pal,
+            &mut xrepeat,
+            &mut yrepeat,
+            &mut clipdist,
+            &mut lotag,
+            &mut hitag,
         );
 
         // Tick 1: increments from 64 to 65
@@ -1393,22 +1753,48 @@ mod tests {
         "#;
         let mut compiler = Compiler::new();
         let compiled = compiler.compile(script).unwrap();
-        let vm = ConVm::new(compiled.bytecode, compiled.actor_script_ptrs, compiled.actor_types);
+        let vm = ConVm::new(
+            compiled.bytecode,
+            compiled.actor_script_ptrs,
+            compiled.actor_types,
+        );
 
         let mut reg = ActorRegisters::default();
-        let mut x = 0; let mut y = 0; let mut z = 0;
-        let mut ang = 0; let mut xvel = 0; let mut zvel = 0;
+        let mut x = 0;
+        let mut y = 0;
+        let mut z = 0;
+        let mut ang = 0;
+        let mut xvel = 0;
+        let mut zvel = 0;
         let mut extra = 100;
         let mut picnum = 2807;
         let mut sectnum = 0;
-        let mut cstat = 0; let mut pal = 0;
-        let mut xrepeat = 64; let mut yrepeat = 64;
-        let mut clipdist = 32; let mut lotag = 0; let mut hitag = 0;
+        let mut cstat = 0;
+        let mut pal = 0;
+        let mut xrepeat = 64;
+        let mut yrepeat = 64;
+        let mut clipdist = 32;
+        let mut lotag = 0;
+        let mut hitag = 0;
 
         let mut ctx = create_test_context(
-            &mut reg, &mut x, &mut y, &mut z, &mut ang, &mut xvel, &mut zvel,
-            &mut extra, &mut picnum, &mut sectnum, &mut cstat, &mut pal,
-            &mut xrepeat, &mut yrepeat, &mut clipdist, &mut lotag, &mut hitag,
+            &mut reg,
+            &mut x,
+            &mut y,
+            &mut z,
+            &mut ang,
+            &mut xvel,
+            &mut zvel,
+            &mut extra,
+            &mut picnum,
+            &mut sectnum,
+            &mut cstat,
+            &mut pal,
+            &mut xrepeat,
+            &mut yrepeat,
+            &mut clipdist,
+            &mut lotag,
+            &mut hitag,
         );
 
         // Hit by RPG
@@ -1441,22 +1827,48 @@ mod tests {
         "#;
         let mut compiler = Compiler::new();
         let compiled = compiler.compile(script).unwrap();
-        let vm = ConVm::new(compiled.bytecode, compiled.actor_script_ptrs, compiled.actor_types);
+        let vm = ConVm::new(
+            compiled.bytecode,
+            compiled.actor_script_ptrs,
+            compiled.actor_types,
+        );
 
         let mut reg = ActorRegisters::default();
-        let mut x = 0; let mut y = 0; let mut z = 0;
-        let mut ang = 0; let mut xvel = 0; let mut zvel = 0;
+        let mut x = 0;
+        let mut y = 0;
+        let mut z = 0;
+        let mut ang = 0;
+        let mut xvel = 0;
+        let mut zvel = 0;
         let mut extra = 100;
         let mut picnum = 2808;
         let mut sectnum = 0;
-        let mut cstat = 0; let mut pal = 0;
-        let mut xrepeat = 64; let mut yrepeat = 64;
-        let mut clipdist = 32; let mut lotag = 0; let mut hitag = 0;
+        let mut cstat = 0;
+        let mut pal = 0;
+        let mut xrepeat = 64;
+        let mut yrepeat = 64;
+        let mut clipdist = 32;
+        let mut lotag = 0;
+        let mut hitag = 0;
 
         let mut ctx = create_test_context(
-            &mut reg, &mut x, &mut y, &mut z, &mut ang, &mut xvel, &mut zvel,
-            &mut extra, &mut picnum, &mut sectnum, &mut cstat, &mut pal,
-            &mut xrepeat, &mut yrepeat, &mut clipdist, &mut lotag, &mut hitag,
+            &mut reg,
+            &mut x,
+            &mut y,
+            &mut z,
+            &mut ang,
+            &mut xvel,
+            &mut zvel,
+            &mut extra,
+            &mut picnum,
+            &mut sectnum,
+            &mut cstat,
+            &mut pal,
+            &mut xrepeat,
+            &mut yrepeat,
+            &mut clipdist,
+            &mut lotag,
+            &mut hitag,
         );
 
         // 1. can_shoot_target = true -> sound 101
@@ -1493,22 +1905,48 @@ mod tests {
         "#;
         let mut compiler = Compiler::new();
         let compiled = compiler.compile(script).unwrap();
-        let vm = ConVm::new(compiled.bytecode, compiled.actor_script_ptrs, compiled.actor_types);
+        let vm = ConVm::new(
+            compiled.bytecode,
+            compiled.actor_script_ptrs,
+            compiled.actor_types,
+        );
 
         let mut reg = ActorRegisters::default();
-        let mut x = 0; let mut y = 0; let mut z = 0;
-        let mut ang = 0; let mut xvel = 0; let mut zvel = 0;
+        let mut x = 0;
+        let mut y = 0;
+        let mut z = 0;
+        let mut ang = 0;
+        let mut xvel = 0;
+        let mut zvel = 0;
         let mut extra = 0; // dead
         let mut picnum = 2630;
         let mut sectnum = 0;
-        let mut cstat = 0; let mut pal = 0;
-        let mut xrepeat = 64; let mut yrepeat = 64;
-        let mut clipdist = 32; let mut lotag = 0; let mut hitag = 0;
+        let mut cstat = 0;
+        let mut pal = 0;
+        let mut xrepeat = 64;
+        let mut yrepeat = 64;
+        let mut clipdist = 32;
+        let mut lotag = 0;
+        let mut hitag = 0;
 
         let mut ctx = create_test_context(
-            &mut reg, &mut x, &mut y, &mut z, &mut ang, &mut xvel, &mut zvel,
-            &mut extra, &mut picnum, &mut sectnum, &mut cstat, &mut pal,
-            &mut xrepeat, &mut yrepeat, &mut clipdist, &mut lotag, &mut hitag,
+            &mut reg,
+            &mut x,
+            &mut y,
+            &mut z,
+            &mut ang,
+            &mut xvel,
+            &mut zvel,
+            &mut extra,
+            &mut picnum,
+            &mut sectnum,
+            &mut cstat,
+            &mut pal,
+            &mut xrepeat,
+            &mut yrepeat,
+            &mut clipdist,
+            &mut lotag,
+            &mut hitag,
         );
 
         vm.execute(&mut ctx);
@@ -1534,22 +1972,48 @@ mod tests {
         "#;
         let mut compiler = Compiler::new();
         let compiled = compiler.compile(script).unwrap();
-        let vm = ConVm::new(compiled.bytecode, compiled.actor_script_ptrs, compiled.actor_types);
+        let vm = ConVm::new(
+            compiled.bytecode,
+            compiled.actor_script_ptrs,
+            compiled.actor_types,
+        );
 
         let mut reg = ActorRegisters::default();
-        let mut x = 0; let mut y = 0; let mut z = 0;
-        let mut ang = 0; let mut xvel = 0; let mut zvel = 0;
+        let mut x = 0;
+        let mut y = 0;
+        let mut z = 0;
+        let mut ang = 0;
+        let mut xvel = 0;
+        let mut zvel = 0;
         let mut extra = 100;
         let mut picnum = 2809;
         let mut sectnum = 0;
-        let mut cstat = 0; let mut pal = 0;
-        let mut xrepeat = 64; let mut yrepeat = 64;
-        let mut clipdist = 32; let mut lotag = 0; let mut hitag = 0;
+        let mut cstat = 0;
+        let mut pal = 0;
+        let mut xrepeat = 64;
+        let mut yrepeat = 64;
+        let mut clipdist = 32;
+        let mut lotag = 0;
+        let mut hitag = 0;
 
         let mut ctx = create_test_context(
-            &mut reg, &mut x, &mut y, &mut z, &mut ang, &mut xvel, &mut zvel,
-            &mut extra, &mut picnum, &mut sectnum, &mut cstat, &mut pal,
-            &mut xrepeat, &mut yrepeat, &mut clipdist, &mut lotag, &mut hitag,
+            &mut reg,
+            &mut x,
+            &mut y,
+            &mut z,
+            &mut ang,
+            &mut xvel,
+            &mut zvel,
+            &mut extra,
+            &mut picnum,
+            &mut sectnum,
+            &mut cstat,
+            &mut pal,
+            &mut xrepeat,
+            &mut yrepeat,
+            &mut clipdist,
+            &mut lotag,
+            &mut hitag,
         );
 
         // 1. Ducking
@@ -1594,4 +2058,3 @@ mod tests {
         assert_eq!(ctx.sound_events[0].0, 65536);
     }
 }
-

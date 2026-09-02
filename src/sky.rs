@@ -25,9 +25,11 @@ pub fn spawn_skybox(
         radius: 500.0,
         half_height: 250.0,
     });
-    
+
     // Invert U coordinate so textures are not mirrored when viewed from the inside
-    if let Some(bevy::render::mesh::VertexAttributeValues::Float32x2(uvs)) = cylinder_mesh.attribute_mut(Mesh::ATTRIBUTE_UV_0) {
+    if let Some(bevy::render::mesh::VertexAttributeValues::Float32x2(uvs)) =
+        cylinder_mesh.attribute_mut(Mesh::ATTRIBUTE_UV_0)
+    {
         for uv in uvs.iter_mut() {
             uv[0] = 1.0 - uv[0];
         }

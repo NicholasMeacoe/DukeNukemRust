@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
-use bevy::prelude::*;
 use crate::game_flow::state::GamePhase;
+use bevy::prelude::*;
 
 #[derive(Resource, Debug, Clone)]
 pub struct AttractModeTimer {

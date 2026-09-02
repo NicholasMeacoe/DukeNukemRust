@@ -1,8 +1,8 @@
 #![allow(dead_code)]
 
+use crate::interactivity::types::*;
 use bevy::prelude::*;
 use std::collections::HashMap;
-use crate::interactivity::types::*;
 
 #[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct DynamicSectorMesh {
@@ -22,19 +22,30 @@ pub fn handle_tag_activations(
 ) {
     for event in events.read() {
         for mut effector in effectors.iter_mut() {
-            if effector.lotag == event.lotag || (effector.hitag != 0 && effector.hitag == event.lotag) {
+            if effector.lotag == event.lotag
+                || (effector.hitag != 0 && effector.hitag == event.lotag)
+            {
                 effector.active = true;
                 match &mut effector.kind {
                     EffectorKind::RotatingDoor { is_open, .. } => {
                         *is_open = !*is_open;
                     }
-                    EffectorKind::SlidingDoor { is_open, auto_close_timer, auto_close_delay, .. } => {
+                    EffectorKind::SlidingDoor {
+                        is_open,
+                        auto_close_timer,
+                        auto_close_delay,
+                        ..
+                    } => {
                         *is_open = !*is_open;
                         if *is_open {
                             *auto_close_timer = Some(*auto_close_delay);
                         }
                     }
-                    EffectorKind::Elevator { is_at_top, auto_return_timer, .. } => {
+                    EffectorKind::Elevator {
+                        is_at_top,
+                        auto_return_timer,
+                        ..
+                    } => {
                         *is_at_top = !*is_at_top;
                         *auto_return_timer = if *is_at_top { Some(5.0) } else { None };
                     }
@@ -44,7 +55,12 @@ pub fn handle_tag_activations(
                     EffectorKind::LightSwitchOperator { is_on, .. } => {
                         *is_on = !*is_on;
                     }
-                    EffectorKind::AutoCloseDoor { is_open, auto_close_timer, auto_close_delay, .. } => {
+                    EffectorKind::AutoCloseDoor {
+                        is_open,
+                        auto_close_timer,
+                        auto_close_delay,
+                        ..
+                    } => {
                         *is_open = !*is_open;
                         if *is_open {
                             *auto_close_timer = Some(*auto_close_delay);
@@ -53,7 +69,11 @@ pub fn handle_tag_activations(
                     EffectorKind::PivotRotatingSector { is_open, .. } => {
                         *is_open = !*is_open;
                     }
-                    EffectorKind::Earthquake { is_triggered, elapsed, .. } => {
+                    EffectorKind::Earthquake {
+                        is_triggered,
+                        elapsed,
+                        ..
+                    } => {
                         *is_triggered = true;
                         *elapsed = 0.0;
                     }
@@ -157,7 +177,11 @@ pub fn update_sector_effectors(
                 auto_return_timer,
                 ..
             } => {
-                let target_z = if *is_at_top { *target_floor_z } else { *orig_floor_z };
+                let target_z = if *is_at_top {
+                    *target_floor_z
+                } else {
+                    *orig_floor_z
+                };
                 let step = (*speed as f32 * dt * 1000.0) as i32;
                 if (*current_floor_z - target_z).abs() <= step.max(1) {
                     *current_floor_z = target_z;
@@ -197,7 +221,8 @@ pub fn update_sector_effectors(
                         *current_floor_z = *target_floor_z;
                         should_deactivate = true;
                     } else {
-                        *current_floor_z += step.max(1) * (*target_floor_z - *current_floor_z).signum();
+                        *current_floor_z +=
+                            step.max(1) * (*target_floor_z - *current_floor_z).signum();
                     }
 
                     let delta_y = -((*current_floor_z - *orig_floor_z) as f32) / (1024.0 * 16.0);
@@ -205,7 +230,11 @@ pub fn update_sector_effectors(
                 }
             }
 
-            EffectorKind::RotatingEngine { pivot, current_ang, speed } => {
+            EffectorKind::RotatingEngine {
+                pivot,
+                current_ang,
+                speed,
+            } => {
                 *current_ang += *speed * dt;
                 transforms.insert(
                     sector_idx,
@@ -380,7 +409,11 @@ pub fn update_sector_effectors(
                 speed,
                 is_stretched,
             } => {
-                let target = if *is_stretched { *target_ceil_z } else { *orig_ceil_z };
+                let target = if *is_stretched {
+                    *target_ceil_z
+                } else {
+                    *orig_ceil_z
+                };
                 let step = (*speed as f32 * dt * 1024.0) as i32;
                 let diff = target - *current_ceil_z;
                 if diff.abs() <= step {
@@ -423,7 +456,10 @@ pub fn update_sector_effectors(
                 transforms.insert(sector_idx, EffectorTransform::Elevate { delta_y });
             }
 
-            EffectorKind::ShootingGlassPane { health, is_shattered } => {
+            EffectorKind::ShootingGlassPane {
+                health,
+                is_shattered,
+            } => {
                 if *health <= 0 && !*is_shattered {
                     *is_shattered = true;
                     should_deactivate = true;
@@ -453,10 +489,12 @@ pub fn update_sector_effectors(
                     transform.rotation = Quat::from_rotation_y(*rot_ang);
                 }
                 EffectorTransform::Slide { offset } => {
-                    transform.translation = dyn_mesh.orig_translation + Vec3::new(offset.x, 0.0, offset.y);
+                    transform.translation =
+                        dyn_mesh.orig_translation + Vec3::new(offset.x, 0.0, offset.y);
                 }
                 EffectorTransform::Elevate { delta_y } => {
-                    transform.translation = dyn_mesh.orig_translation + Vec3::new(0.0, *delta_y, 0.0);
+                    transform.translation =
+                        dyn_mesh.orig_translation + Vec3::new(0.0, *delta_y, 0.0);
                 }
             }
         }

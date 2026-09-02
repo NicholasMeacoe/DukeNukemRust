@@ -1,5 +1,5 @@
 #![allow(dead_code)]
-use std::io::{Read, Cursor};
+use std::io::{Cursor, Read};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Sector {
@@ -91,35 +91,47 @@ pub struct Map {
 
 fn read_i32(reader: &mut Cursor<&[u8]>) -> Result<i32, String> {
     let mut buf = [0u8; 4];
-    reader.read_exact(&mut buf).map(|_| i32::from_le_bytes(buf)).map_err(|e| e.to_string())
+    reader
+        .read_exact(&mut buf)
+        .map(|_| i32::from_le_bytes(buf))
+        .map_err(|e| e.to_string())
 }
 
 fn read_i16(reader: &mut Cursor<&[u8]>) -> Result<i16, String> {
     let mut buf = [0u8; 2];
-    reader.read_exact(&mut buf).map(|_| i16::from_le_bytes(buf)).map_err(|e| e.to_string())
+    reader
+        .read_exact(&mut buf)
+        .map(|_| i16::from_le_bytes(buf))
+        .map_err(|e| e.to_string())
 }
 
 fn read_u8(reader: &mut Cursor<&[u8]>) -> Result<u8, String> {
     let mut buf = [0u8; 1];
-    reader.read_exact(&mut buf).map(|_| buf[0]).map_err(|e| e.to_string())
+    reader
+        .read_exact(&mut buf)
+        .map(|_| buf[0])
+        .map_err(|e| e.to_string())
 }
 
 fn read_i8(reader: &mut Cursor<&[u8]>) -> Result<i8, String> {
     let mut buf = [0u8; 1];
-    reader.read_exact(&mut buf).map(|_| buf[0] as i8).map_err(|e| e.to_string())
+    reader
+        .read_exact(&mut buf)
+        .map(|_| buf[0] as i8)
+        .map_err(|e| e.to_string())
 }
 
 impl Map {
     pub fn from_bytes(data: &[u8]) -> Result<Self, String> {
         let mut reader = Cursor::new(data);
-        
+
         let version = read_i32(&mut reader)?;
         let posx = read_i32(&mut reader)?;
         let posy = read_i32(&mut reader)?;
         let posz = read_i32(&mut reader)?;
         let ang = read_i16(&mut reader)?;
         let cursectnum = read_i16(&mut reader)?;
-        
+
         let numsectors = read_i16(&mut reader)?;
         if numsectors < 0 || numsectors > 4096 {
             return Err(format!("Invalid sector count: {}", numsectors));
@@ -152,7 +164,7 @@ impl Map {
                 extra: read_i16(&mut reader)?,
             });
         }
-        
+
         let numwalls = read_i16(&mut reader)?;
         if numwalls < 0 || numwalls > 16384 {
             return Err(format!("Invalid wall count: {}", numwalls));
@@ -179,7 +191,7 @@ impl Map {
                 extra: read_i16(&mut reader)?,
             });
         }
-        
+
         let numsprites = read_i16(&mut reader)?;
         if numsprites < 0 || numsprites > 16384 {
             return Err(format!("Invalid sprite count: {}", numsprites));
@@ -208,11 +220,15 @@ impl Map {
                 yvel: read_i16(&mut reader)?,
                 zvel: read_i16(&mut reader)?,
                 lotag: read_i16(&mut reader)?,
-                hitag: i16::from_le_bytes({let mut b=[0u8;2]; reader.read_exact(&mut b).map_err(|e| e.to_string())?; b}), // inline read for hitag
+                hitag: i16::from_le_bytes({
+                    let mut b = [0u8; 2];
+                    reader.read_exact(&mut b).map_err(|e| e.to_string())?;
+                    b
+                }), // inline read for hitag
                 extra: read_i16(&mut reader)?,
             });
         }
-        
+
         Ok(Map {
             version,
             posx,
@@ -378,10 +394,82 @@ mod tests {
         };
 
         let walls = vec![
-            Wall { x: 0, y: 0, point2: 1, nextwall: -1, nextsector: -1, cstat: 0, picnum: 0, overpicnum: 0, shade: 0, pal: 0, xrepeat: 8, yrepeat: 8, xpanning: 0, ypanning: 0, lotag: 0, hitag: 0, extra: 0 },
-            Wall { x: 1024, y: 0, point2: 2, nextwall: -1, nextsector: -1, cstat: 0, picnum: 0, overpicnum: 0, shade: 0, pal: 0, xrepeat: 8, yrepeat: 8, xpanning: 0, ypanning: 0, lotag: 0, hitag: 0, extra: 0 },
-            Wall { x: 1024, y: 1024, point2: 3, nextwall: -1, nextsector: -1, cstat: 0, picnum: 0, overpicnum: 0, shade: 0, pal: 0, xrepeat: 8, yrepeat: 8, xpanning: 0, ypanning: 0, lotag: 0, hitag: 0, extra: 0 },
-            Wall { x: 0, y: 1024, point2: 0, nextwall: -1, nextsector: -1, cstat: 0, picnum: 0, overpicnum: 0, shade: 0, pal: 0, xrepeat: 8, yrepeat: 8, xpanning: 0, ypanning: 0, lotag: 0, hitag: 0, extra: 0 },
+            Wall {
+                x: 0,
+                y: 0,
+                point2: 1,
+                nextwall: -1,
+                nextsector: -1,
+                cstat: 0,
+                picnum: 0,
+                overpicnum: 0,
+                shade: 0,
+                pal: 0,
+                xrepeat: 8,
+                yrepeat: 8,
+                xpanning: 0,
+                ypanning: 0,
+                lotag: 0,
+                hitag: 0,
+                extra: 0,
+            },
+            Wall {
+                x: 1024,
+                y: 0,
+                point2: 2,
+                nextwall: -1,
+                nextsector: -1,
+                cstat: 0,
+                picnum: 0,
+                overpicnum: 0,
+                shade: 0,
+                pal: 0,
+                xrepeat: 8,
+                yrepeat: 8,
+                xpanning: 0,
+                ypanning: 0,
+                lotag: 0,
+                hitag: 0,
+                extra: 0,
+            },
+            Wall {
+                x: 1024,
+                y: 1024,
+                point2: 3,
+                nextwall: -1,
+                nextsector: -1,
+                cstat: 0,
+                picnum: 0,
+                overpicnum: 0,
+                shade: 0,
+                pal: 0,
+                xrepeat: 8,
+                yrepeat: 8,
+                xpanning: 0,
+                ypanning: 0,
+                lotag: 0,
+                hitag: 0,
+                extra: 0,
+            },
+            Wall {
+                x: 0,
+                y: 1024,
+                point2: 0,
+                nextwall: -1,
+                nextsector: -1,
+                cstat: 0,
+                picnum: 0,
+                overpicnum: 0,
+                shade: 0,
+                pal: 0,
+                xrepeat: 8,
+                yrepeat: 8,
+                xpanning: 0,
+                ypanning: 0,
+                lotag: 0,
+                hitag: 0,
+                extra: 0,
+            },
         ];
 
         assert_eq!(sector.get_floor_z_at(&walls, 500, 500), 20000.0);
@@ -418,10 +506,82 @@ mod tests {
 
         // First wall along X axis: (0,0) -> (1024, 0)
         let walls = vec![
-            Wall { x: 0, y: 0, point2: 1, nextwall: -1, nextsector: -1, cstat: 0, picnum: 0, overpicnum: 0, shade: 0, pal: 0, xrepeat: 8, yrepeat: 8, xpanning: 0, ypanning: 0, lotag: 0, hitag: 0, extra: 0 },
-            Wall { x: 1024, y: 0, point2: 2, nextwall: -1, nextsector: -1, cstat: 0, picnum: 0, overpicnum: 0, shade: 0, pal: 0, xrepeat: 8, yrepeat: 8, xpanning: 0, ypanning: 0, lotag: 0, hitag: 0, extra: 0 },
-            Wall { x: 1024, y: 1024, point2: 3, nextwall: -1, nextsector: -1, cstat: 0, picnum: 0, overpicnum: 0, shade: 0, pal: 0, xrepeat: 8, yrepeat: 8, xpanning: 0, ypanning: 0, lotag: 0, hitag: 0, extra: 0 },
-            Wall { x: 0, y: 1024, point2: 0, nextwall: -1, nextsector: -1, cstat: 0, picnum: 0, overpicnum: 0, shade: 0, pal: 0, xrepeat: 8, yrepeat: 8, xpanning: 0, ypanning: 0, lotag: 0, hitag: 0, extra: 0 },
+            Wall {
+                x: 0,
+                y: 0,
+                point2: 1,
+                nextwall: -1,
+                nextsector: -1,
+                cstat: 0,
+                picnum: 0,
+                overpicnum: 0,
+                shade: 0,
+                pal: 0,
+                xrepeat: 8,
+                yrepeat: 8,
+                xpanning: 0,
+                ypanning: 0,
+                lotag: 0,
+                hitag: 0,
+                extra: 0,
+            },
+            Wall {
+                x: 1024,
+                y: 0,
+                point2: 2,
+                nextwall: -1,
+                nextsector: -1,
+                cstat: 0,
+                picnum: 0,
+                overpicnum: 0,
+                shade: 0,
+                pal: 0,
+                xrepeat: 8,
+                yrepeat: 8,
+                xpanning: 0,
+                ypanning: 0,
+                lotag: 0,
+                hitag: 0,
+                extra: 0,
+            },
+            Wall {
+                x: 1024,
+                y: 1024,
+                point2: 3,
+                nextwall: -1,
+                nextsector: -1,
+                cstat: 0,
+                picnum: 0,
+                overpicnum: 0,
+                shade: 0,
+                pal: 0,
+                xrepeat: 8,
+                yrepeat: 8,
+                xpanning: 0,
+                ypanning: 0,
+                lotag: 0,
+                hitag: 0,
+                extra: 0,
+            },
+            Wall {
+                x: 0,
+                y: 1024,
+                point2: 0,
+                nextwall: -1,
+                nextsector: -1,
+                cstat: 0,
+                picnum: 0,
+                overpicnum: 0,
+                shade: 0,
+                pal: 0,
+                xrepeat: 8,
+                yrepeat: 8,
+                xpanning: 0,
+                ypanning: 0,
+                lotag: 0,
+                hitag: 0,
+                extra: 0,
+            },
         ];
 
         // On the first wall (y = 0), offset is 0
@@ -432,15 +592,49 @@ mod tests {
 
     #[test]
     fn test_wall_flags() {
-        let solid_wall = Wall { x: 0, y: 0, point2: 1, nextwall: -1, nextsector: -1, cstat: 1, picnum: 100, overpicnum: 0, shade: 0, pal: 0, xrepeat: 8, yrepeat: 8, xpanning: 0, ypanning: 0, lotag: 0, hitag: 0, extra: 0 };
+        let solid_wall = Wall {
+            x: 0,
+            y: 0,
+            point2: 1,
+            nextwall: -1,
+            nextsector: -1,
+            cstat: 1,
+            picnum: 100,
+            overpicnum: 0,
+            shade: 0,
+            pal: 0,
+            xrepeat: 8,
+            yrepeat: 8,
+            xpanning: 0,
+            ypanning: 0,
+            lotag: 0,
+            hitag: 0,
+            extra: 0,
+        };
         assert!(!solid_wall.is_portal());
         assert!(solid_wall.is_blocking());
 
-        let portal_wall = Wall { x: 0, y: 0, point2: 1, nextwall: 5, nextsector: 2, cstat: 16 | 4, picnum: 100, overpicnum: 200, shade: 0, pal: 0, xrepeat: 8, yrepeat: 8, xpanning: 0, ypanning: 0, lotag: 0, hitag: 0, extra: 0 };
+        let portal_wall = Wall {
+            x: 0,
+            y: 0,
+            point2: 1,
+            nextwall: 5,
+            nextsector: 2,
+            cstat: 16 | 4,
+            picnum: 100,
+            overpicnum: 200,
+            shade: 0,
+            pal: 0,
+            xrepeat: 8,
+            yrepeat: 8,
+            xpanning: 0,
+            ypanning: 0,
+            lotag: 0,
+            hitag: 0,
+            extra: 0,
+        };
         assert!(portal_wall.is_portal());
         assert!(portal_wall.is_masked());
         assert!(portal_wall.align_bottom());
     }
 }
-
-

@@ -1,10 +1,10 @@
 #![allow(dead_code)]
 
-use bevy::prelude::*;
 use crate::game_flow::state::*;
+use bevy::prelude::*;
 
-use bevy::app::AppExit;
 use crate::audio::PlaySoundEvent;
+use bevy::app::AppExit;
 
 #[derive(Resource, Debug, Clone)]
 pub struct MenuCursor {
@@ -36,10 +36,7 @@ impl Default for CursorAnimTimer {
     }
 }
 
-pub fn update_cursor_animation(
-    time: Res<Time>,
-    mut anim: ResMut<CursorAnimTimer>,
-) {
+pub fn update_cursor_animation(time: Res<Time>, mut anim: ResMut<CursorAnimTimer>) {
     if anim.timer.tick(time.delta()).just_finished() {
         anim.frame = (anim.frame + 1) % 4;
     }

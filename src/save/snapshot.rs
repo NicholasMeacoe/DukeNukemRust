@@ -1,9 +1,9 @@
 #![allow(dead_code)]
 
+use crate::save::format::*;
 use std::fs::{self, File};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use crate::save::format::*;
 
 pub fn get_save_dir() -> PathBuf {
     let dir = PathBuf::from("saves");
@@ -25,7 +25,8 @@ pub fn write_save_to_disk(path: &Path, snapshot: &SaveGameSnapshot) -> Result<()
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
-    let bytes = bincode::serialize(snapshot).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+    let bytes = bincode::serialize(snapshot)
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
     let mut file = File::create(path)?;
     file.write_all(&bytes)?;
     file.flush()?;
@@ -35,6 +36,7 @@ pub fn write_save_to_disk(path: &Path, snapshot: &SaveGameSnapshot) -> Result<()
 pub fn read_save_from_disk(path: &Path) -> Result<SaveGameSnapshot, &'static str> {
     let mut file = File::open(path).map_err(|_| "Failed to open save file")?;
     let mut buffer = Vec::new();
-    file.read_to_end(&mut buffer).map_err(|_| "Failed to read save file")?;
+    file.read_to_end(&mut buffer)
+        .map_err(|_| "Failed to read save file")?;
     bincode::deserialize(&buffer).map_err(|_| "Failed to deserialize save file")
 }

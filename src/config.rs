@@ -64,16 +64,24 @@ impl DukeConfig {
 
                 match (current_section.as_str(), key.as_str()) {
                     ("screen setup", "screenwidth") => {
-                        if let Ok(w) = val.parse::<u32>() { cfg.screen_width = w; }
+                        if let Ok(w) = val.parse::<u32>() {
+                            cfg.screen_width = w;
+                        }
                     }
                     ("screen setup", "screenheight") => {
-                        if let Ok(h) = val.parse::<u32>() { cfg.screen_height = h; }
+                        if let Ok(h) = val.parse::<u32>() {
+                            cfg.screen_height = h;
+                        }
                     }
                     ("sound setup", "fxvolume") => {
-                        if let Ok(v) = val.parse::<u8>() { cfg.fx_volume = v; }
+                        if let Ok(v) = val.parse::<u8>() {
+                            cfg.fx_volume = v;
+                        }
                     }
                     ("sound setup", "musicvolume") => {
-                        if let Ok(v) = val.parse::<u8>() { cfg.music_volume = v; }
+                        if let Ok(v) = val.parse::<u8>() {
+                            cfg.music_volume = v;
+                        }
                     }
                     ("sound setup", "soundtoggle") => {
                         cfg.sound_toggle = val == "1" || val.eq_ignore_ascii_case("true");
@@ -88,7 +96,9 @@ impl DukeConfig {
                         cfg.ambience_toggle = val == "1" || val.eq_ignore_ascii_case("true");
                     }
                     ("controls", "mousesensitivity") => {
-                        if let Ok(s) = val.parse::<f32>() { cfg.mouse_sensitivity = s; }
+                        if let Ok(s) = val.parse::<f32>() {
+                            cfg.mouse_sensitivity = s;
+                        }
                     }
                     ("controls", "mouseaiming") => {
                         cfg.mouse_aiming = val == "1" || val.eq_ignore_ascii_case("true");

@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
+use hound::{SampleFormat, WavSpec, WavWriter};
 use std::io::Cursor;
-use hound::{WavSpec, WavWriter, SampleFormat};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct VocSound {
@@ -81,7 +81,7 @@ impl VocSound {
                             }
                         }
                         extended_rate_set = false; // Reset for subsequent blocks
-                        
+
                         let raw_samples = &block_data[2..];
                         match pack_type {
                             0 => {
@@ -157,9 +157,11 @@ impl VocSound {
                         }
                         let bits = block_data[4];
                         let ch = block_data[5] as u16;
-                        if ch > 0 { channels = ch; }
+                        if ch > 0 {
+                            channels = ch;
+                        }
                         let format_tag = u16::from_le_bytes([block_data[6], block_data[7]]);
-                        
+
                         let audio_bytes = &block_data[12..];
                         if bits == 16 || format_tag == 4 {
                             bits_per_sample = 16;
@@ -210,7 +212,9 @@ impl VocSound {
             let mut writer = WavWriter::new(Cursor::new(&mut out), spec)
                 .expect("Failed to initialize WavWriter for VOC to WAV");
             for &sample in &self.pcm_samples_16bit {
-                writer.write_sample(sample).expect("Failed to write PCM sample");
+                writer
+                    .write_sample(sample)
+                    .expect("Failed to write PCM sample");
             }
             writer.finalize().expect("Failed to finalize WAV output");
         }
@@ -243,7 +247,7 @@ mod tests {
         voc_bytes.push(((block_len >> 8) & 0xFF) as u8);
         voc_bytes.push(((block_len >> 16) & 0xFF) as u8);
         voc_bytes.push(165); // tc
-        voc_bytes.push(0);   // 8-bit unsigned PCM
+        voc_bytes.push(0); // 8-bit unsigned PCM
         voc_bytes.extend_from_slice(&[128, 200, 50, 128]); // 4 samples
 
         // Block 0 (Terminator)
@@ -268,7 +272,12 @@ mod tests {
                 if entry.name.to_uppercase().ends_with(".VOC") {
                     if let Ok(voc_data) = grp.read_file(&entry.name) {
                         let res = VocSound::parse(&entry.name, &voc_data);
-                        assert!(res.is_ok(), "Failed to parse VOC {}: {:?}", entry.name, res.err());
+                        assert!(
+                            res.is_ok(),
+                            "Failed to parse VOC {}: {:?}",
+                            entry.name,
+                            res.err()
+                        );
                         let sound = res.unwrap();
                         assert!(sound.sample_rate > 0);
                         let wav = sound.to_wav_bytes();
@@ -277,8 +286,14 @@ mod tests {
                     }
                 }
             }
-            println!("Successfully parsed {} VOC files from duke3d.grp into WAV!", parsed_count);
-            assert!(parsed_count > 50, "Expected at least 50 VOC files in duke3d.grp");
+            println!(
+                "Successfully parsed {} VOC files from duke3d.grp into WAV!",
+                parsed_count
+            );
+            assert!(
+                parsed_count > 50,
+                "Expected at least 50 VOC files in duke3d.grp"
+            );
         }
     }
 }

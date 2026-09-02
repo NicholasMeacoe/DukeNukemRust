@@ -175,7 +175,12 @@ impl PaletteFlashState {
         let r = 1.0 + self.red_flash * 0.8 + self.yellow_flash * 0.4 + self.amber_glow * 0.5;
         let g = 1.0 + self.green_tint * 0.9 + self.yellow_flash * 0.4 + self.amber_glow * 0.3;
         let b = 1.0 + self.blue_tint * 0.8;
-        let a = (self.red_flash + self.yellow_flash + self.blue_tint + self.green_tint + self.amber_glow).min(0.85);
+        let a = (self.red_flash
+            + self.yellow_flash
+            + self.blue_tint
+            + self.green_tint
+            + self.amber_glow)
+            .min(0.85);
         [r.clamp(0.0, 2.0), g.clamp(0.0, 2.0), b.clamp(0.0, 2.0), a]
     }
 

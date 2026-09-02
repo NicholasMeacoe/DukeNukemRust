@@ -235,18 +235,18 @@ impl From<i32> for Opcode {
 }
 
 pub mod move_flags {
-    pub const FACE_PLAYER: i32       = 1;
-    pub const FACE_PLAYER_SLOW: i32  = 2;
-    pub const SPIN: i32              = 32;
+    pub const FACE_PLAYER: i32 = 1;
+    pub const FACE_PLAYER_SLOW: i32 = 2;
+    pub const SPIN: i32 = 32;
     pub const FACE_PLAYER_SMART: i32 = 64;
-    pub const FLEE_ENEMY: i32        = 128;
-    pub const JUMP_TO_PLAYER: i32    = 257;
-    pub const SEEK_PLAYER: i32       = 512;
-    pub const FURTHEST_DIR: i32      = 1024;
-    pub const DODGE_BULLET: i32      = 4096;
-    pub const GET_H: i32             = 8192;
-    pub const GET_V: i32             = 16384;
-    pub const RANDOM_ANGLE: i32      = 32768;
+    pub const FLEE_ENEMY: i32 = 128;
+    pub const JUMP_TO_PLAYER: i32 = 257;
+    pub const SEEK_PLAYER: i32 = 512;
+    pub const FURTHEST_DIR: i32 = 1024;
+    pub const DODGE_BULLET: i32 = 4096;
+    pub const GET_H: i32 = 8192;
+    pub const GET_V: i32 = 16384;
+    pub const RANDOM_ANGLE: i32 = 32768;
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -275,13 +275,13 @@ pub const NULL_PTR: usize = 0;
 
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct ActorRegisters {
-    pub count: i32,                  // T1: temp_data[0]
-    pub move_ptr: Option<usize>,     // T2: temp_data[1]
-    pub action_count: i32,           // T3: temp_data[2]
-    pub frame_offset: i32,           // T4: temp_data[3]
-    pub action_ptr: Option<usize>,   // T5: temp_data[4]
-    pub ai_ptr: Option<usize>,       // T6: temp_data[5]
-    pub action_delay_timer: i16,     // Internal frame animation accumulator
+    pub count: i32,                // T1: temp_data[0]
+    pub move_ptr: Option<usize>,   // T2: temp_data[1]
+    pub action_count: i32,         // T3: temp_data[2]
+    pub frame_offset: i32,         // T4: temp_data[3]
+    pub action_ptr: Option<usize>, // T5: temp_data[4]
+    pub ai_ptr: Option<usize>,     // T6: temp_data[5]
+    pub action_delay_timer: i16,   // Internal frame animation accumulator
     pub time_to_sleep: i16,
     pub mov_flag: i16,
     pub floor_z: i32,
@@ -301,8 +301,12 @@ pub fn getincangle(a: i16, na: i16) -> i16 {
     if (a - na).abs() < 1024 {
         na - a
     } else {
-        if na > 1024 { na -= 2048; }
-        if a > 1024 { a -= 2048; }
+        if na > 1024 {
+            na -= 2048;
+        }
+        if a > 1024 {
+            a -= 2048;
+        }
         na - a
     }
 }

@@ -1,9 +1,11 @@
 #![allow(dead_code)]
 
 pub mod protocol;
+pub mod rng;
 pub mod scoreboard;
 
 pub use protocol::*;
+pub use rng::*;
 pub use scoreboard::*;
 
 use bevy::prelude::*;
@@ -13,29 +15,21 @@ pub struct NetPlugin;
 impl Plugin for NetPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<DukematchState>()
+            .init_resource::<DeterministicRng>()
             .add_systems(
                 Update,
-                (
-                    toggle_scoreboard,
-                    update_dukematch_timer,
-                ).in_set(crate::GameSet::Input),
+                (toggle_scoreboard, update_dukematch_timer).in_set(crate::GameSet::Input),
             );
     }
 }
 
-pub fn toggle_scoreboard(
-    keys: Res<ButtonInput<KeyCode>>,
-    mut net_state: ResMut<DukematchState>,
-) {
+pub fn toggle_scoreboard(keys: Res<ButtonInput<KeyCode>>, mut net_state: ResMut<DukematchState>) {
     if keys.just_pressed(KeyCode::F7) {
         net_state.show_scoreboard = !net_state.show_scoreboard;
     }
 }
 
-pub fn update_dukematch_timer(
-    time: Res<Time>,
-    mut net_state: ResMut<DukematchState>,
-) {
+pub fn update_dukematch_timer(time: Res<Time>, mut net_state: ResMut<DukematchState>) {
     if net_state.mode != NetMode::SinglePlayer {
         net_state.match_timer += time.delta_seconds();
     }
@@ -117,7 +111,7 @@ mod tests {
 
         assert_eq!(dm.get_total_frags(0), 1); // 2 kills - 1 suicide = 1
         assert_eq!(dm.get_total_frags(1), 1); // 1 kill
-        assert_eq!(dm.get_deaths(1), 1);      // 1 death
+        assert_eq!(dm.get_deaths(1), 1); // 1 death
         assert_eq!(dm.get_leader(), 0);
     }
 }

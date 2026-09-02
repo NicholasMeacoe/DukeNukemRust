@@ -1,16 +1,16 @@
 #![allow(dead_code)]
 
-pub mod types;
-pub mod projectiles;
 pub mod ai;
-pub mod gore;
 pub mod decals;
+pub mod gore;
+pub mod projectiles;
+pub mod types;
 
-pub use types::*;
-pub use projectiles::*;
 pub use ai::*;
-pub use gore::*;
 pub use decals::*;
+pub use gore::*;
+pub use projectiles::*;
+pub use types::*;
 
 use bevy::prelude::*;
 
@@ -26,8 +26,21 @@ impl Plugin for CombatPlugin {
             .add_systems(
                 Update,
                 (
-                    (spawn_projectiles, update_projectiles, update_enemy_status_effects, apply_damage_events, update_con_actors).in_set(crate::GameSet::Combat),
-                    (handle_gib_events, update_gib_particles, handle_spawn_casing_events, update_brass_casings).in_set(crate::GameSet::Animation),
+                    (
+                        spawn_projectiles,
+                        update_projectiles,
+                        update_enemy_status_effects,
+                        apply_damage_events,
+                        update_con_actors,
+                    )
+                        .in_set(crate::GameSet::Combat),
+                    (
+                        handle_gib_events,
+                        update_gib_particles,
+                        handle_spawn_casing_events,
+                        update_brass_casings,
+                    )
+                        .in_set(crate::GameSet::Animation),
                 ),
             );
     }
@@ -160,8 +173,9 @@ mod tests {
     #[test]
     fn test_con_script_engine_default_core_compilation() {
         let engine = crate::scripting::ConScriptEngine::from_source(
-            crate::scripting::DEFAULT_CORE_CON_SCRIPT
-        ).expect("Default core CON script must compile cleanly");
+            crate::scripting::DEFAULT_CORE_CON_SCRIPT,
+        )
+        .expect("Default core CON script must compile cleanly");
 
         assert!(engine.compiled.symbols.contains_key("PIGCOP"));
         assert!(engine.compiled.symbols.contains_key("LIZTROOP"));
@@ -354,14 +368,38 @@ mod tests {
 
     #[test]
     fn test_map_tile_to_projectile_con_mapping() {
-        assert_eq!(map_tile_to_projectile(1625), (ProjectileType::AlienBlaster, 50.0, 7));
-        assert_eq!(map_tile_to_projectile(1636), (ProjectileType::Spit, 35.0, 8));
-        assert_eq!(map_tile_to_projectile(1641), (ProjectileType::FreezeShard, 45.0, 20));
-        assert_eq!(map_tile_to_projectile(1650), (ProjectileType::Mortar, 30.0, 50));
-        assert_eq!(map_tile_to_projectile(2595), (ProjectileType::HitscanBullet, 150.0, 9));
-        assert_eq!(map_tile_to_projectile(2605), (ProjectileType::Rocket, 45.0, 140));
-        assert_eq!(map_tile_to_projectile(2613), (ProjectileType::ShotgunPellet, 80.0, 10));
-        assert_eq!(map_tile_to_projectile(1360), (ProjectileType::PsiBlast, 30.0, 38));
+        assert_eq!(
+            map_tile_to_projectile(1625),
+            (ProjectileType::AlienBlaster, 50.0, 7)
+        );
+        assert_eq!(
+            map_tile_to_projectile(1636),
+            (ProjectileType::Spit, 35.0, 8)
+        );
+        assert_eq!(
+            map_tile_to_projectile(1641),
+            (ProjectileType::FreezeShard, 45.0, 20)
+        );
+        assert_eq!(
+            map_tile_to_projectile(1650),
+            (ProjectileType::Mortar, 30.0, 50)
+        );
+        assert_eq!(
+            map_tile_to_projectile(2595),
+            (ProjectileType::HitscanBullet, 150.0, 9)
+        );
+        assert_eq!(
+            map_tile_to_projectile(2605),
+            (ProjectileType::Rocket, 45.0, 140)
+        );
+        assert_eq!(
+            map_tile_to_projectile(2613),
+            (ProjectileType::ShotgunPellet, 80.0, 10)
+        );
+        assert_eq!(
+            map_tile_to_projectile(1360),
+            (ProjectileType::PsiBlast, 30.0, 38)
+        );
     }
 
     #[test]
@@ -381,7 +419,8 @@ mod tests {
     fn test_boss_lethal_stomp_damage() {
         let boss = EnemyActor::new_battlelord(false);
         let dist_to_player = 1.0;
-        let is_lethal_stomp = dist_to_player <= 1.25 && matches!(boss.kind, EnemyKind::Boss1Battlelord);
+        let is_lethal_stomp =
+            dist_to_player <= 1.25 && matches!(boss.kind, EnemyKind::Boss1Battlelord);
         assert!(is_lethal_stomp);
         let stomp_damage = 1000;
         assert_eq!(stomp_damage, 1000);
@@ -406,11 +445,11 @@ mod tests {
         // Bullet starts at x = 0.0 and travels to x = 5.0
         let p_start = Vec3::new(0.0, 0.0, 0.0);
         let p_end = Vec3::new(5.0, 0.0, 0.0);
-        
+
         // Enemy is at x = 2.5, y = 0.0, z = 0.2 (offset slightly)
         let enemy_center = Vec3::new(2.5, 0.0, 0.2);
         let dist_sq = dist_sq_point_to_segment(enemy_center, p_start, p_end);
-        
+
         // Closest point on segment is (2.5, 0, 0), distance squared is 0.04
         assert!((dist_sq - 0.04).abs() < 0.001);
         assert!(dist_sq <= 1.44); // Hits inside standard enemy radius

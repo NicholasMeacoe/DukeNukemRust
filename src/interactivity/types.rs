@@ -136,10 +136,7 @@ pub enum EffectorKind {
         is_stretched: bool,
     },
     /// SE 24: Conveyor Belt Floor Velocity
-    ConveyorBelt {
-        direction: Vec2,
-        speed: f32,
-    },
+    ConveyorBelt { direction: Vec2, speed: f32 },
     /// SE 31 & 32: Crusher Sectors (Floor rise / Ceiling lower)
     CrusherSector {
         min_z: i32,
@@ -150,10 +147,7 @@ pub enum EffectorKind {
         moving_down: bool,
     },
     /// SE 36: Shooting Breakable Glass Pane
-    ShootingGlassPane {
-        health: i32,
-        is_shattered: bool,
-    },
+    ShootingGlassPane { health: i32, is_shattered: bool },
 }
 
 #[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -284,39 +278,39 @@ impl Default for SecurityCamera {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum PickupKind {
     // Health
-    SmallMedkit,       // +10 HP (up to 100) - Tile 51
-    LargeMedkit,       // +30 HP (up to 100) - Tile 52
-    PortableMedkit,    // +100 Portable Medkit - Tile 53
-    AtomicHealth,      // +50 HP (up to 200) - Tile 55
-    ArmorVest,         // 100 Armor - Tile 56
+    SmallMedkit,    // +10 HP (up to 100) - Tile 51
+    LargeMedkit,    // +30 HP (up to 100) - Tile 52
+    PortableMedkit, // +100 Portable Medkit - Tile 53
+    AtomicHealth,   // +50 HP (up to 200) - Tile 55
+    ArmorVest,      // 100 Armor - Tile 56
     // Ammo
-    PistolClip,        // +12 Pistol Ammo - Tile 40
-    ShotgunBox,        // +10 Shotgun Ammo - Tile 49
-    ChaingunBox,       // +50 Chaingun Ammo - Tile 44
-    RpgRocket,         // +5 Rockets - Tile 47
-    PipebombBox,       // +5 Pipebombs - Tile 48
-    ShrinkerAmmo,      // +5 Shrinker - Tile 42
-    DevastatorBox,     // +15 Devastator - Tile 45
-    FreezeAmmo,        // +25 Freeze - Tile 46
-    ExpanderAmmo,      // +20 Expander - Tile 45
+    PistolClip,    // +12 Pistol Ammo - Tile 40
+    ShotgunBox,    // +10 Shotgun Ammo - Tile 49
+    ChaingunBox,   // +50 Chaingun Ammo - Tile 44
+    RpgRocket,     // +5 Rockets - Tile 47
+    PipebombBox,   // +5 Pipebombs - Tile 48
+    ShrinkerAmmo,  // +5 Shrinker - Tile 42
+    DevastatorBox, // +15 Devastator - Tile 45
+    FreezeAmmo,    // +25 Freeze - Tile 46
+    ExpanderAmmo,  // +20 Expander - Tile 45
     // Inventory Items
-    Steroids,          // +400 Steroids - Tile 57
-    ScubaTank,         // +100 Scuba - Tile 59
-    NightvisionGoggles,// +100 Nightvision - Tile 60
-    ProtectiveBoots,   // +100 Boots - Tile 61
-    Jetpack,           // +100 Jetpack - Tile 58
-    Holoduke,          // +100 Holoduke - Tile 62
+    Steroids,           // +400 Steroids - Tile 57
+    ScubaTank,          // +100 Scuba - Tile 59
+    NightvisionGoggles, // +100 Nightvision - Tile 60
+    ProtectiveBoots,    // +100 Boots - Tile 61
+    Jetpack,            // +100 Jetpack - Tile 58
+    Holoduke,           // +100 Holoduke - Tile 62
     // Weapons on Ground
-    WeaponPistol,      // Tile 21
-    WeaponShotgun,     // Tile 22
-    WeaponChaingun,    // Tile 23
-    WeaponRpg,         // Tile 24
-    WeaponPipebomb,    // Tile 25
-    WeaponShrinker,    // Tile 26
-    WeaponDevastator,  // Tile 27
-    WeaponTripbomb,    // Tile 28
-    WeaponFreezer,     // Tile 29
-    WeaponExpander,    // Tile 32
+    WeaponPistol,     // Tile 21
+    WeaponShotgun,    // Tile 22
+    WeaponChaingun,   // Tile 23
+    WeaponRpg,        // Tile 24
+    WeaponPipebomb,   // Tile 25
+    WeaponShrinker,   // Tile 26
+    WeaponDevastator, // Tile 27
+    WeaponTripbomb,   // Tile 28
+    WeaponFreezer,    // Tile 29
+    WeaponExpander,   // Tile 32
 }
 
 #[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -403,7 +397,9 @@ pub struct MirrorProp {
 
 impl Default for MirrorProp {
     fn default() -> Self {
-        Self { cooldown_timer: 0.0 }
+        Self {
+            cooldown_timer: 0.0,
+        }
     }
 }
 

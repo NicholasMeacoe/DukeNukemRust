@@ -1,9 +1,9 @@
 #![allow(dead_code)]
 
+use crate::demo::format::*;
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
-use crate::demo::format::*;
 
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct DemoRecorder {

@@ -1,19 +1,18 @@
 #![allow(dead_code)]
 
+use crate::combat::types::*;
+use crate::interactivity::types::ExplosionDamageEvent;
+use crate::player::types::PlayerController;
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
-use crate::combat::types::*;
-use crate::player::types::PlayerController;
-use crate::interactivity::types::ExplosionDamageEvent;
 
-pub fn spawn_projectiles(
-    mut events: EventReader<SpawnProjectileEvent>,
-    mut commands: Commands,
-) {
+pub fn spawn_projectiles(mut events: EventReader<SpawnProjectileEvent>, mut commands: Commands) {
     for ev in events.read() {
         let vel = ev.direction.normalize_or_zero() * ev.velocity;
         let lifetime = match ev.projectile_type {
-            ProjectileType::HitscanBullet | ProjectileType::ShotgunPellet | ProjectileType::MightyBoot => 0.05,
+            ProjectileType::HitscanBullet
+            | ProjectileType::ShotgunPellet
+            | ProjectileType::MightyBoot => 0.05,
             ProjectileType::Rocket | ProjectileType::DevastatorMissile => 4.0,
             ProjectileType::Pipebomb => 8.0,
             _ => 3.0,
@@ -44,7 +43,10 @@ pub fn update_projectiles(
     mut commands: Commands,
     mut projectiles: Query<(Entity, &mut Transform, &mut Projectile)>,
     mut enemies: Query<(Entity, &Transform, &mut EnemyActor), Without<Projectile>>,
-    mut players: Query<(Entity, &Transform, &mut PlayerController), (Without<Projectile>, Without<EnemyActor>)>,
+    players: Query<
+        (Entity, &Transform, &PlayerController),
+        (Without<Projectile>, Without<EnemyActor>),
+    >,
     mut damage_events: EventWriter<EntityDamageEvent>,
     mut explosion_events: EventWriter<ExplosionDamageEvent>,
     mut sound_events: EventWriter<crate::audio::PlaySoundEvent>,
@@ -57,7 +59,10 @@ pub fn update_projectiles(
     for (_, player_trans, _) in players.iter() {
         let p_pos = player_trans.translation;
         for (e_entity, enemy_trans, mut enemy) in enemies.iter_mut() {
-            if enemy.is_shrunk && enemy.state != EnemyAiState::Gibbed && enemy.state != EnemyAiState::Dying {
+            if enemy.is_shrunk
+                && enemy.state != EnemyAiState::Gibbed
+                && enemy.state != EnemyAiState::Dying
+            {
                 let e_pos = enemy_trans.translation;
                 let horizontal_dist_sq = (p_pos.x - e_pos.x).powi(2) + (p_pos.z - e_pos.z).powi(2);
                 let vertical_dist = (p_pos.y - e_pos.y).abs();
@@ -86,23 +91,41 @@ pub fn update_projectiles(
         let step_vec = proj.velocity * dt;
         let step_dist = step_vec.length();
         let mut hit_wall = false;
+        let mut hit_enemy_entity = None;
+        let mut hit_player_entity = None;
         let mut hit_point = old_pos + step_vec;
         let mut hit_normal = Vec3::Y;
 
         if let Some(ref rapier) = rapier_context {
             if step_dist > 0.001 {
                 let ray_dir = step_vec / step_dist;
-                let filter = QueryFilter::only_fixed();
-                if let Some((_hit_entity, intersection)) = rapier.cast_ray_and_get_normal(
-                    old_pos,
-                    ray_dir,
-                    step_dist,
-                    true,
-                    filter,
-                ) {
-                    hit_wall = true;
-                    hit_point = intersection.point;
-                    hit_normal = intersection.normal;
+                let filter = if proj.is_player_source {
+                    QueryFilter::new().groups(CollisionGroups::new(
+                        Group::ALL,
+                        Group::GROUP_1 | Group::GROUP_2,
+                    ))
+                } else {
+                    QueryFilter::new().groups(CollisionGroups::new(
+                        Group::ALL,
+                        Group::GROUP_1 | Group::GROUP_3,
+                    ))
+                };
+                if let Some((hit_entity, intersection)) =
+                    rapier.cast_ray_and_get_normal(old_pos, ray_dir, step_dist, true, filter)
+                {
+                    if proj.is_player_source && enemies.get(hit_entity).is_ok() {
+                        hit_enemy_entity = Some(hit_entity);
+                        hit_point = intersection.point;
+                        hit_normal = intersection.normal;
+                    } else if !proj.is_player_source && players.get(hit_entity).is_ok() {
+                        hit_player_entity = Some(hit_entity);
+                        hit_point = intersection.point;
+                        hit_normal = intersection.normal;
+                    } else {
+                        hit_wall = true;
+                        hit_point = intersection.point;
+                        hit_normal = intersection.normal;
+                    }
                 }
             }
         }
@@ -111,7 +134,9 @@ pub fn update_projectiles(
             trans.translation = hit_point;
 
             match proj.projectile_type {
-                ProjectileType::Rocket | ProjectileType::DevastatorMissile | ProjectileType::Mortar => {
+                ProjectileType::Rocket
+                | ProjectileType::DevastatorMissile
+                | ProjectileType::Mortar => {
                     explosion_events.send(ExplosionDamageEvent {
                         origin: hit_point,
                         radius: 5.0,
@@ -161,20 +186,10 @@ pub fn update_projectiles(
             trans.translation += step_vec;
         }
 
-        let new_pos = trans.translation;
-
         // Check enemy continuous swept collision if player source
-        if proj.is_player_source {
-            for (e_entity, enemy_trans, mut enemy) in enemies.iter_mut() {
-                if enemy.state == EnemyAiState::Dying || enemy.state == EnemyAiState::Gibbed {
-                    continue;
-                }
-
-                let enemy_center = enemy_trans.translation + Vec3::Y * 0.4;
-                let dist_sq = dist_sq_point_to_segment(enemy_center, old_pos, new_pos);
-                let hit_radius_sq = if enemy.is_shrunk { 0.25 } else { 1.44 }; // 0.5^2 vs 1.2^2
-
-                if dist_sq <= hit_radius_sq {
+        if let Some(e_entity) = hit_enemy_entity {
+            if let Ok((_, _, mut enemy)) = enemies.get_mut(e_entity) {
+                if enemy.state != EnemyAiState::Dying && enemy.state != EnemyAiState::Gibbed {
                     // Status effects
                     match proj.projectile_type {
                         ProjectileType::ShrinkRay => {
@@ -203,43 +218,36 @@ pub fn update_projectiles(
                         target: e_entity,
                         amount: proj.damage,
                         source: DamageSource::PlayerWeapon(proj.projectile_type),
-                        hit_origin: new_pos,
+                        hit_origin: hit_point,
                     });
 
                     decal_events.send(crate::combat::decals::SpawnDecalEvent {
-                        origin: new_pos,
+                        origin: hit_point,
                         normal: Vec3::Y,
                         decal_type: crate::combat::decals::DecalType::BloodSplatter,
                     });
 
-                    if proj.projectile_type == ProjectileType::Rocket || proj.projectile_type == ProjectileType::DevastatorMissile {
+                    if proj.projectile_type == ProjectileType::Rocket
+                        || proj.projectile_type == ProjectileType::DevastatorMissile
+                    {
                         explosion_events.send(ExplosionDamageEvent {
-                            origin: new_pos,
+                            origin: hit_point,
                             radius: 5.0,
                             damage: proj.damage,
                         });
                     }
 
                     proj.lifetime = 0.0;
-                    break;
                 }
             }
-        } else {
-            // Enemy projectile continuous swept collision hitting player
-            for (p_entity, player_trans, _) in players.iter_mut() {
-                let player_center = player_trans.translation + Vec3::Y * 0.5;
-                let dist_sq = dist_sq_point_to_segment(player_center, old_pos, new_pos);
-                if dist_sq <= 1.0 {
-                    damage_events.send(EntityDamageEvent {
-                        target: p_entity,
-                        amount: proj.damage,
-                        source: DamageSource::EnemyWeapon(proj.projectile_type),
-                        hit_origin: new_pos,
-                    });
-                    proj.lifetime = 0.0;
-                    break;
-                }
-            }
+        } else if let Some(p_entity) = hit_player_entity {
+            damage_events.send(EntityDamageEvent {
+                target: p_entity,
+                amount: proj.damage,
+                source: DamageSource::EnemyWeapon(proj.projectile_type),
+                hit_origin: hit_point,
+            });
+            proj.lifetime = 0.0;
         }
 
         if proj.lifetime <= 0.0 {
@@ -312,6 +320,7 @@ pub fn apply_damage_events(
     mut sound_events: EventWriter<crate::audio::PlaySoundEvent>,
     mut duke_voice_events: EventWriter<crate::audio::PlayDukeVoiceEvent>,
     mut tint: Option<ResMut<crate::hud::ScreenTintState>>,
+    mut rng: ResMut<crate::net::DeterministicRng>,
 ) {
     for ev in damage_events.read() {
         if let Ok((enemy_trans, mut enemy)) = enemies.get_mut(ev.target) {
@@ -339,7 +348,7 @@ pub fn apply_damage_events(
                     gib_count: 6,
                 });
                 // 30% chance for Duke to drop a one-liner on gib kill
-                if rand::random::<f32>() < 0.3 {
+                if rng.next_f32() < 0.3 {
                     duke_voice_events.send(crate::audio::PlayDukeVoiceEvent { name: None });
                 }
             } else if enemy.health <= 0 {
@@ -356,7 +365,7 @@ pub fn apply_damage_events(
                     duke_voice_events.send(crate::audio::PlayDukeVoiceEvent {
                         name: Some("REST_IN_PIECES".into()),
                     });
-                } else if rand::random::<f32>() < 0.2 {
+                } else if rng.next_f32() < 0.2 {
                     duke_voice_events.send(crate::audio::PlayDukeVoiceEvent { name: None });
                 }
 
@@ -382,9 +391,11 @@ pub fn apply_damage_events(
         if let Ok(mut player) = players.get_mut(ev.target) {
             player.health = player.health.saturating_sub(ev.amount);
             if player.health == 0 {
-                sound_events.send(crate::audio::PlaySoundEvent { sound_id: 41 }); // DUKE_DEAD
+                sound_events.send(crate::audio::PlaySoundEvent { sound_id: 41 });
+            // DUKE_DEAD
             } else {
-                sound_events.send(crate::audio::PlaySoundEvent { sound_id: 37 }); // DUKE_PAIN
+                sound_events.send(crate::audio::PlaySoundEvent { sound_id: 37 });
+                // DUKE_PAIN
             }
             if let Some(ref mut t) = tint {
                 t.target_color = Color::srgba(0.8, 0.0, 0.0, 0.6);

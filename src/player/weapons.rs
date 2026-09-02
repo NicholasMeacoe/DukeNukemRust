@@ -1,17 +1,19 @@
 #![allow(dead_code)]
 
-use bevy::prelude::*;
-use crate::player::types::*;
-use crate::combat::types::{SpawnProjectileEvent, ProjectileType, Projectile};
-use crate::interactivity::types::ExplosionDamageEvent;
 use crate::audio::PlaySoundEvent;
+use crate::combat::types::{Projectile, ProjectileType, SpawnProjectileEvent};
+use crate::interactivity::types::ExplosionDamageEvent;
+use crate::player::types::*;
+use bevy::prelude::*;
 
 pub fn handle_weapon_selection(
     keys: Res<ButtonInput<KeyCode>>,
     mut query: Query<&mut PlayerController>,
     mut sound_events: EventWriter<PlaySoundEvent>,
 ) {
-    let Ok(mut player) = query.get_single_mut() else { return; };
+    let Ok(mut player) = query.get_single_mut() else {
+        return;
+    };
 
     let selected = if keys.just_pressed(KeyCode::Digit1) {
         Some(WeaponType::Knee)
@@ -26,7 +28,9 @@ pub fn handle_weapon_selection(
     } else if keys.just_pressed(KeyCode::Digit6) {
         Some(WeaponType::Pipebomb)
     } else if keys.just_pressed(KeyCode::Digit7) {
-        if player.current_weapon == WeaponType::Shrinker && player.weapons[WeaponType::Expander as usize].is_unlocked {
+        if player.current_weapon == WeaponType::Shrinker
+            && player.weapons[WeaponType::Expander as usize].is_unlocked
+        {
             Some(WeaponType::Expander)
         } else {
             Some(WeaponType::Shrinker)
@@ -66,7 +70,9 @@ pub fn get_highest_priority_available_weapon(player: &PlayerController) -> Weapo
     ];
     for &wt in &priority {
         let idx = wt as usize;
-        if wt == WeaponType::Knee || (player.weapons[idx].is_unlocked && player.weapons[idx].ammo > 0) {
+        if wt == WeaponType::Knee
+            || (player.weapons[idx].is_unlocked && player.weapons[idx].ammo > 0)
+        {
             return wt;
         }
     }
@@ -85,9 +91,14 @@ pub fn handle_weapon_firing(
     mut casing_events: EventWriter<crate::combat::gore::SpawnCasingEvent>,
     pipebomb_query: Query<(Entity, &Transform, &Projectile), Without<PlayerController>>,
     mut commands: Commands,
+    mut rng: ResMut<crate::net::DeterministicRng>,
 ) {
-    let Ok(cam_trans) = camera_query.get_single() else { return; };
-    let Ok((player_trans, mut player)) = query.get_single_mut() else { return; };
+    let Ok(cam_trans) = camera_query.get_single() else {
+        return;
+    };
+    let Ok((player_trans, mut player)) = query.get_single_mut() else {
+        return;
+    };
     let dt = time.delta_seconds();
 
     for weapon in player.weapons.iter_mut() {
@@ -114,7 +125,11 @@ pub fn handle_weapon_firing(
     if keys.just_pressed(KeyCode::KeyQ) && player.quick_kick_timer <= 0.0 {
         player.quick_kick_timer = 0.5;
         sound_events.send(PlaySoundEvent { sound_id: 0 }); // KICK_HIT
-        let kick_damage = if player.inventory.steroids_active { 40 } else { 15 };
+        let kick_damage = if player.inventory.steroids_active {
+            40
+        } else {
+            15
+        };
         projectile_events.send(SpawnProjectileEvent {
             projectile_type: ProjectileType::MightyBoot,
             origin: player_trans.translation + Vec3::Y * 0.2,
@@ -130,14 +145,18 @@ pub fn handle_weapon_firing(
         return;
     }
 
-    let is_firing = if player.current_weapon == WeaponType::Chaingun || player.current_weapon == WeaponType::Freezethrower {
+    let is_firing = if player.current_weapon == WeaponType::Chaingun
+        || player.current_weapon == WeaponType::Freezethrower
+    {
         btn.pressed(MouseButton::Left)
     } else {
         btn.just_pressed(MouseButton::Left)
     };
 
     // Detonator Trigger on Right Click or HandRemote weapon
-    if btn.just_pressed(MouseButton::Right) || (player.current_weapon == WeaponType::HandRemote && btn.just_pressed(MouseButton::Left)) {
+    if btn.just_pressed(MouseButton::Right)
+        || (player.current_weapon == WeaponType::HandRemote && btn.just_pressed(MouseButton::Left))
+    {
         for (entity, p_trans, proj) in pipebomb_query.iter() {
             if proj.projectile_type == ProjectileType::Pipebomb && proj.is_player_source {
                 sound_events.send(PlaySoundEvent { sound_id: 14 }); // PIPEBOMB_EXPLODE
@@ -151,12 +170,19 @@ pub fn handle_weapon_firing(
         }
     }
 
-    if is_firing && player.weapons[cur_idx].fire_timer <= 0.0 && player.weapons[cur_idx].reload_timer <= 0.0 {
+    if is_firing
+        && player.weapons[cur_idx].fire_timer <= 0.0
+        && player.weapons[cur_idx].reload_timer <= 0.0
+    {
         let fire_pos = player_trans.translation + Vec3::Y * 0.4 + fwd_vec * 0.5;
 
         match player.current_weapon {
             WeaponType::Knee => {
-                let kick_damage = if player.inventory.steroids_active { 40 } else { 15 };
+                let kick_damage = if player.inventory.steroids_active {
+                    40
+                } else {
+                    15
+                };
                 player.weapons[cur_idx].fire_timer = player.weapons[cur_idx].fire_delay;
                 sound_events.send(PlaySoundEvent { sound_id: 0 }); // KICK_HIT
                 projectile_events.send(SpawnProjectileEvent {
@@ -212,9 +238,10 @@ pub fn handle_weapon_firing(
 
                     // Spawn 7 spread pellets
                     for _ in 0..7 {
-                        let spread_x = (rand::random::<f32>() - 0.5) * 0.06;
-                        let spread_y = (rand::random::<f32>() - 0.5) * 0.06;
-                        let dir = (fwd_vec + right_vec * spread_x + up_vec * spread_y).normalize_or_zero();
+                        let spread_x = (rng.next_f32() - 0.5) * 0.06;
+                        let spread_y = (rng.next_f32() - 0.5) * 0.06;
+                        let dir = (fwd_vec + right_vec * spread_x + up_vec * spread_y)
+                            .normalize_or_zero();
 
                         projectile_events.send(SpawnProjectileEvent {
                             projectile_type: ProjectileType::ShotgunPellet,
@@ -239,9 +266,10 @@ pub fn handle_weapon_firing(
                         is_shotgun: false,
                     });
 
-                    let spread_x = (rand::random::<f32>() - 0.5) * 0.03;
-                    let spread_y = (rand::random::<f32>() - 0.5) * 0.03;
-                    let dir = (fwd_vec + right_vec * spread_x + up_vec * spread_y).normalize_or_zero();
+                    let spread_x = (rng.next_f32() - 0.5) * 0.03;
+                    let spread_y = (rng.next_f32() - 0.5) * 0.03;
+                    let dir =
+                        (fwd_vec + right_vec * spread_x + up_vec * spread_y).normalize_or_zero();
 
                     projectile_events.send(SpawnProjectileEvent {
                         projectile_type: ProjectileType::HitscanBullet,
@@ -310,7 +338,11 @@ pub fn handle_weapon_firing(
                     sound_events.send(PlaySoundEvent { sound_id: 10 }); // CAT_FIRE
 
                     player.devastator_alt_side = !player.devastator_alt_side;
-                    let side_offset = if player.devastator_alt_side { 0.2 } else { -0.2 };
+                    let side_offset = if player.devastator_alt_side {
+                        0.2
+                    } else {
+                        -0.2
+                    };
                     let pod_pos = fire_pos + right_vec * side_offset;
 
                     projectile_events.send(SpawnProjectileEvent {
@@ -399,8 +431,20 @@ pub fn update_laser_tripbombs(
     time: Res<Time>,
     mut commands: Commands,
     mut tripbombs: Query<(Entity, &Transform, &mut crate::combat::LaserTripbomb)>,
-    player_query: Query<&Transform, (With<PlayerController>, Without<crate::combat::LaserTripbomb>)>,
-    enemies: Query<&Transform, (With<crate::combat::EnemyActor>, Without<crate::combat::LaserTripbomb>)>,
+    player_query: Query<
+        &Transform,
+        (
+            With<PlayerController>,
+            Without<crate::combat::LaserTripbomb>,
+        ),
+    >,
+    enemies: Query<
+        &Transform,
+        (
+            With<crate::combat::EnemyActor>,
+            Without<crate::combat::LaserTripbomb>,
+        ),
+    >,
     mut explosion_events: EventWriter<ExplosionDamageEvent>,
     mut sound_events: EventWriter<PlaySoundEvent>,
 ) {
@@ -429,7 +473,8 @@ pub fn update_laser_tripbombs(
             let proj = v.dot(normal);
             if proj > 0.3 && proj < bomb.beam_length {
                 let closest = origin + normal * proj;
-                if closest.distance_squared(p_pos) < 1.0 { // 1.0 meter beam radius
+                if closest.distance_squared(p_pos) < 1.0 {
+                    // 1.0 meter beam radius
                     triggered = true;
                     break;
                 }
@@ -495,8 +540,12 @@ pub fn update_first_person_viewmodel(
     mut vm_query: Query<&mut FirstPersonViewModel>,
 ) {
     let dt = time.delta_seconds();
-    let Ok(player) = player_query.get_single() else { return; };
-    let Ok(mut vm) = vm_query.get_single_mut() else { return; };
+    let Ok(player) = player_query.get_single() else {
+        return;
+    };
+    let Ok(mut vm) = vm_query.get_single_mut() else {
+        return;
+    };
 
     let cur_idx = player.current_weapon as usize;
     if cur_idx < player.weapons.len() {

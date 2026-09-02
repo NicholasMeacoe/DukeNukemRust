@@ -1,9 +1,9 @@
 #![allow(dead_code)]
 
+use hound::{SampleFormat, WavSpec, WavWriter};
+use midly::{MetaMessage, MidiMessage, Smf, Timing, TrackEventKind};
 use std::collections::HashMap;
 use std::io::Cursor;
-use hound::{WavSpec, WavWriter, SampleFormat};
-use midly::{Smf, TrackEventKind, MidiMessage, MetaMessage, Timing};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum LevelMidiTrack {
@@ -111,7 +111,8 @@ impl MidiSynth {
             for event in track {
                 let delta = event.delta.as_int() as u64;
                 if delta > 0 {
-                    let seconds_per_tick = (tempo_micros_per_quarter / 1_000_000.0) / ticks_per_beat;
+                    let seconds_per_tick =
+                        (tempo_micros_per_quarter / 1_000_000.0) / ticks_per_beat;
                     current_sec += delta as f64 * seconds_per_tick;
                 }
 
@@ -133,10 +134,15 @@ impl MidiSynth {
                                 let vel_num = vel.as_int();
                                 if vel_num > 0 {
                                     active_notes.insert((ch, key_num), (current_sample, vel_num));
-                                } else if let Some((start_sample, start_vel)) = active_notes.remove(&(ch, key_num)) {
+                                } else if let Some((start_sample, start_vel)) =
+                                    active_notes.remove(&(ch, key_num))
+                                {
                                     notes.push(TimedNote {
                                         start_sample,
-                                        end_sample: current_sample.max(start_sample + (self.sample_rate as f64 * 0.05) as usize),
+                                        end_sample: current_sample.max(
+                                            start_sample
+                                                + (self.sample_rate as f64 * 0.05) as usize,
+                                        ),
                                         channel: ch,
                                         key: key_num,
                                         velocity: start_vel,
@@ -147,10 +153,15 @@ impl MidiSynth {
                             }
                             MidiMessage::NoteOff { key, .. } => {
                                 let key_num = key.as_int();
-                                if let Some((start_sample, start_vel)) = active_notes.remove(&(ch, key_num)) {
+                                if let Some((start_sample, start_vel)) =
+                                    active_notes.remove(&(ch, key_num))
+                                {
                                     notes.push(TimedNote {
                                         start_sample,
-                                        end_sample: current_sample.max(start_sample + (self.sample_rate as f64 * 0.05) as usize),
+                                        end_sample: current_sample.max(
+                                            start_sample
+                                                + (self.sample_rate as f64 * 0.05) as usize,
+                                        ),
                                         channel: ch,
                                         key: key_num,
                                         velocity: start_vel,
@@ -171,7 +182,8 @@ impl MidiSynth {
             for ((ch, key_num), (start_sample, vel)) in active_notes {
                 notes.push(TimedNote {
                     start_sample,
-                    end_sample: end_sample.max(start_sample + (self.sample_rate as f64 * 0.1) as usize),
+                    end_sample: end_sample
+                        .max(start_sample + (self.sample_rate as f64 * 0.1) as usize),
                     channel: ch,
                     key: key_num,
                     velocity: vel,
@@ -185,7 +197,8 @@ impl MidiSynth {
             return Err("No notes found in MIDI file".to_string());
         }
 
-        let total_samples = notes.iter().map(|n| n.end_sample).max().unwrap_or(0) + (self.sample_rate as usize);
+        let total_samples =
+            notes.iter().map(|n| n.end_sample).max().unwrap_or(0) + (self.sample_rate as usize);
         let mut buffer: Vec<f32> = vec![0.0; total_samples];
 
         // Synthesize each note into the buffer
@@ -193,7 +206,9 @@ impl MidiSynth {
             let start = note.start_sample;
             let end = note.end_sample.min(total_samples);
             let len = end.saturating_sub(start);
-            if len == 0 { continue; }
+            if len == 0 {
+                continue;
+            }
 
             let vel_scale = (note.velocity as f32 / 127.0) * 0.25;
 
@@ -201,13 +216,14 @@ impl MidiSynth {
                 // Drum synthesis (Kick, Snare, Hi-hat, Crash, Tom)
                 let drum_key = note.key;
                 let decay_time = match drum_key {
-                    35 | 36 => 0.25, // Bass Drum
-                    38 | 40 => 0.20, // Snare
-                    42 | 44 => 0.08, // Closed Hi-hat
+                    35 | 36 => 0.25,      // Bass Drum
+                    38 | 40 => 0.20,      // Snare
+                    42 | 44 => 0.08,      // Closed Hi-hat
                     46 | 49 | 57 => 0.60, // Open Hat / Crash
                     _ => 0.15,
                 };
-                let drum_len = ((decay_time * self.sample_rate as f32) as usize).min(total_samples - start);
+                let drum_len =
+                    ((decay_time * self.sample_rate as f32) as usize).min(total_samples - start);
 
                 for i in 0..drum_len {
                     let t = i as f32 / self.sample_rate as f32;
@@ -255,7 +271,7 @@ impl MidiSynth {
                     };
 
                     let phase = t * freq * std::f32::consts::TAU;
-                    
+
                     // Rich retro synth timbre based on instrument family
                     let s = match note.instrument {
                         // Bass instruments (32..39): Square/Saw tooth mix
@@ -266,12 +282,17 @@ impl MidiSynth {
                         }
                         // Guitars (24..31): Overdriven / harmonic rich wave
                         24..=31 => {
-                            let raw = (phase.sin() + 0.5 * (phase * 2.0).sin() + 0.25 * (phase * 3.0).sin()) * 1.5;
+                            let raw = (phase.sin()
+                                + 0.5 * (phase * 2.0).sin()
+                                + 0.25 * (phase * 3.0).sin())
+                                * 1.5;
                             raw.clamp(-0.8, 0.8)
                         }
                         // Strings/Pads (40..55): Smooth multi-sine blend
                         40..=55 => {
-                            phase.sin() * 0.6 + (phase * 2.01).sin() * 0.3 + (phase * 3.0).sin() * 0.1
+                            phase.sin() * 0.6
+                                + (phase * 2.01).sin() * 0.3
+                                + (phase * 3.0).sin() * 0.1
                         }
                         // Brass / Reed (56..79): Bright sawtooth
                         56..=79 => {
@@ -280,7 +301,9 @@ impl MidiSynth {
                         }
                         // Default / Pianos / Synths: Warm triangle/sine combo
                         _ => {
-                            let tri = 2.0 * (2.0 * (phase / std::f32::consts::TAU).fract() - 1.0).abs() - 1.0;
+                            let tri = 2.0
+                                * (2.0 * (phase / std::f32::consts::TAU).fract() - 1.0).abs()
+                                - 1.0;
                             tri * 0.5 + phase.sin() * 0.5
                         }
                     };
@@ -305,9 +328,13 @@ impl MidiSynth {
             for &sample in &buffer {
                 let clamped = sample.clamp(-1.0, 1.0);
                 let pcm_16 = (clamped * 32767.0) as i16;
-                writer.write_sample(pcm_16).map_err(|e| format!("Write sample error: {:?}", e))?;
+                writer
+                    .write_sample(pcm_16)
+                    .map_err(|e| format!("Write sample error: {:?}", e))?;
             }
-            writer.finalize().map_err(|e| format!("WAV finalize error: {:?}", e))?;
+            writer
+                .finalize()
+                .map_err(|e| format!("WAV finalize error: {:?}", e))?;
         }
 
         Ok(out)
@@ -321,9 +348,15 @@ mod tests {
     #[test]
     fn test_midi_track_mapping() {
         assert_eq!(LevelMidiTrack::for_level(1, 1), LevelMidiTrack::E1L1Stalker);
-        assert_eq!(LevelMidiTrack::for_level(1, 2), LevelMidiTrack::E1L2Dethtoll);
+        assert_eq!(
+            LevelMidiTrack::for_level(1, 2),
+            LevelMidiTrack::E1L2Dethtoll
+        );
         assert_eq!(LevelMidiTrack::for_level(1, 3), LevelMidiTrack::E1L3Streets);
-        assert_eq!(LevelMidiTrack::for_level(1, 4), LevelMidiTrack::E1L4Watrwrld);
+        assert_eq!(
+            LevelMidiTrack::for_level(1, 4),
+            LevelMidiTrack::E1L4Watrwrld
+        );
         assert_eq!(LevelMidiTrack::for_level(1, 5), LevelMidiTrack::E1L5Snake1);
         assert_eq!(LevelMidiTrack::for_level(1, 6), LevelMidiTrack::E1L6TheCall);
         assert_eq!(LevelMidiTrack::E1L1Stalker.filename(), "STALKER.MID");
@@ -335,11 +368,18 @@ mod tests {
             if let Ok(midi_data) = grp.read_file("STALKER.MID") {
                 let synth = MidiSynth::new(22050);
                 let wav_res = synth.midi_to_wav(&midi_data);
-                assert!(wav_res.is_ok(), "Failed to synthesize STALKER.MID: {:?}", wav_res.err());
+                assert!(
+                    wav_res.is_ok(),
+                    "Failed to synthesize STALKER.MID: {:?}",
+                    wav_res.err()
+                );
                 let wav = wav_res.unwrap();
                 assert!(wav.len() > 1000);
                 assert!(wav.starts_with(b"RIFF"));
-                println!("Successfully synthesized STALKER.MID ({} bytes of WAV)", wav.len());
+                println!(
+                    "Successfully synthesized STALKER.MID ({} bytes of WAV)",
+                    wav.len()
+                );
             }
         }
     }

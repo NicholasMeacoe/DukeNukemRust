@@ -1,17 +1,17 @@
 #![allow(dead_code, unused_imports)]
 
-pub mod types;
-pub mod lexer;
 pub mod compiler;
-pub mod vm;
+pub mod lexer;
 pub mod physics;
+pub mod types;
+pub mod vm;
 
 use bevy::prelude::*;
 
-pub use types::*;
-pub use compiler::{Compiler, CompiledScript};
-pub use vm::{ConVm, VmActorContext};
+pub use compiler::{CompiledScript, Compiler};
 pub use physics::TrigTables;
+pub use types::*;
+pub use vm::{ConVm, VmActorContext};
 
 #[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ConActor {
@@ -27,7 +27,7 @@ pub struct ConActor {
     pub extra: i16, // Health
     pub xvel: i16,
     pub zvel: i16,
-    pub ang: i16,   // Facing angle (0..2047)
+    pub ang: i16, // Facing angle (0..2047)
     pub registers: ActorRegisters,
     pub last_hit_weapon: i16,
     pub spawned_by_picnum: i16,
@@ -88,7 +88,9 @@ impl ConScriptEngine {
 
         let mut compiler = Compiler::new();
         let loader = |name: &str| -> Option<String> {
-            grp.read_file(name).ok().map(|bytes| String::from_utf8_lossy(&bytes).to_string())
+            grp.read_file(name)
+                .ok()
+                .map(|bytes| String::from_utf8_lossy(&bytes).to_string())
         };
 
         let compiled = compiler.compile_with_loader(&game_con_str, &loader)?;
@@ -273,7 +275,6 @@ actor ENFORCER 100 AENFSTAND ENFSTOP
 enda
 "#;
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -305,14 +306,22 @@ mod tests {
         assert_eq!(engine.compiled.symbols.get("TROOP_HEALTH"), Some(&100));
 
         let mut reg = ActorRegisters::default();
-        let mut x = 0; let mut y = 0; let mut z = 0;
-        let mut ang = 0; let mut xvel = 0; let mut zvel = 0;
+        let mut x = 0;
+        let mut y = 0;
+        let mut z = 0;
+        let mut ang = 0;
+        let mut xvel = 0;
+        let mut zvel = 0;
         let mut extra = 100;
         let mut picnum = 1680;
         let mut sectnum = 0;
-        let mut cstat = 0; let mut pal = 0;
-        let mut xrepeat = 64; let mut yrepeat = 64;
-        let mut clipdist = 32; let mut lotag = 0; let mut hitag = 0;
+        let mut cstat = 0;
+        let mut pal = 0;
+        let mut xrepeat = 64;
+        let mut yrepeat = 64;
+        let mut clipdist = 32;
+        let mut lotag = 0;
+        let mut hitag = 0;
 
         let mut ctx = VmActorContext {
             sprite_idx: 0,
@@ -320,6 +329,7 @@ mod tests {
             dist_to_player: 500,
             can_see_player: true,
             hit_by_weapon: false,
+            rng: Box::leak(Box::new(crate::net::DeterministicRng::default())),
             registers: &mut reg,
             sprite_x: &mut x,
             sprite_y: &mut y,

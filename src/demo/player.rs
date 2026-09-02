@@ -1,9 +1,9 @@
 #![allow(dead_code)]
 
+use crate::demo::format::*;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
-use crate::demo::format::*;
 
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct DemoPlayer {
@@ -17,7 +17,8 @@ impl DemoPlayer {
     pub fn load_from_file(&mut self, path: &Path) -> Result<(), &'static str> {
         let mut file = File::open(path).map_err(|_| "Failed to open demo file")?;
         let mut buffer = Vec::new();
-        file.read_to_end(&mut buffer).map_err(|_| "Failed to read demo file")?;
+        file.read_to_end(&mut buffer)
+            .map_err(|_| "Failed to read demo file")?;
 
         if buffer.len() < 8 {
             return Err("Demo file too small");

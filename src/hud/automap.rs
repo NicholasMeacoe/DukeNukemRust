@@ -1,8 +1,8 @@
 #![allow(dead_code)]
 
+use crate::game_flow::state::GamePhase;
 use bevy::prelude::*;
 use std::collections::HashSet;
-use crate::game_flow::state::GamePhase;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum AutomapMode {
@@ -37,12 +37,10 @@ pub struct AutomapPlugin;
 
 impl Plugin for AutomapPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<AutomapState>()
-            .add_systems(
-                Update,
-                (handle_automap_input, update_automap_discovery)
-                    .run_if(in_state(GamePhase::Playing)),
-            );
+        app.init_resource::<AutomapState>().add_systems(
+            Update,
+            (handle_automap_input, update_automap_discovery).run_if(in_state(GamePhase::Playing)),
+        );
     }
 }
 
@@ -112,7 +110,9 @@ pub fn update_automap_discovery(
         return;
     }
 
-    let Ok(trans) = player_query.get_single() else { return; };
+    let Ok(trans) = player_query.get_single() else {
+        return;
+    };
     // Current sector proximity discovery
     let _player_pos = trans.translation;
     automap.discovered_sectors.insert(0);

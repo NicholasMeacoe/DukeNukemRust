@@ -34,8 +34,14 @@ impl DukeRts {
 
         for i in 0..numlumps {
             let entry_offset = infotable_offset + i * 16;
-            let filepos = i32::from_le_bytes(bytes[entry_offset..entry_offset + 4].try_into().unwrap()) as usize;
-            let size = i32::from_le_bytes(bytes[entry_offset + 4..entry_offset + 8].try_into().unwrap()) as usize;
+            let filepos =
+                i32::from_le_bytes(bytes[entry_offset..entry_offset + 4].try_into().unwrap())
+                    as usize;
+            let size = i32::from_le_bytes(
+                bytes[entry_offset + 4..entry_offset + 8]
+                    .try_into()
+                    .unwrap(),
+            ) as usize;
 
             let name_bytes = &bytes[entry_offset + 8..entry_offset + 16];
             let name_str = String::from_utf8_lossy(name_bytes)

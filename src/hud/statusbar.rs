@@ -1,8 +1,8 @@
 #![allow(dead_code)]
 
-use bevy::prelude::*;
 use crate::hud::font::{DukeFont, DukeFontRenderer, GlyphDrawCall};
 use crate::player::types::PlayerController;
+use bevy::prelude::*;
 
 pub const BOTTOMSTATUSBAR: i16 = 2462;
 pub const KEY_BLUE: i16 = 175;
@@ -54,17 +54,36 @@ impl StatusbarState {
             HudMode::ClassicStatusbar => {
                 // Health (3 digits at x: 24, y: 176)
                 let health_str = format!("{:>3}", player.health.clamp(0, 999));
-                glyphs.extend(DukeFontRenderer::layout_text(DukeFont::DigitalNumbers, &health_str, 24, 176));
+                glyphs.extend(DukeFontRenderer::layout_text(
+                    DukeFont::DigitalNumbers,
+                    &health_str,
+                    24,
+                    176,
+                ));
 
                 // Armor (3 digits at x: 64, y: 176)
                 let armor_str = format!("{:>3}", player.armor.clamp(0, 999));
-                glyphs.extend(DukeFontRenderer::layout_text(DukeFont::DigitalNumbers, &armor_str, 64, 176));
+                glyphs.extend(DukeFontRenderer::layout_text(
+                    DukeFont::DigitalNumbers,
+                    &armor_str,
+                    64,
+                    176,
+                ));
 
                 // Current Weapon Ammo (3 digits at x: 224, y: 176)
                 let cur_idx = player.current_weapon as usize;
-                let ammo = if cur_idx < player.weapons.len() { player.weapons[cur_idx].ammo } else { 0 };
+                let ammo = if cur_idx < player.weapons.len() {
+                    player.weapons[cur_idx].ammo
+                } else {
+                    0
+                };
                 let ammo_str = format!("{:>3}", ammo.clamp(0, 999));
-                glyphs.extend(DukeFontRenderer::layout_text(DukeFont::DigitalNumbers, &ammo_str, 224, 176));
+                glyphs.extend(DukeFontRenderer::layout_text(
+                    DukeFont::DigitalNumbers,
+                    &ammo_str,
+                    224,
+                    176,
+                ));
 
                 // Keycards
                 if self.has_blue_key {
@@ -79,7 +98,12 @@ impl StatusbarState {
 
                 // Message text console at top of screen
                 if self.message_timer > 0.0 && !self.message_text.is_empty() {
-                    glyphs.extend(DukeFontRenderer::layout_text(DukeFont::SmallBlue, &self.message_text, 10, 10));
+                    glyphs.extend(DukeFontRenderer::layout_text(
+                        DukeFont::SmallBlue,
+                        &self.message_text,
+                        10,
+                        10,
+                    ));
                 }
 
                 StatusbarLayout {
@@ -91,15 +115,34 @@ impl StatusbarState {
             HudMode::FullscreenMini => {
                 // Minimalist floating numbers
                 let health_str = format!("H:{}", player.health);
-                glyphs.extend(DukeFontRenderer::layout_text(DukeFont::SmallBlue, &health_str, 10, 185));
+                glyphs.extend(DukeFontRenderer::layout_text(
+                    DukeFont::SmallBlue,
+                    &health_str,
+                    10,
+                    185,
+                ));
 
                 let armor_str = format!("A:{}", player.armor);
-                glyphs.extend(DukeFontRenderer::layout_text(DukeFont::SmallBlue, &armor_str, 70, 185));
+                glyphs.extend(DukeFontRenderer::layout_text(
+                    DukeFont::SmallBlue,
+                    &armor_str,
+                    70,
+                    185,
+                ));
 
                 let cur_idx = player.current_weapon as usize;
-                let ammo = if cur_idx < player.weapons.len() { player.weapons[cur_idx].ammo } else { 0 };
+                let ammo = if cur_idx < player.weapons.len() {
+                    player.weapons[cur_idx].ammo
+                } else {
+                    0
+                };
                 let ammo_str = format!("AMMO:{}", ammo);
-                glyphs.extend(DukeFontRenderer::layout_text(DukeFont::SmallBlue, &ammo_str, 240, 185));
+                glyphs.extend(DukeFontRenderer::layout_text(
+                    DukeFont::SmallBlue,
+                    &ammo_str,
+                    240,
+                    185,
+                ));
 
                 StatusbarLayout {
                     base_tile: 0, // No full background

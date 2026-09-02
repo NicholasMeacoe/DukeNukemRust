@@ -19,8 +19,14 @@ impl Default for ConsoleState {
             history: Vec::new(),
             history_index: None,
             log_lines: vec![
-                ("Duke Nukem 3D Developer Console Initialized.".to_string(), [0.0, 1.0, 0.0, 1.0]),
-                ("Type 'help' for a list of available commands.".to_string(), [0.8, 0.8, 0.8, 1.0]),
+                (
+                    "Duke Nukem 3D Developer Console Initialized.".to_string(),
+                    [0.0, 1.0, 0.0, 1.0],
+                ),
+                (
+                    "Type 'help' for a list of available commands.".to_string(),
+                    [0.8, 0.8, 0.8, 1.0],
+                ),
             ],
         }
     }
@@ -57,14 +63,38 @@ impl ConsoleState {
         match cmd.as_str() {
             "help" => {
                 self.log("Available Commands:", [0.2, 0.8, 1.0, 1.0]);
-                self.log("  map <name>            - Warp to map (e.g. map E1L1, map E1L3)", [0.9, 0.9, 0.9, 1.0]);
-                self.log("  god                   - Toggle God Mode", [0.9, 0.9, 0.9, 1.0]);
-                self.log("  noclip                - Toggle No-Clip Mode", [0.9, 0.9, 0.9, 1.0]);
-                self.log("  give <all|weapons|ammo|keys|health|armor> - Replenish items", [0.9, 0.9, 0.9, 1.0]);
-                self.log("  kill                  - Commit suicide", [0.9, 0.9, 0.9, 1.0]);
-                self.log("  killmonsters          - Eliminate all enemies in map", [0.9, 0.9, 0.9, 1.0]);
-                self.log("  clear                 - Clear console text buffer", [0.9, 0.9, 0.9, 1.0]);
-                self.log("  quit / exit           - Exit application", [0.9, 0.9, 0.9, 1.0]);
+                self.log(
+                    "  map <name>            - Warp to map (e.g. map E1L1, map E1L3)",
+                    [0.9, 0.9, 0.9, 1.0],
+                );
+                self.log(
+                    "  god                   - Toggle God Mode",
+                    [0.9, 0.9, 0.9, 1.0],
+                );
+                self.log(
+                    "  noclip                - Toggle No-Clip Mode",
+                    [0.9, 0.9, 0.9, 1.0],
+                );
+                self.log(
+                    "  give <all|weapons|ammo|keys|health|armor> - Replenish items",
+                    [0.9, 0.9, 0.9, 1.0],
+                );
+                self.log(
+                    "  kill                  - Commit suicide",
+                    [0.9, 0.9, 0.9, 1.0],
+                );
+                self.log(
+                    "  killmonsters          - Eliminate all enemies in map",
+                    [0.9, 0.9, 0.9, 1.0],
+                );
+                self.log(
+                    "  clear                 - Clear console text buffer",
+                    [0.9, 0.9, 0.9, 1.0],
+                );
+                self.log(
+                    "  quit / exit           - Exit application",
+                    [0.9, 0.9, 0.9, 1.0],
+                );
             }
             "clear" => {
                 self.log_lines.clear();
@@ -72,14 +102,22 @@ impl ConsoleState {
             "god" | "godmode" => {
                 if let Ok(mut p) = player_query.get_single_mut() {
                     p.god_mode = !p.god_mode;
-                    let msg = if p.god_mode { "God Mode ON" } else { "God Mode OFF" };
+                    let msg = if p.god_mode {
+                        "God Mode ON"
+                    } else {
+                        "God Mode OFF"
+                    };
                     self.log(msg, [1.0, 1.0, 0.0, 1.0]);
                 }
             }
             "noclip" | "clip" => {
                 if let Ok(mut p) = player_query.get_single_mut() {
                     p.no_clip = !p.no_clip;
-                    let msg = if p.no_clip { "No-Clip ON" } else { "No-Clip OFF" };
+                    let msg = if p.no_clip {
+                        "No-Clip ON"
+                    } else {
+                        "No-Clip OFF"
+                    };
                     self.log(msg, [1.0, 1.0, 0.0, 1.0]);
                 }
             }
@@ -91,7 +129,10 @@ impl ConsoleState {
             }
             "give" => {
                 if args.is_empty() {
-                    self.log("Usage: give <all | weapons | ammo | keys | health | armor>", [1.0, 0.3, 0.3, 1.0]);
+                    self.log(
+                        "Usage: give <all | weapons | ammo | keys | health | armor>",
+                        [1.0, 0.3, 0.3, 1.0],
+                    );
                     return;
                 }
                 if let Ok(mut p) = player_query.get_single_mut() {
@@ -113,7 +154,10 @@ impl ConsoleState {
                                 w.is_unlocked = true;
                                 w.ammo = w.max_ammo;
                             }
-                            self.log("All weapons, ammo, keys, and items granted.", [0.0, 1.0, 0.0, 1.0]);
+                            self.log(
+                                "All weapons, ammo, keys, and items granted.",
+                                [0.0, 1.0, 0.0, 1.0],
+                            );
                         }
                         "weapons" => {
                             for w in p.weapons.iter_mut() {
@@ -142,26 +186,41 @@ impl ConsoleState {
                             self.log("Armor restored to 100.", [0.0, 1.0, 0.0, 1.0]);
                         }
                         other => {
-                            self.log(&format!("Unknown give parameter '{}'", other), [1.0, 0.3, 0.3, 1.0]);
+                            self.log(
+                                &format!("Unknown give parameter '{}'", other),
+                                [1.0, 0.3, 0.3, 1.0],
+                            );
                         }
                     }
                 }
             }
             "map" | "warp" => {
                 if args.is_empty() {
-                    self.log("Usage: map <eXlY> (e.g. map E1L1, map E1L3)", [1.0, 0.3, 0.3, 1.0]);
+                    self.log(
+                        "Usage: map <eXlY> (e.g. map E1L1, map E1L3)",
+                        [1.0, 0.3, 0.3, 1.0],
+                    );
                     return;
                 }
                 let map_str = args[0].to_uppercase();
                 let (ep, lvl) = if map_str.starts_with('E') && map_str.contains('L') {
                     let parts: Vec<&str> = map_str.trim_start_matches('E').split('L').collect();
                     let ep = parts.first().and_then(|s| s.parse().ok()).unwrap_or(1);
-                    let lvl = parts.get(1).and_then(|s| s.trim_end_matches(".MAP").parse().ok()).unwrap_or(1);
+                    let lvl = parts
+                        .get(1)
+                        .and_then(|s| s.trim_end_matches(".MAP").parse().ok())
+                        .unwrap_or(1);
                     (ep, lvl)
                 } else {
                     (1, 1)
                 };
-                self.log(&format!("Warping to Episode {} Level {} (E{}L{})...", ep, lvl, ep, lvl), [0.2, 1.0, 0.2, 1.0]);
+                self.log(
+                    &format!(
+                        "Warping to Episode {} Level {} (E{}L{})...",
+                        ep, lvl, ep, lvl
+                    ),
+                    [0.2, 1.0, 0.2, 1.0],
+                );
                 level_event_writer.send(crate::game_flow::LoadLevelEvent {
                     episode: ep,
                     level: lvl,
@@ -172,47 +231,77 @@ impl ConsoleState {
             }
             "r_crt" | "crt" => {
                 let enabled = if let Some(arg) = args.first() {
-                    arg.starts_with("1") || arg.eq_ignore_ascii_case("true") || arg.eq_ignore_ascii_case("on")
+                    arg.starts_with("1")
+                        || arg.eq_ignore_ascii_case("true")
+                        || arg.eq_ignore_ascii_case("on")
                 } else {
                     true
                 };
                 if let Some(ref mut config) = crt_config {
                     config.enabled = enabled;
                 }
-                self.log(&format!("Retro CRT Post-Processing: {}", if enabled { "ENABLED" } else { "DISABLED" }), [0.2, 1.0, 0.8, 1.0]);
+                self.log(
+                    &format!(
+                        "Retro CRT Post-Processing: {}",
+                        if enabled { "ENABLED" } else { "DISABLED" }
+                    ),
+                    [0.2, 1.0, 0.8, 1.0],
+                );
             }
             "r_scanlines" => {
                 let intensity: f32 = args.first().and_then(|s| s.parse().ok()).unwrap_or(0.25);
                 if let Some(ref mut config) = crt_config {
                     config.scanline_intensity = intensity;
                 }
-                self.log(&format!("CRT Scanline Intensity set to {:.2}", intensity), [0.2, 1.0, 0.8, 1.0]);
+                self.log(
+                    &format!("CRT Scanline Intensity set to {:.2}", intensity),
+                    [0.2, 1.0, 0.8, 1.0],
+                );
             }
             "r_quantize" => {
                 let enabled = if let Some(arg) = args.first() {
-                    arg.starts_with("1") || arg.eq_ignore_ascii_case("true") || arg.eq_ignore_ascii_case("on")
+                    arg.starts_with("1")
+                        || arg.eq_ignore_ascii_case("true")
+                        || arg.eq_ignore_ascii_case("on")
                 } else {
                     true
                 };
                 if let Some(ref mut config) = crt_config {
                     config.vga_color_quantization = enabled;
                 }
-                self.log(&format!("256-Color VGA Palette Quantization: {}", if enabled { "ENABLED" } else { "DISABLED" }), [0.2, 1.0, 0.8, 1.0]);
+                self.log(
+                    &format!(
+                        "256-Color VGA Palette Quantization: {}",
+                        if enabled { "ENABLED" } else { "DISABLED" }
+                    ),
+                    [0.2, 1.0, 0.8, 1.0],
+                );
             }
             "r_stats" | "stats" => {
                 let enabled = if let Some(arg) = args.first() {
-                    arg.starts_with("1") || arg.eq_ignore_ascii_case("true") || arg.eq_ignore_ascii_case("on")
+                    arg.starts_with("1")
+                        || arg.eq_ignore_ascii_case("true")
+                        || arg.eq_ignore_ascii_case("on")
                 } else {
                     true
                 };
-                self.log(&format!("Engine Performance Profiler: {}", if enabled { "ENABLED" } else { "DISABLED" }), [0.2, 1.0, 0.8, 1.0]);
+                self.log(
+                    &format!(
+                        "Engine Performance Profiler: {}",
+                        if enabled { "ENABLED" } else { "DISABLED" }
+                    ),
+                    [0.2, 1.0, 0.8, 1.0],
+                );
             }
             "quit" | "exit" => {
                 self.log("Exiting application...", [1.0, 0.0, 0.0, 1.0]);
                 std::process::exit(0);
             }
             unknown => {
-                self.log(&format!("Unknown command '{}'. Type 'help' for commands.", unknown), [1.0, 0.3, 0.3, 1.0]);
+                self.log(
+                    &format!("Unknown command '{}'. Type 'help' for commands.", unknown),
+                    [1.0, 0.3, 0.3, 1.0],
+                );
             }
         }
     }
@@ -222,21 +311,14 @@ pub struct ConsolePlugin;
 
 impl Plugin for ConsolePlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<ConsoleState>()
-            .add_systems(
-                Update,
-                (
-                    toggle_console_system,
-                    handle_console_input_system,
-                ).in_set(crate::GameSet::Input),
-            );
+        app.init_resource::<ConsoleState>().add_systems(
+            Update,
+            (toggle_console_system, handle_console_input_system).in_set(crate::GameSet::Input),
+        );
     }
 }
 
-pub fn toggle_console_system(
-    keys: Res<ButtonInput<KeyCode>>,
-    mut console: ResMut<ConsoleState>,
-) {
+pub fn toggle_console_system(keys: Res<ButtonInput<KeyCode>>, mut console: ResMut<ConsoleState>) {
     if keys.just_pressed(KeyCode::Backquote) {
         console.is_open = !console.is_open;
         if console.is_open {

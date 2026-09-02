@@ -24,7 +24,12 @@ pub struct GlyphDrawCall {
 pub struct DukeFontRenderer;
 
 impl DukeFontRenderer {
-    pub fn layout_text(font: DukeFont, text: &str, start_x: i32, start_y: i32) -> Vec<GlyphDrawCall> {
+    pub fn layout_text(
+        font: DukeFont,
+        text: &str,
+        start_x: i32,
+        start_y: i32,
+    ) -> Vec<GlyphDrawCall> {
         let mut calls = Vec::new();
         let mut cur_x = start_x;
 

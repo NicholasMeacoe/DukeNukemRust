@@ -1,9 +1,9 @@
 #![allow(dead_code)]
 
+use crate::audio::PlaySoundEvent;
+use crate::player::types::*;
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
-use crate::player::types::*;
-use crate::audio::PlaySoundEvent;
 
 pub fn update_player_movement(
     keys: Res<ButtonInput<KeyCode>>,
@@ -18,7 +18,9 @@ pub fn update_player_movement(
     mut sound_events: EventWriter<PlaySoundEvent>,
     mut tint: Option<ResMut<crate::hud::ScreenTintState>>,
 ) {
-    let Ok(camera_transform) = camera_query.get_single() else { return; };
+    let Ok(camera_transform) = camera_query.get_single() else {
+        return;
+    };
     let dt = time.delta_seconds();
 
     for (mut trans, mut player, mut controller, output) in query.iter_mut() {
@@ -30,7 +32,10 @@ pub fn update_player_movement(
 
         // Void fall protection: if player ever falls below map limits, teleport back to start
         if trans.translation.y < -15.0 {
-            println!("Player fell into void (y = {}). Teleporting back to start position!", trans.translation.y);
+            println!(
+                "Player fell into void (y = {}). Teleporting back to start position!",
+                trans.translation.y
+            );
             trans.translation = player.spawn_position + Vec3::Y * 0.5;
             player.velocity_y = 0.0;
             player.velocity_xz = Vec2::ZERO;
@@ -78,7 +83,10 @@ pub fn update_player_movement(
             speed_multiplier *= 0.5;
         }
 
-        let is_swimming = matches!(player.movement_mode, PlayerMovementMode::Swimming | PlayerMovementMode::Diving);
+        let is_swimming = matches!(
+            player.movement_mode,
+            PlayerMovementMode::Swimming | PlayerMovementMode::Diving
+        );
         if is_swimming {
             speed_multiplier *= 0.7;
             if let Some(ref mut t) = tint {
@@ -137,7 +145,9 @@ pub fn update_player_movement(
             if player.velocity_y < 0.0 {
                 player.velocity_y = -0.2; // Gentle slope adherence
             }
-            if keys.just_pressed(KeyCode::Space) && player.movement_mode != PlayerMovementMode::Crouching {
+            if keys.just_pressed(KeyCode::Space)
+                && player.movement_mode != PlayerMovementMode::Crouching
+            {
                 player.velocity_y = jump_speed;
                 sound_events.send(PlaySoundEvent { sound_id: 38 }); // DUKE_GRUNT
             }

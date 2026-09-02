@@ -77,22 +77,19 @@ pub struct DecalPlugin;
 
 impl Plugin for DecalPlugin {
     fn build(&self, app: &mut App) {
-        app.add_event::<SpawnDecalEvent>()
-            .add_systems(
-                Update,
-                (
-                    handle_spawn_decal_events,
-                    update_surface_decals,
-                    update_atmospheric_emitters,
-                ).in_set(crate::GameSet::Animation),
-            );
+        app.add_event::<SpawnDecalEvent>().add_systems(
+            Update,
+            (
+                handle_spawn_decal_events,
+                update_surface_decals,
+                update_atmospheric_emitters,
+            )
+                .in_set(crate::GameSet::Animation),
+        );
     }
 }
 
-pub fn handle_spawn_decal_events(
-    mut events: EventReader<SpawnDecalEvent>,
-    mut commands: Commands,
-) {
+pub fn handle_spawn_decal_events(mut events: EventReader<SpawnDecalEvent>, mut commands: Commands) {
     for ev in events.read() {
         let max_lifetime = match ev.decal_type {
             DecalType::BulletHole => 20.0,
@@ -122,7 +119,9 @@ pub fn handle_spawn_decal_events(
                 max_lifetime,
                 alpha: 1.0,
             },
-            TransformBundle::from_transform(Transform::from_translation(offset_pos).with_rotation(rot)),
+            TransformBundle::from_transform(
+                Transform::from_translation(offset_pos).with_rotation(rot),
+            ),
             crate::game_flow::LevelEntity,
         ));
     }
@@ -135,7 +134,11 @@ pub fn update_surface_decals(
 ) {
     let dt = time.delta_seconds();
     let total_decals = query.iter().count();
-    let mut excess = if total_decals > 256 { total_decals - 256 } else { 0 };
+    let mut excess = if total_decals > 256 {
+        total_decals - 256
+    } else {
+        0
+    };
 
     for (entity, mut decal) in query.iter_mut() {
         if excess > 0 {

@@ -1,7 +1,7 @@
 #![allow(dead_code)]
+use crate::art::PicAnm;
 use bevy::prelude::*;
 use std::collections::HashMap;
-use crate::art::PicAnm;
 
 #[derive(Resource)]
 pub struct EngineClock {

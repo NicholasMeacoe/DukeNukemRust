@@ -1,18 +1,18 @@
 #![allow(dead_code)]
 
-pub mod voc;
 pub mod midi;
 pub mod rts;
 pub mod synth_stream;
+pub mod voc;
 
-pub use voc::*;
 pub use midi::*;
 pub use rts::*;
 pub use synth_stream::*;
+pub use voc::*;
 
+use crate::grp::Grp;
 use bevy::prelude::*;
 use std::collections::HashMap;
-use crate::grp::Grp;
 
 pub struct DukeAudioPlugin;
 
@@ -134,8 +134,9 @@ pub fn sync_music_volume_system(
 ) {
     let target = music_state.get_target_volume();
     // Smooth lerp to prevent popping
-    music_state.current_volume = music_state.current_volume + (target - music_state.current_volume) * (time.delta_seconds() * 5.0).min(1.0);
-    
+    music_state.current_volume = music_state.current_volume
+        + (target - music_state.current_volume) * (time.delta_seconds() * 5.0).min(1.0);
+
     for sink in &sink_query {
         sink.set_volume(music_state.current_volume);
     }
@@ -265,7 +266,10 @@ pub fn setup_duke_audio(
     println!("DukeAudioPlugin: Initializing audio from {}", grp_path);
 
     let Ok(grp) = Grp::open(&grp_path) else {
-        println!("DukeAudioPlugin: Warning - could not open GRP at {}", grp_path);
+        println!(
+            "DukeAudioPlugin: Warning - could not open GRP at {}",
+            grp_path
+        );
         return;
     };
 
@@ -301,8 +305,12 @@ pub fn setup_duke_audio(
                     let handle = audio_sources.add(audio_source);
 
                     let stem = upper_name.trim_end_matches(".VOC").to_string();
-                    audio_assets.sounds_by_name.insert(upper_name.clone(), handle.clone());
-                    audio_assets.sounds_by_name.insert(stem.clone(), handle.clone());
+                    audio_assets
+                        .sounds_by_name
+                        .insert(upper_name.clone(), handle.clone());
+                    audio_assets
+                        .sounds_by_name
+                        .insert(stem.clone(), handle.clone());
                     audio_assets.all_sounds.push(handle.clone());
                     voc_count += 1;
 
@@ -364,7 +372,10 @@ pub fn setup_duke_audio(
                 };
                 let music_handle = midi_sources.add(stream);
                 audio_assets.music_tracks.insert(*track_enum, music_handle);
-                println!("DukeAudioPlugin: Loaded background music: {}", midi_filename);
+                println!(
+                    "DukeAudioPlugin: Loaded background music: {}",
+                    midi_filename
+                );
             }
         }
     }
@@ -412,7 +423,9 @@ pub fn handle_play_spatial_sound_events(
 ) {
     for ev in events.read() {
         if let Some(handle) = audio_assets.get_sound_by_id(ev.sound_id) {
-            let settings = PlaybackSettings::default().with_volume(bevy::audio::Volume::new(ev.volume)).with_spatial(true);
+            let settings = PlaybackSettings::default()
+                .with_volume(bevy::audio::Volume::new(ev.volume))
+                .with_spatial(true);
             commands.spawn((
                 AudioBundle {
                     source: handle,
@@ -431,8 +444,9 @@ pub fn handle_play_named_sound_events(
 ) {
     for ev in events.read() {
         if let Some(handle) = audio_assets.get_sound_by_name(&ev.name) {
-            let mut settings = PlaybackSettings::default().with_volume(bevy::audio::Volume::new(ev.volume));
-            
+            let mut settings =
+                PlaybackSettings::default().with_volume(bevy::audio::Volume::new(ev.volume));
+
             if let Some(pos) = ev.position {
                 settings = settings.with_spatial(true);
                 commands.spawn((
@@ -472,7 +486,8 @@ pub fn handle_play_music_track_events(
             commands.spawn((
                 bevy::audio::AudioSourceBundle {
                     source: music_handle.clone(),
-                    settings: PlaybackSettings::LOOP.with_volume(bevy::audio::Volume::new(music_state.current_volume)),
+                    settings: PlaybackSettings::LOOP
+                        .with_volume(bevy::audio::Volume::new(music_state.current_volume)),
                 },
                 MusicTrackEmitter,
             ));
@@ -559,92 +574,92 @@ fn parse_user_con_sounds(
 /// Fallback dictionary of Duke Nukem 3D sound IDs to original VOC filenames
 pub fn build_default_sound_id_map() -> HashMap<i32, String> {
     let mut map = HashMap::new();
-    map.insert(0, "KICKHIT.VOC".into());       // KICK_HIT
-    map.insert(1, "RICOCHET.VOC".into());      // PISTOL_RICOCHET
-    map.insert(2, "BULITHIT.VOC".into());      // PISTOL_BODYHIT
-    map.insert(3, "PISTOL.VOC".into());        // PISTOL_FIRE
-    map.insert(4, "CLIPOUT.VOC".into());       // EJECT_CLIP
-    map.insert(5, "CLIPIN.VOC".into());        // INSERT_CLIP
-    map.insert(6, "CHAINGUN.VOC".into());      // CHAINGUN_FIRE
-    map.insert(7, "RPGFIRE.VOC".into());       // RPG_SHOOT
-    map.insert(8, "POOLBALL.VOC".into());      // POOLBALLHIT
-    map.insert(9, "BOMBEXPL.VOC".into());      // RPG_EXPLODE
-    map.insert(10, "CATFIRE.VOC".into());      // CAT_FIRE (Devastator)
-    map.insert(11, "SHRINKER.VOC".into());     // SHRINKER_FIRE
-    map.insert(12, "SHRINK.VOC".into());       // ACTOR_SHRINKING
-    map.insert(13, "PBOMBBNC.VOC".into());     // PIPEBOMB_BOUNCE
-    map.insert(14, "BOMBEXPL.VOC".into());     // PIPEBOMB_EXPLODE
-    map.insert(15, "LSRBMBPT.VOC".into());     // LASERTRIP_ONWALL
-    map.insert(16, "LSRBMBWN.VOC".into());     // LASERTRIP_ARMING
-    map.insert(17, "BOMBEXPL.VOC".into());     // LASERTRIP_EXPLODE
-    map.insert(18, "VENTBUST.VOC".into());     // VENT_BUST
-    map.insert(19, "GLASS.VOC".into());        // GLASS_BREAKING
-    map.insert(20, "GLASHEVY.VOC".into());     // GLASS_HEAVYBREAK
-    map.insert(21, "SHORTED.VOC".into());      // SHORT_CIRCUIT
-    map.insert(22, "SPLASH.VOC".into());       // ITEM_SPLASH
-    map.insert(23, "HLMINHAL.VOC".into());     // DUKE_BREATHING
-    map.insert(24, "HLMEXHAL.VOC".into());     // DUKE_EXHALING
-    map.insert(25, "GASP.VOC".into());         // DUKE_GASP
-    map.insert(28, "PISSING.VOC".into());      // DUKE_URINATE
-    map.insert(36, "DRINK18.VOC".into());      // DUKE_DRINKING
-    map.insert(37, "DAMN03.VOC".into());       // DUKE_KILLED1 (Pain)
-    map.insert(38, "EXERT.VOC".into());        // DUKE_GRUNT (Jump)
-    map.insert(39, "HARTBEAT.VOC".into());     // DUKE_HARTBEAT
-    map.insert(40, "WETFEET.VOC".into());      // DUKE_ONWATER
-    map.insert(41, "DMDEATH.VOC".into());      // DUKE_DEAD
-    map.insert(42, "LAND02.VOC".into());       // DUKE_LAND
-    map.insert(43, "DUCTWLK.VOC".into());      // DUKE_WALKINDUCTS
-    map.insert(44, "COOL01.VOC".into());       // DUKE_GLAD
-    map.insert(45, "YES.VOC".into());          // DUKE_YES
-    map.insert(49, "JETPAKON.VOC".into());     // DUKE_JETPACK_ON
-    map.insert(50, "JETPAKI.VOC".into());      // DUKE_JETPACK_IDLE
-    map.insert(51, "JETPAKOF.VOC".into());     // DUKE_JETPACK_OFF
-    map.insert(52, "ROAM06.VOC".into());       // LIZTROOP_GROWL / PRED_ROAM
-    map.insert(62, "PREDPN.VOC".into());       // LIZARD_PAIN
-    map.insert(63, "PREDDY.VOC".into());       // LIZARD_DEATH
-    map.insert(64, "LIZSPIT.VOC".into());      // LIZARD_SPIT
-    map.insert(69, "SQUISH1A.VOC".into());     // SQUISHED
-    map.insert(70, "TELEPORT.VOC".into());     // TELEPORTER
-    map.insert(71, "GBELEV01.VOC".into());     // ELEVATOR_ON
-    map.insert(73, "GBELEV02.VOC".into());     // ELEVATOR_OFF
-    map.insert(74, "CDOOR1B.VOC".into());      // DOOR_OPERATE1
-    map.insert(75, "SUBWAY.VOC".into());       // SUBWAY
-    map.insert(76, "SWITCH1.VOC".into());      // SWITCH_ON
-    map.insert(77, "FAN.VOC".into());          // FAN
-    map.insert(78, "GROOVY02.VOC".into());     // DUKE_GETWEAPON3
-    map.insert(79, "FLUSH.VOC".into());        // FLUSH_TOILET
-    map.insert(81, "TRUMBLE.VOC".into());      // EARTHQUAKE
-    map.insert(82, "ALARM1A.VOC".into());      // INTRUDER_ALERT
-    map.insert(83, "ENDSEQ.VOC".into());       // END_OF_LEVEL_WARN
-    map.insert(109, "SHOTGUN7.VOC".into());    // SHOTGUN_FIRE
-    map.insert(110, "FREEZE.VOC".into());      // SOMETHINGFROZE
-    map.insert(118, "WPNSEL21.VOC".into());    // SELECT_WEAPON
-    map.insert(649, "GOGGLE12.VOC".into());    // NITEVISION_ONOFF
-    map.insert(670, "COOL01.VOC".into());      // DUKE_GETWEAPON1
-    map.insert(671, "GETSOM1A.VOC".into());    // DUKE_GETWEAPON2
-    map.insert(672, "GROOVY02.VOC".into());    // DUKE_GETWEAPON3
-    map.insert(674, "HAIL01.VOC".into());      // DUKE_GETWEAPON6
-    map.insert(722, "AHH04.VOC".into());       // DUKE_USEMEDKIT
-    map.insert(723, "GULP01.VOC".into());      // DUKE_TAKEPILLS
+    map.insert(0, "KICKHIT.VOC".into()); // KICK_HIT
+    map.insert(1, "RICOCHET.VOC".into()); // PISTOL_RICOCHET
+    map.insert(2, "BULITHIT.VOC".into()); // PISTOL_BODYHIT
+    map.insert(3, "PISTOL.VOC".into()); // PISTOL_FIRE
+    map.insert(4, "CLIPOUT.VOC".into()); // EJECT_CLIP
+    map.insert(5, "CLIPIN.VOC".into()); // INSERT_CLIP
+    map.insert(6, "CHAINGUN.VOC".into()); // CHAINGUN_FIRE
+    map.insert(7, "RPGFIRE.VOC".into()); // RPG_SHOOT
+    map.insert(8, "POOLBALL.VOC".into()); // POOLBALLHIT
+    map.insert(9, "BOMBEXPL.VOC".into()); // RPG_EXPLODE
+    map.insert(10, "CATFIRE.VOC".into()); // CAT_FIRE (Devastator)
+    map.insert(11, "SHRINKER.VOC".into()); // SHRINKER_FIRE
+    map.insert(12, "SHRINK.VOC".into()); // ACTOR_SHRINKING
+    map.insert(13, "PBOMBBNC.VOC".into()); // PIPEBOMB_BOUNCE
+    map.insert(14, "BOMBEXPL.VOC".into()); // PIPEBOMB_EXPLODE
+    map.insert(15, "LSRBMBPT.VOC".into()); // LASERTRIP_ONWALL
+    map.insert(16, "LSRBMBWN.VOC".into()); // LASERTRIP_ARMING
+    map.insert(17, "BOMBEXPL.VOC".into()); // LASERTRIP_EXPLODE
+    map.insert(18, "VENTBUST.VOC".into()); // VENT_BUST
+    map.insert(19, "GLASS.VOC".into()); // GLASS_BREAKING
+    map.insert(20, "GLASHEVY.VOC".into()); // GLASS_HEAVYBREAK
+    map.insert(21, "SHORTED.VOC".into()); // SHORT_CIRCUIT
+    map.insert(22, "SPLASH.VOC".into()); // ITEM_SPLASH
+    map.insert(23, "HLMINHAL.VOC".into()); // DUKE_BREATHING
+    map.insert(24, "HLMEXHAL.VOC".into()); // DUKE_EXHALING
+    map.insert(25, "GASP.VOC".into()); // DUKE_GASP
+    map.insert(28, "PISSING.VOC".into()); // DUKE_URINATE
+    map.insert(36, "DRINK18.VOC".into()); // DUKE_DRINKING
+    map.insert(37, "DAMN03.VOC".into()); // DUKE_KILLED1 (Pain)
+    map.insert(38, "EXERT.VOC".into()); // DUKE_GRUNT (Jump)
+    map.insert(39, "HARTBEAT.VOC".into()); // DUKE_HARTBEAT
+    map.insert(40, "WETFEET.VOC".into()); // DUKE_ONWATER
+    map.insert(41, "DMDEATH.VOC".into()); // DUKE_DEAD
+    map.insert(42, "LAND02.VOC".into()); // DUKE_LAND
+    map.insert(43, "DUCTWLK.VOC".into()); // DUKE_WALKINDUCTS
+    map.insert(44, "COOL01.VOC".into()); // DUKE_GLAD
+    map.insert(45, "YES.VOC".into()); // DUKE_YES
+    map.insert(49, "JETPAKON.VOC".into()); // DUKE_JETPACK_ON
+    map.insert(50, "JETPAKI.VOC".into()); // DUKE_JETPACK_IDLE
+    map.insert(51, "JETPAKOF.VOC".into()); // DUKE_JETPACK_OFF
+    map.insert(52, "ROAM06.VOC".into()); // LIZTROOP_GROWL / PRED_ROAM
+    map.insert(62, "PREDPN.VOC".into()); // LIZARD_PAIN
+    map.insert(63, "PREDDY.VOC".into()); // LIZARD_DEATH
+    map.insert(64, "LIZSPIT.VOC".into()); // LIZARD_SPIT
+    map.insert(69, "SQUISH1A.VOC".into()); // SQUISHED
+    map.insert(70, "TELEPORT.VOC".into()); // TELEPORTER
+    map.insert(71, "GBELEV01.VOC".into()); // ELEVATOR_ON
+    map.insert(73, "GBELEV02.VOC".into()); // ELEVATOR_OFF
+    map.insert(74, "CDOOR1B.VOC".into()); // DOOR_OPERATE1
+    map.insert(75, "SUBWAY.VOC".into()); // SUBWAY
+    map.insert(76, "SWITCH1.VOC".into()); // SWITCH_ON
+    map.insert(77, "FAN.VOC".into()); // FAN
+    map.insert(78, "GROOVY02.VOC".into()); // DUKE_GETWEAPON3
+    map.insert(79, "FLUSH.VOC".into()); // FLUSH_TOILET
+    map.insert(81, "TRUMBLE.VOC".into()); // EARTHQUAKE
+    map.insert(82, "ALARM1A.VOC".into()); // INTRUDER_ALERT
+    map.insert(83, "ENDSEQ.VOC".into()); // END_OF_LEVEL_WARN
+    map.insert(109, "SHOTGUN7.VOC".into()); // SHOTGUN_FIRE
+    map.insert(110, "FREEZE.VOC".into()); // SOMETHINGFROZE
+    map.insert(118, "WPNSEL21.VOC".into()); // SELECT_WEAPON
+    map.insert(649, "GOGGLE12.VOC".into()); // NITEVISION_ONOFF
+    map.insert(670, "COOL01.VOC".into()); // DUKE_GETWEAPON1
+    map.insert(671, "GETSOM1A.VOC".into()); // DUKE_GETWEAPON2
+    map.insert(672, "GROOVY02.VOC".into()); // DUKE_GETWEAPON3
+    map.insert(674, "HAIL01.VOC".into()); // DUKE_GETWEAPON6
+    map.insert(722, "AHH04.VOC".into()); // DUKE_USEMEDKIT
+    map.insert(723, "GULP01.VOC".into()); // DUKE_TAKEPILLS
 
     // Enemy sounds
-    map.insert(507, "ROAM06.VOC".into());      // PRED_ROAM
-    map.insert(509, "PREDRG.VOC".into());      // PRED_RECOG
-    map.insert(510, "GBLASR01.VOC".into());    // PRED_ATTACK
-    map.insert(511, "PREDPN.VOC".into());      // PRED_PAIN
-    map.insert(512, "PREDDY.VOC".into());      // PRED_DYING
+    map.insert(507, "ROAM06.VOC".into()); // PRED_ROAM
+    map.insert(509, "PREDRG.VOC".into()); // PRED_RECOG
+    map.insert(510, "GBLASR01.VOC".into()); // PRED_ATTACK
+    map.insert(511, "PREDPN.VOC".into()); // PRED_PAIN
+    map.insert(512, "PREDDY.VOC".into()); // PRED_DYING
 
-    map.insert(533, "ROAM29.VOC".into());      // PIG_ROAM
-    map.insert(536, "PIGRG.VOC".into());       // PIG_RECOG
-    map.insert(537, "SHOTGUN7.VOC".into());    // PIG_ATTACK
-    map.insert(538, "PIGPN.VOC".into());       // PIG_PAIN
-    map.insert(539, "PIGDY.VOC".into());       // PIG_DYING
+    map.insert(533, "ROAM29.VOC".into()); // PIG_ROAM
+    map.insert(536, "PIGRG.VOC".into()); // PIG_RECOG
+    map.insert(537, "SHOTGUN7.VOC".into()); // PIG_ATTACK
+    map.insert(538, "PIGPN.VOC".into()); // PIG_PAIN
+    map.insert(539, "PIGDY.VOC".into()); // PIG_DYING
 
-    map.insert(568, "OCTARM.VOC".into());      // OCTA_ROAM
-    map.insert(569, "OCTARG.VOC".into());      // OCTA_RECOG
-    map.insert(570, "OCTAAT1.VOC".into());     // OCTA_ATTACK1
-    map.insert(572, "OCTAPN.VOC".into());      // OCTA_PAIN
-    map.insert(573, "OCTADY.VOC".into());      // OCTA_DYING
+    map.insert(568, "OCTARM.VOC".into()); // OCTA_ROAM
+    map.insert(569, "OCTARG.VOC".into()); // OCTA_RECOG
+    map.insert(570, "OCTAAT1.VOC".into()); // OCTA_ATTACK1
+    map.insert(572, "OCTAPN.VOC".into()); // OCTA_PAIN
+    map.insert(573, "OCTADY.VOC".into()); // OCTA_DYING
     map
 }
 
@@ -655,9 +670,15 @@ mod tests {
     #[test]
     fn test_midi_track_mapping() {
         assert_eq!(LevelMidiTrack::for_level(1, 1), LevelMidiTrack::E1L1Stalker);
-        assert_eq!(LevelMidiTrack::for_level(1, 2), LevelMidiTrack::E1L2Dethtoll);
+        assert_eq!(
+            LevelMidiTrack::for_level(1, 2),
+            LevelMidiTrack::E1L2Dethtoll
+        );
         assert_eq!(LevelMidiTrack::for_level(1, 3), LevelMidiTrack::E1L3Streets);
-        assert_eq!(LevelMidiTrack::for_level(1, 4), LevelMidiTrack::E1L4Watrwrld);
+        assert_eq!(
+            LevelMidiTrack::for_level(1, 4),
+            LevelMidiTrack::E1L4Watrwrld
+        );
         assert_eq!(LevelMidiTrack::for_level(1, 5), LevelMidiTrack::E1L5Snake1);
         assert_eq!(LevelMidiTrack::for_level(1, 6), LevelMidiTrack::E1L6TheCall);
         assert_eq!(LevelMidiTrack::E1L1Stalker.filename(), "STALKER.MID");

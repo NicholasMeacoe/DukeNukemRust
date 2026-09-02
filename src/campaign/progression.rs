@@ -1,8 +1,8 @@
 #![allow(dead_code)]
 
-use bevy::prelude::*;
 use crate::campaign::episodes::*;
 use crate::game_flow::state::SkillLevel;
+use bevy::prelude::*;
 
 #[derive(Resource, Debug, Clone)]
 pub struct CampaignProgression {
@@ -58,7 +58,9 @@ impl CampaignProgression {
 
         if is_boss {
             self.episode_completed = true;
-            return LevelAdvanceResult::EpisodeCompleted { episode: self.current_episode };
+            return LevelAdvanceResult::EpisodeCompleted {
+                episode: self.current_episode,
+            };
         }
 
         if is_secret_exit {
@@ -87,7 +89,9 @@ impl CampaignProgression {
         let max_level = get_episode_level_count(self.current_episode);
         if self.current_level >= max_level {
             self.episode_completed = true;
-            LevelAdvanceResult::EpisodeCompleted { episode: self.current_episode }
+            LevelAdvanceResult::EpisodeCompleted {
+                episode: self.current_episode,
+            }
         } else {
             self.current_level += 1;
             self.reset_level_stats();

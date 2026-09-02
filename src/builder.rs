@@ -2,16 +2,14 @@ use bevy::prelude::*;
 use bevy::render::render_asset::RenderAssetUsages;
 use bevy_rapier3d::prelude::*;
 use lyon_tessellation::math::point;
-use lyon_tessellation::{
-    BuffersBuilder, FillOptions, FillTessellator, FillVertex, VertexBuffers,
-};
+use lyon_tessellation::{BuffersBuilder, FillOptions, FillTessellator, FillVertex, VertexBuffers};
 use std::collections::{HashMap, HashSet};
 
 use crate::animation::AnimatedTileMaterial;
 use crate::art::PicAnm;
 use crate::map::{Map, Wall};
-use crate::palette::Palette;
 use crate::names::*;
+use crate::palette::Palette;
 
 pub struct MapMeshBuilder<'a> {
     pub map: &'a Map,
@@ -112,10 +110,7 @@ impl<'a> MapMeshBuilder<'a> {
                     }
                     visited_walls.insert(w);
                     let wall = &self.map.walls[w];
-                    current_loop.push(Vec2::new(
-                        wall.x as f32 / 1024.0,
-                        wall.y as f32 / 1024.0,
-                    ));
+                    current_loop.push(Vec2::new(wall.x as f32 / 1024.0, wall.y as f32 / 1024.0));
                     let next_w = wall.point2 as usize;
                     if next_w == wall_idx {
                         break;
@@ -168,7 +163,9 @@ impl<'a> MapMeshBuilder<'a> {
                 buffers.vertices.clear();
                 buffers.indices.clear();
                 for poly in &loops {
-                    if poly.len() < 3 { continue; }
+                    if poly.len() < 3 {
+                        continue;
+                    }
                     let base_idx = buffers.vertices.len() as u32;
                     for p in poly {
                         buffers.vertices.push([p.x, p.y]);
@@ -204,10 +201,10 @@ impl<'a> MapMeshBuilder<'a> {
                     .map(|v| {
                         let bx = v[0] * 1024.0;
                         let by = v[1] * 1024.0;
-                        let u = (bx / (floor_tw as f32 * 16.0))
-                            + (sector.floorxpanning as f32 / 256.0);
-                        let v_coord = (by / (floor_th as f32 * 16.0))
-                            + (sector.floorypanning as f32 / 256.0);
+                        let u =
+                            (bx / (floor_tw as f32 * 16.0)) + (sector.floorxpanning as f32 / 256.0);
+                        let v_coord =
+                            (by / (floor_th as f32 * 16.0)) + (sector.floorypanning as f32 / 256.0);
                         [u, v_coord]
                     })
                     .collect();
@@ -389,7 +386,8 @@ impl<'a> MapMeshBuilder<'a> {
                 let cur_floor_y1 = sector.get_floor_y_at(&self.map.walls, wall.x, wall.y);
                 let cur_floor_y2 = sector.get_floor_y_at(&self.map.walls, next_wall.x, next_wall.y);
                 let cur_ceil_y1 = sector.get_ceiling_y_at(&self.map.walls, wall.x, wall.y);
-                let cur_ceil_y2 = sector.get_ceiling_y_at(&self.map.walls, next_wall.x, next_wall.y);
+                let cur_ceil_y2 =
+                    sector.get_ceiling_y_at(&self.map.walls, next_wall.x, next_wall.y);
 
                 if !wall.is_portal() {
                     // One-sided solid wall: floor to ceiling
@@ -406,7 +404,7 @@ impl<'a> MapMeshBuilder<'a> {
                         cur_ceil_y2,
                         wall,
                         wall.picnum,
-                        true, // solid blocking
+                        true,  // solid blocking
                         false, // opaque
                     );
                 } else {
@@ -418,9 +416,11 @@ impl<'a> MapMeshBuilder<'a> {
                     let next_sec = &self.map.sectors[next_sec_idx];
 
                     let next_floor_y1 = next_sec.get_floor_y_at(&self.map.walls, wall.x, wall.y);
-                    let next_floor_y2 = next_sec.get_floor_y_at(&self.map.walls, next_wall.x, next_wall.y);
+                    let next_floor_y2 =
+                        next_sec.get_floor_y_at(&self.map.walls, next_wall.x, next_wall.y);
                     let next_ceil_y1 = next_sec.get_ceiling_y_at(&self.map.walls, wall.x, wall.y);
-                    let next_ceil_y2 = next_sec.get_ceiling_y_at(&self.map.walls, next_wall.x, next_wall.y);
+                    let next_ceil_y2 =
+                        next_sec.get_ceiling_y_at(&self.map.walls, next_wall.x, next_wall.y);
 
                     // 1. Upper Wall (Step down from ceiling)
                     if next_ceil_y1 < cur_ceil_y1 - 0.001 || next_ceil_y2 < cur_ceil_y2 - 0.001 {
@@ -443,7 +443,8 @@ impl<'a> MapMeshBuilder<'a> {
                     }
 
                     // 2. Lower Wall (Step up from floor)
-                    if next_floor_y1 > cur_floor_y1 + 0.001 || next_floor_y2 > cur_floor_y2 + 0.001 {
+                    if next_floor_y1 > cur_floor_y1 + 0.001 || next_floor_y2 > cur_floor_y2 + 0.001
+                    {
                         let lower_picnum = if wall.bottoms_swapped() {
                             wall.picnum
                         } else if (wall.nextwall as usize) < self.map.walls.len() {
@@ -477,7 +478,8 @@ impl<'a> MapMeshBuilder<'a> {
                         let mid_ceil_y1 = cur_ceil_y1.min(next_ceil_y1);
                         let mid_ceil_y2 = cur_ceil_y2.min(next_ceil_y2);
 
-                        if mid_ceil_y1 > mid_floor_y1 + 0.001 || mid_ceil_y2 > mid_floor_y2 + 0.001 {
+                        if mid_ceil_y1 > mid_floor_y1 + 0.001 || mid_ceil_y2 > mid_floor_y2 + 0.001
+                        {
                             let masked_picnum = if wall.overpicnum != 0 {
                                 wall.overpicnum
                             } else {
@@ -585,8 +587,10 @@ impl<'a> MapMeshBuilder<'a> {
             .map(|v| Vect::new(v[0], v[1], v[2]))
             .collect();
         let collider_indices: Vec<[u32; 3]> = vec![
-            [0, 1, 2], [0, 2, 3],
-            [0, 2, 1], [0, 3, 2], // Double-sided wall collision
+            [0, 1, 2],
+            [0, 2, 3],
+            [0, 2, 1],
+            [0, 3, 2], // Double-sided wall collision
         ];
 
         let mut entity_cmds = commands.spawn((
@@ -637,10 +641,10 @@ impl<'a> MapMeshBuilder<'a> {
                 // We'll skip spawning them entirely.
                 match sprite.picnum {
                     // Items & Monsters
-                    2000 | 1680 | 1820 | 2120 | 1960 | 2370 | 2710 | 4610 |
-                    21 | 22 | 23 | 27 | 28 | 29 | 33 | 37 | 40 | 44 | 51 | 52 | 53 | 54 | 55 | 56 | 57 | 60 | 61 => {
+                    2000 | 1680 | 1820 | 2120 | 1960 | 2370 | 2710 | 4610 | 21 | 22 | 23 | 27
+                    | 28 | 29 | 33 | 37 | 40 | 44 | 51 | 52 | 53 | 54 | 55 | 56 | 57 | 60 | 61 => {
                         continue;
-                    },
+                    }
                     _ => {} // Other things with lotag (like sector effectors) are logic IDs!
                 }
             }
@@ -663,7 +667,8 @@ impl<'a> MapMeshBuilder<'a> {
                     PbrBundle {
                         mesh: meshes.add(Rectangle::new(1.0, 1.0)),
                         material: sprite_mat.clone(),
-                        transform: Transform::from_translation(pos).with_scale(Vec3::new(scale_x, scale_y, 1.0)),
+                        transform: Transform::from_translation(pos)
+                            .with_scale(Vec3::new(scale_x, scale_y, 1.0)),
                         ..default()
                     },
                     crate::SpriteBillboard,
@@ -679,7 +684,8 @@ impl<'a> MapMeshBuilder<'a> {
                 // Attach Phase 4 Interactive Components directly to visual entities!
                 match sprite.picnum {
                     // SWITCHES
-                    LIGHTSWITCH | SPACEDOORSWITCH | DIPSWITCH | LIGHTSWITCH2 | POWERSWITCH1 | HANDSWITCH | PULLSWITCH => {
+                    LIGHTSWITCH | SPACEDOORSWITCH | DIPSWITCH | LIGHTSWITCH2 | POWERSWITCH1
+                    | HANDSWITCH | PULLSWITCH => {
                         entity_cmds.insert(crate::interactivity::InteractiveSwitch {
                             switch_type: crate::interactivity::SwitchType::LightSwitch,
                             on_tile: sprite.picnum + 1,
@@ -891,7 +897,11 @@ impl<'a> MapMeshBuilder<'a> {
                     TOILET | STALL => {
                         entity_cmds.insert(crate::interactivity::ToiletProp {
                             is_broken: false,
-                            broken_tile: if sprite.picnum == TOILET { TOILETBROKE } else { STALLBROKE },
+                            broken_tile: if sprite.picnum == TOILET {
+                                TOILETBROKE
+                            } else {
+                                STALLBROKE
+                            },
                             water_tile: TOILETWATER,
                             last_used_time: 0.0,
                             cooldown_timer: 0.0,
@@ -952,12 +962,20 @@ impl<'a> MapMeshBuilder<'a> {
                         } else {
                             (crate::combat::EnemyActor::new_liztroop(), 30)
                         };
-                        let is_dormant = matches!(sprite.picnum, LIZTROOPSTAYPUT | LIZTROOPONTOILET | LIZTROOPJUSTSIT | LIZTROOPDUCKING);
+                        let is_dormant = matches!(
+                            sprite.picnum,
+                            LIZTROOPSTAYPUT | LIZTROOPONTOILET | LIZTROOPJUSTSIT | LIZTROOPDUCKING
+                        );
                         let is_jetpack = sprite.picnum == LIZTROOPJETPACK;
 
                         entity_cmds.insert((
                             enemy,
-                            crate::scripting::ConActor::new(LIZTROOP, sprite.sectnum, sprite.ang, actor_hp),
+                            crate::scripting::ConActor::new(
+                                LIZTROOP,
+                                sprite.sectnum,
+                                sprite.ang,
+                                actor_hp,
+                            ),
                             crate::combat::SituationalSpawn {
                                 initial_picnum: sprite.picnum,
                                 is_dormant,
@@ -971,7 +989,12 @@ impl<'a> MapMeshBuilder<'a> {
                     PIGCOP | PIGCOPSTAYPUT | PIGCOPDIVE => {
                         entity_cmds.insert((
                             crate::combat::EnemyActor::new_pigcop(),
-                            crate::scripting::ConActor::new(PIGCOP, sprite.sectnum, sprite.ang, 100),
+                            crate::scripting::ConActor::new(
+                                PIGCOP,
+                                sprite.sectnum,
+                                sprite.ang,
+                                100,
+                            ),
                             crate::combat::SituationalSpawn {
                                 initial_picnum: sprite.picnum,
                                 is_dormant: sprite.picnum == PIGCOPSTAYPUT,
@@ -997,7 +1020,12 @@ impl<'a> MapMeshBuilder<'a> {
                     OCTABRAIN | OCTABRAINSTAYPUT => {
                         entity_cmds.insert((
                             crate::combat::EnemyActor::new_octabrain(),
-                            crate::scripting::ConActor::new(OCTABRAIN, sprite.sectnum, sprite.ang, 175),
+                            crate::scripting::ConActor::new(
+                                OCTABRAIN,
+                                sprite.sectnum,
+                                sprite.ang,
+                                175,
+                            ),
                             crate::combat::SituationalSpawn {
                                 initial_picnum: sprite.picnum,
                                 is_dormant: sprite.picnum == OCTABRAINSTAYPUT,
@@ -1019,14 +1047,24 @@ impl<'a> MapMeshBuilder<'a> {
                     GREENSLIME => {
                         entity_cmds.insert((
                             crate::combat::EnemyActor::new_slimer(),
-                            crate::scripting::ConActor::new(GREENSLIME, sprite.sectnum, sprite.ang, 1),
+                            crate::scripting::ConActor::new(
+                                GREENSLIME,
+                                sprite.sectnum,
+                                sprite.ang,
+                                1,
+                            ),
                         ));
                     }
                     // 7. Enforcer (LIZMAN..=LIZMANJUMP)
                     LIZMAN..=LIZMANJUMP => {
                         entity_cmds.insert((
                             crate::combat::EnemyActor::new_enforcer(),
-                            crate::scripting::ConActor::new(LIZMAN, sprite.sectnum, sprite.ang, 120),
+                            crate::scripting::ConActor::new(
+                                LIZMAN,
+                                sprite.sectnum,
+                                sprite.ang,
+                                120,
+                            ),
                             crate::combat::SituationalSpawn {
                                 initial_picnum: sprite.picnum,
                                 is_dormant: sprite.picnum == LIZMANSTAYPUT,
@@ -1037,7 +1075,12 @@ impl<'a> MapMeshBuilder<'a> {
                     COMMANDER | COMMANDERSTAYPUT => {
                         entity_cmds.insert((
                             crate::combat::EnemyActor::new_commander(),
-                            crate::scripting::ConActor::new(COMMANDER, sprite.sectnum, sprite.ang, 350),
+                            crate::scripting::ConActor::new(
+                                COMMANDER,
+                                sprite.sectnum,
+                                sprite.ang,
+                                350,
+                            ),
                             crate::combat::SituationalSpawn {
                                 initial_picnum: sprite.picnum,
                                 is_dormant: sprite.picnum == COMMANDERSTAYPUT,
@@ -1065,10 +1108,16 @@ impl<'a> MapMeshBuilder<'a> {
                     NEWBEAST | NEWBEASTSTAYPUT | NEWBEASTHANG | NEWBEASTJUMP => {
                         entity_cmds.insert((
                             crate::combat::EnemyActor::new_protector_drone(),
-                            crate::scripting::ConActor::new(NEWBEAST, sprite.sectnum, sprite.ang, 300),
+                            crate::scripting::ConActor::new(
+                                NEWBEAST,
+                                sprite.sectnum,
+                                sprite.ang,
+                                300,
+                            ),
                             crate::combat::SituationalSpawn {
                                 initial_picnum: sprite.picnum,
-                                is_dormant: sprite.picnum == NEWBEASTHANG || sprite.picnum == NEWBEASTSTAYPUT,
+                                is_dormant: sprite.picnum == NEWBEASTHANG
+                                    || sprite.picnum == NEWBEASTSTAYPUT,
                             },
                         ));
                     }
@@ -1076,7 +1125,12 @@ impl<'a> MapMeshBuilder<'a> {
                     ROTATEGUN => {
                         entity_cmds.insert((
                             crate::combat::EnemyActor::new_turret(),
-                            crate::scripting::ConActor::new(ROTATEGUN, sprite.sectnum, sprite.ang, 40),
+                            crate::scripting::ConActor::new(
+                                ROTATEGUN,
+                                sprite.sectnum,
+                                sprite.ang,
+                                40,
+                            ),
                         ));
                     }
                     // 13. Scampering Rat (RAT)
@@ -1090,7 +1144,9 @@ impl<'a> MapMeshBuilder<'a> {
                     OOZ | OOZ2 => {
                         entity_cmds.insert((
                             crate::combat::EnemyActor::new_slime_hazard(),
-                            crate::player::types::HazardSector { damage_per_sec: 20.0 },
+                            crate::player::types::HazardSector {
+                                damage_per_sec: 20.0,
+                            },
                         ));
                     }
                     // 13. Boss 1: Battlelord & Mini-Battlelord (BOSS1, BOSS1STAYPUT)
@@ -1103,7 +1159,12 @@ impl<'a> MapMeshBuilder<'a> {
                         };
                         entity_cmds.insert((
                             enemy,
-                            crate::scripting::ConActor::new(BOSS1, sprite.sectnum, sprite.ang, actor_hp),
+                            crate::scripting::ConActor::new(
+                                BOSS1,
+                                sprite.sectnum,
+                                sprite.ang,
+                                actor_hp,
+                            ),
                             crate::combat::SituationalSpawn {
                                 initial_picnum: sprite.picnum,
                                 is_dormant: sprite.picnum == BOSS1STAYPUT,
@@ -1114,21 +1175,36 @@ impl<'a> MapMeshBuilder<'a> {
                     BOSS2 => {
                         entity_cmds.insert((
                             crate::combat::EnemyActor::new_overlord(),
-                            crate::scripting::ConActor::new(BOSS2, sprite.sectnum, sprite.ang, 4500),
+                            crate::scripting::ConActor::new(
+                                BOSS2,
+                                sprite.sectnum,
+                                sprite.ang,
+                                4500,
+                            ),
                         ));
                     }
                     // 15. Boss 3: Cycloid Emperor (BOSS3)
                     BOSS3 => {
                         entity_cmds.insert((
                             crate::combat::EnemyActor::new_cycloid(),
-                            crate::scripting::ConActor::new(BOSS3, sprite.sectnum, sprite.ang, 4500),
+                            crate::scripting::ConActor::new(
+                                BOSS3,
+                                sprite.sectnum,
+                                sprite.ang,
+                                4500,
+                            ),
                         ));
                     }
                     // 16. Boss 4: Alien Queen (BOSS4, BOSS4STAYPUT)
                     BOSS4 | BOSS4STAYPUT => {
                         entity_cmds.insert((
                             crate::combat::EnemyActor::new_queen(),
-                            crate::scripting::ConActor::new(BOSS4, sprite.sectnum, sprite.ang, 6000),
+                            crate::scripting::ConActor::new(
+                                BOSS4,
+                                sprite.sectnum,
+                                sprite.ang,
+                                6000,
+                            ),
                         ));
                     }
                     // NUKE BUTTON (Level Exit)
@@ -1235,7 +1311,9 @@ fn point_in_triangle_2d(p: Vec2, a: Vec2, b: Vec2, c: Vec2) -> bool {
 mod tests {
     use super::*;
     use lyon_tessellation::math::point;
-    use lyon_tessellation::{BuffersBuilder, FillOptions, FillTessellator, FillVertex, VertexBuffers};
+    use lyon_tessellation::{
+        BuffersBuilder, FillOptions, FillTessellator, FillVertex, VertexBuffers,
+    };
 
     #[test]
     fn test_e1l1_all_sectors_tessellation() {
@@ -1264,10 +1342,8 @@ mod tests {
                             }
                             visited_walls.insert(w);
                             let wall = &map.walls[w];
-                            current_loop.push(Vec2::new(
-                                wall.x as f32 / 1024.0,
-                                wall.y as f32 / 1024.0,
-                            ));
+                            current_loop
+                                .push(Vec2::new(wall.x as f32 / 1024.0, wall.y as f32 / 1024.0));
                             let next_w = wall.point2 as usize;
                             if next_w == wall_idx {
                                 break;
@@ -1305,19 +1381,23 @@ mod tests {
                     }
                     let path = path_builder.build();
 
-                    let lyon_ok = tessellator.tessellate_path(
-                        &path,
-                        &FillOptions::default(),
-                        &mut BuffersBuilder::new(&mut buffers, |vertex: FillVertex| {
-                            [vertex.position().x, vertex.position().y]
-                        }),
-                    ).is_ok();
+                    let lyon_ok = tessellator
+                        .tessellate_path(
+                            &path,
+                            &FillOptions::default(),
+                            &mut BuffersBuilder::new(&mut buffers, |vertex: FillVertex| {
+                                [vertex.position().x, vertex.position().y]
+                            }),
+                        )
+                        .is_ok();
 
                     if !lyon_ok || buffers.indices.is_empty() {
                         buffers.vertices.clear();
                         buffers.indices.clear();
                         for poly in &loops {
-                            if poly.len() < 3 { continue; }
+                            if poly.len() < 3 {
+                                continue;
+                            }
                             let base_idx = buffers.vertices.len() as u32;
                             for p in poly {
                                 buffers.vertices.push([p.x, p.y]);
@@ -1328,12 +1408,23 @@ mod tests {
                     }
 
                     if buffers.indices.is_empty() {
-                        println!("Sector {} FAILED! wallptr={}, wallnum={}, loops count={}", sec_idx, sector.wallptr, sector.wallnum, loops.len());
+                        println!(
+                            "Sector {} FAILED! wallptr={}, wallnum={}, loops count={}",
+                            sec_idx,
+                            sector.wallptr,
+                            sector.wallnum,
+                            loops.len()
+                        );
                         failed_sectors += 1;
                     }
                 }
 
-                println!("Tessellation result: {}/{} succeeded, {} failed", total_sectors - failed_sectors, total_sectors, failed_sectors);
+                println!(
+                    "Tessellation result: {}/{} succeeded, {} failed",
+                    total_sectors - failed_sectors,
+                    total_sectors,
+                    failed_sectors
+                );
                 assert_eq!(failed_sectors, 0, "All sectors must succeed!");
             }
         }

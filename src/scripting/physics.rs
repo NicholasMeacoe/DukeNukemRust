@@ -75,7 +75,11 @@ impl<'a> PhysicsContext<'a> {
             let target_hvel = m.hvel as i16;
             let target_zvel = (m.vvel << 4) as i16;
 
-            let div = if (flags & move_flags::GET_H) != 0 { 2 } else { 5 };
+            let div = if (flags & move_flags::GET_H) != 0 {
+                2
+            } else {
+                5
+            };
             let diff_h = target_hvel - *self.sprite_xvel;
             let step_h = diff_h / div;
             if step_h == 0 && diff_h != 0 {
@@ -85,7 +89,11 @@ impl<'a> PhysicsContext<'a> {
             }
 
             if *self.sprite_zvel < 648 {
-                let div_z = if (flags & move_flags::GET_V) != 0 { 2 } else { 5 };
+                let div_z = if (flags & move_flags::GET_V) != 0 {
+                    2
+                } else {
+                    5
+                };
                 let diff_z = target_zvel - *self.sprite_zvel;
                 let step_z = diff_z / div_z;
                 if step_z == 0 && diff_z != 0 {
@@ -157,9 +165,12 @@ mod tests {
     fn test_physics_movement() {
         let trig = TrigTables::new();
         let mut reg = ActorRegisters::default();
-        let mut x = 0; let mut y = 0; let mut z = 0;
+        let mut x = 0;
+        let mut y = 0;
+        let mut z = 0;
         let mut ang = 0; // East
-        let mut xvel = 0; let mut zvel = 0;
+        let mut xvel = 0;
+        let mut zvel = 0;
 
         let mut pctx = PhysicsContext {
             sprite_x: &mut x,
@@ -187,7 +198,9 @@ mod tests {
     fn test_physics_step_signum_convergence() {
         let trig = TrigTables::new();
         let mut reg = ActorRegisters::default();
-        let mut x = 0; let mut y = 0; let mut z = 0;
+        let mut x = 0;
+        let mut y = 0;
+        let mut z = 0;
         let mut ang = 0;
         let mut xvel = 99; // target is 100, diff is 1
         let mut zvel = 0;

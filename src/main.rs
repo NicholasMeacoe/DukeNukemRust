@@ -1,38 +1,36 @@
-mod grp;
-mod art;
-mod palette;
-mod map;
-mod kwv;
-mod builder;
-mod sky;
 mod animation;
-mod scripting;
-mod interactivity;
-pub mod player;
-pub mod combat;
+mod art;
 pub mod audio;
-pub mod hud;
-pub mod game_flow;
+mod builder;
 pub mod campaign;
-pub mod save;
-pub mod demo;
+pub mod combat;
 pub mod config;
-pub mod net;
+pub mod demo;
+pub mod game_flow;
+mod grp;
+pub mod hud;
+mod interactivity;
+mod kwv;
+mod map;
 pub mod names;
+pub mod net;
+mod palette;
+pub mod player;
+pub mod save;
+mod scripting;
+mod sky;
 
 pub type Player = player::PlayerController;
 
+use art::Art;
+use bevy::input::mouse::MouseMotion;
 use bevy::prelude::*;
 use bevy::render::render_asset::RenderAssetUsages;
 use bevy::render::texture::{ImageSampler, ImageSamplerDescriptor};
 use bevy::window::{CursorGrabMode, PrimaryWindow};
-use bevy::input::mouse::MouseMotion;
-use grp::Grp;
-use art::Art;
-use palette::Palette;
-use map::Map;
 use bevy_rapier3d::prelude::*;
-use builder::MapMeshBuilder;
+use grp::Grp;
+use palette::Palette;
 
 #[derive(SystemSet, Debug, Hash, PartialEq, Eq, Clone)]
 pub enum GameSet {
@@ -90,21 +88,38 @@ fn main() {
         .add_plugins(config::ConfigPlugin)
         .add_plugins(net::NetPlugin)
         .init_resource::<palette::PaletteFlashState>()
-        .configure_sets(Update, (
-            GameSet::Input.run_if(in_state(game_flow::GamePhase::Playing)),
-            GameSet::Movement.run_if(in_state(game_flow::GamePhase::Playing)),
-            GameSet::Combat.run_if(in_state(game_flow::GamePhase::Playing)),
-            GameSet::Interactivity.run_if(in_state(game_flow::GamePhase::Playing)),
-            GameSet::Animation.run_if(in_state(game_flow::GamePhase::Playing)),
-            GameSet::RenderSync,
-        ).chain())
+        .configure_sets(
+            Update,
+            (
+                GameSet::Input.run_if(in_state(game_flow::GamePhase::Playing)),
+                GameSet::Movement.run_if(in_state(game_flow::GamePhase::Playing)),
+                GameSet::Combat.run_if(in_state(game_flow::GamePhase::Playing)),
+                GameSet::Interactivity.run_if(in_state(game_flow::GamePhase::Playing)),
+                GameSet::Animation.run_if(in_state(game_flow::GamePhase::Playing)),
+                GameSet::RenderSync,
+            )
+                .chain(),
+        )
         .add_systems(Startup, setup)
-        .add_systems(Update, (
-            (player_look, cursor_grab, emit_player_interaction).in_set(GameSet::Input),
-            (play_duke_quotes, update_weapon).in_set(GameSet::Combat),
-            (animation::update_engine_clock, animation::update_tile_animations).in_set(GameSet::Animation),
-            (update_billboards, update_directional_sprites, sky::update_skybox, capture_debug_screenshot).in_set(GameSet::RenderSync),
-        ))
+        .add_systems(
+            Update,
+            (
+                (player_look, cursor_grab, emit_player_interaction).in_set(GameSet::Input),
+                (play_duke_quotes, update_weapon).in_set(GameSet::Combat),
+                (
+                    animation::update_engine_clock,
+                    animation::update_tile_animations,
+                )
+                    .in_set(GameSet::Animation),
+                (
+                    update_billboards,
+                    update_directional_sprites,
+                    sky::update_skybox,
+                    capture_debug_screenshot,
+                )
+                    .in_set(GameSet::RenderSync),
+            ),
+        )
         .run();
 }
 
@@ -157,18 +172,28 @@ fn setup(
             if let Ok(mut pal) = Palette::from_bytes(&pal_data) {
                 if let Ok(lookup_data) = grp.read_file("LOOKUP.DAT") {
                     let _ = pal.load_lookups(&lookup_data);
-                    println!("Successfully loaded LOOKUP.DAT ({} remappings)", pal.lookups.len());
+                    println!(
+                        "Successfully loaded LOOKUP.DAT ({} remappings)",
+                        pal.lookups.len()
+                    );
                 }
 
                 let mut art_files_found = 0;
                 for entry in &grp.entries {
-                    if entry.name.to_uppercase().starts_with("TILES") && entry.name.to_uppercase().ends_with(".ART") {
+                    if entry.name.to_uppercase().starts_with("TILES")
+                        && entry.name.to_uppercase().ends_with(".ART")
+                    {
                         art_files_found += 1;
                         if let Ok(art_data) = grp.read_file(&entry.name) {
                             if let Ok(art) = Art::from_bytes(&art_data) {
-                                println!("Successfully loaded {} (tiles {} to {})", entry.name, art.local_tile_start, art.local_tile_end);
+                                println!(
+                                    "Successfully loaded {} (tiles {} to {})",
+                                    entry.name, art.local_tile_start, art.local_tile_end
+                                );
                                 for tile_idx in art.local_tile_start..=art.local_tile_end {
-                                    if let Some((w, h, rgba)) = art.get_tile_rgba(tile_idx, &pal.colors) {
+                                    if let Some((w, h, rgba)) =
+                                        art.get_tile_rgba(tile_idx, &pal.colors)
+                                    {
                                         if w > 0 && h > 0 {
                                             let mut image = Image::new_fill(
                                                 bevy::render::render_resource::Extent3d {
@@ -181,8 +206,11 @@ fn setup(
                                                 bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb,
                                                 RenderAssetUsages::default(),
                                             );
-                                            image.sampler = ImageSampler::Descriptor(ImageSamplerDescriptor::nearest());
-                                            tile_textures.insert(tile_idx as i16, images.add(image));
+                                            image.sampler = ImageSampler::Descriptor(
+                                                ImageSamplerDescriptor::nearest(),
+                                            );
+                                            tile_textures
+                                                .insert(tile_idx as i16, images.add(image));
                                             tile_sizes.insert(tile_idx as i16, (w, h));
                                             if let Some(picanm) = art.get_picanm(tile_idx) {
                                                 picanm_map.insert(tile_idx as i16, picanm);
@@ -200,7 +228,7 @@ fn setup(
     }
 
     let default_material = materials.add(Color::srgb(0.5, 0.5, 0.6));
-    
+
     let spark_tile = 2595;
     let spark_material = if let Some(handle) = tile_textures.get(&spark_tile) {
         materials.add(StandardMaterial {
@@ -234,7 +262,8 @@ fn setup(
         let con_engine = scripting::ConScriptEngine::from_grp(&grp);
         commands.insert_resource(con_engine);
     } else {
-        let con_engine = scripting::ConScriptEngine::from_source(scripting::DEFAULT_CORE_CON_SCRIPT).unwrap();
+        let con_engine =
+            scripting::ConScriptEngine::from_source(scripting::DEFAULT_CORE_CON_SCRIPT).unwrap();
         commands.insert_resource(con_engine);
     }
 
@@ -264,48 +293,54 @@ fn setup(
         ..default()
     });
 
-    let player_entity = commands.spawn((
-        player::PlayerController {
-            yaw: start_yaw,
-            spawn_position: start_pos,
-            ..default()
-        },
-        TransformBundle::from_transform(Transform::from_translation(start_pos)),
-        RigidBody::KinematicPositionBased,
-        Collider::capsule_y(0.5, 0.3),
-        LockedAxes::ROTATION_LOCKED, // Prevent the player from tipping over
-        KinematicCharacterController {
-            up: Vec3::Y,
-            offset: CharacterLength::Absolute(0.02),
-            slide: true,
-            autostep: Some(CharacterAutostep {
-                max_height: CharacterLength::Absolute(0.35),
-                min_width: CharacterLength::Absolute(0.1),
-                include_dynamic_bodies: false,
-            }),
-            snap_to_ground: None,
-            max_slope_climb_angle: 45.0f32.to_radians(),
-            min_slope_slide_angle: 60.0f32.to_radians(),
-            ..default()
-        },
-    )).id();
-
-    let _camera_entity = commands.spawn((
-        Camera3dBundle {
-            transform: Transform::from_xyz(0.0, 0.4, 0.0).with_rotation(Quat::from_rotation_y(start_yaw)),
-            ..default()
-        },
-        bevy::pbr::FogSettings {
-            color: Color::srgb(0.02, 0.0, 0.02),
-            directional_light_color: Color::NONE,
-            directional_light_exponent: 30.0,
-            falloff: bevy::pbr::FogFalloff::Linear {
-                start: 5.0,
-                end: 35.0,
+    let player_entity = commands
+        .spawn((
+            player::PlayerController {
+                yaw: start_yaw,
+                spawn_position: start_pos,
+                ..default()
             },
-        },
-        bevy::audio::SpatialListener::new(0.35),
-    )).set_parent(player_entity).id();
+            TransformBundle::from_transform(Transform::from_translation(start_pos)),
+            RigidBody::KinematicPositionBased,
+            Collider::capsule_y(0.5, 0.3),
+            LockedAxes::ROTATION_LOCKED, // Prevent the player from tipping over
+            KinematicCharacterController {
+                up: Vec3::Y,
+                offset: CharacterLength::Absolute(0.02),
+                slide: true,
+                autostep: Some(CharacterAutostep {
+                    max_height: CharacterLength::Absolute(0.35),
+                    min_width: CharacterLength::Absolute(0.1),
+                    include_dynamic_bodies: false,
+                }),
+                snap_to_ground: None,
+                max_slope_climb_angle: 45.0f32.to_radians(),
+                min_slope_slide_angle: 60.0f32.to_radians(),
+                ..default()
+            },
+        ))
+        .id();
+
+    let _camera_entity = commands
+        .spawn((
+            Camera3dBundle {
+                transform: Transform::from_xyz(0.0, 0.4, 0.0)
+                    .with_rotation(Quat::from_rotation_y(start_yaw)),
+                ..default()
+            },
+            bevy::pbr::FogSettings {
+                color: Color::srgb(0.02, 0.0, 0.02),
+                directional_light_color: Color::NONE,
+                directional_light_exponent: 30.0,
+                falloff: bevy::pbr::FogFalloff::Linear {
+                    start: 5.0,
+                    end: 35.0,
+                },
+            },
+            bevy::audio::SpatialListener::new(0.35),
+        ))
+        .set_parent(player_entity)
+        .id();
 
     // Spawn First Person Weapon (Pistol) using UI
     // The shareware version might not have 2524, let's try 2524 (FIRSTGUN) or fallback to something else, or a colored block
@@ -315,13 +350,13 @@ fn setup(
     } else {
         // Fallback to shotgun or just something visible if pistol is missing in this GRP
         tile_textures.get(&2613).cloned().unwrap_or_else(|| {
-             images.add(Image::default()) // dummy
+            images.add(Image::default()) // dummy
         })
     };
 
     let base_y = 0.0; // Rest position at bottom of screen
-    commands.spawn((
-        NodeBundle {
+    commands
+        .spawn((NodeBundle {
             style: Style {
                 width: Val::Percent(100.0),
                 height: Val::Percent(100.0),
@@ -330,28 +365,28 @@ fn setup(
                 ..default()
             },
             ..default()
-        },
-    )).with_children(|parent| {
-        parent.spawn((
-            ImageBundle {
-                image: UiImage::new(weapon_image),
-                style: Style {
-                    width: Val::Px(400.0),
-                    height: Val::Px(400.0),
-                    margin: UiRect::bottom(Val::Px(base_y)), // Offset from bottom
+        },))
+        .with_children(|parent| {
+            parent.spawn((
+                ImageBundle {
+                    image: UiImage::new(weapon_image),
+                    style: Style {
+                        width: Val::Px(400.0),
+                        height: Val::Px(400.0),
+                        margin: UiRect::bottom(Val::Px(base_y)), // Offset from bottom
+                        ..default()
+                    },
+                    // Transparent background so only the weapon sprite pixels render
+                    background_color: Color::NONE.into(),
                     ..default()
                 },
-                // Transparent background so only the weapon sprite pixels render
-                background_color: Color::NONE.into(),
-                ..default()
-            },
-            FirstPersonWeapon {
-                fire_timer: 0.0,
-                base_y,
-                bob_timer: 0.0,
-            },
-        ));
-    });
+                FirstPersonWeapon {
+                    fire_timer: 0.0,
+                    base_y,
+                    bob_timer: 0.0,
+                },
+            ));
+        });
 }
 
 #[derive(Component)]
@@ -370,7 +405,7 @@ fn update_billboards(
     if let Ok(camera_transform) = camera_query.get_single() {
         for mut transform in query.iter_mut() {
             let mut target = camera_transform.translation;
-            target.y = transform.translation.y; 
+            target.y = transform.translation.y;
             if target.xz().distance_squared(transform.translation.xz()) > 0.001 {
                 transform.look_at(target, Vec3::Y);
             }
@@ -380,30 +415,34 @@ fn update_billboards(
 
 fn update_directional_sprites(
     camera_query: Query<&Transform, (With<Camera>, Without<crate::scripting::ConActor>)>,
-    mut query: Query<(&mut Handle<StandardMaterial>, &crate::scripting::ConActor, &Transform)>,
+    mut query: Query<(
+        &mut Handle<StandardMaterial>,
+        &crate::scripting::ConActor,
+        &Transform,
+    )>,
     game_assets: Res<crate::GameAssets>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     if let Ok(camera_transform) = camera_query.get_single() {
         let cam_pos = camera_transform.translation.xz();
-        
+
         for (mut material_handle, con_actor, trans) in query.iter_mut() {
             let sprite_pos = trans.translation.xz();
-            
+
             // Build engine angles map 0 = right, 512 = down, 1024 = left, 1536 = up
             let heading_rad = (con_actor.ang as f32 / 2048.0) * std::f32::consts::TAU;
             let sprite_dir = Vec2::new(heading_rad.cos(), heading_rad.sin());
-            
+
             let to_cam = (cam_pos - sprite_pos).normalize_or_zero();
-            
+
             let mut rel_angle = sprite_dir.angle_between(to_cam);
             if rel_angle < 0.0 {
                 rel_angle += std::f32::consts::TAU;
             }
-            
+
             // Quantize into 8 octants
             let octant = ((rel_angle / std::f32::consts::TAU) * 8.0 + 0.5).floor() as i32 % 8;
-            
+
             // Note: Not all sprites have 8 angles. We assume ones that do are 8 contiguous frames.
             // Some sprites only have 5 frames and use mirrored flags. For this implementation,
             // we will just add the octant to the current picnum.
@@ -422,7 +461,7 @@ fn update_directional_sprites(
             };
 
             let display_picnum = con_actor.picnum + offset;
-            
+
             if let Some(tex) = game_assets.tile_textures.get(&display_picnum) {
                 *material_handle = materials.add(StandardMaterial {
                     base_color_texture: Some(tex.clone()),
@@ -441,7 +480,9 @@ fn player_look(
     mut camera_query: Query<&mut Transform, (With<Camera>, Without<FirstPersonWeapon>)>,
     window_query: Query<&Window, With<PrimaryWindow>>,
 ) {
-    let Ok(window) = window_query.get_single() else { return; };
+    let Ok(window) = window_query.get_single() else {
+        return;
+    };
     if window.cursor.grab_mode != CursorGrabMode::Locked {
         return;
     }
@@ -455,7 +496,9 @@ fn player_look(
         return;
     }
 
-    let Ok(mut camera_transform) = camera_query.get_single_mut() else { return; };
+    let Ok(mut camera_transform) = camera_query.get_single_mut() else {
+        return;
+    };
 
     for mut player in query.iter_mut() {
         player.yaw -= delta.x * 0.002;
@@ -520,7 +563,9 @@ fn update_weapon(
         false
     };
 
-    let Ok(camera_transform) = camera_query.get_single() else { return; };
+    let Ok(camera_transform) = camera_query.get_single() else {
+        return;
+    };
 
     for (mut style, mut weapon) in query.iter_mut() {
         // Simple View Bobbing
@@ -528,11 +573,13 @@ fn update_weapon(
             weapon.bob_timer += time.delta_seconds() * 10.0;
         } else {
             weapon.bob_timer = weapon.bob_timer.lerp(0.0, time.delta_seconds() * 5.0);
-            if weapon.bob_timer < 0.1 { weapon.bob_timer = 0.0; }
+            if weapon.bob_timer < 0.1 {
+                weapon.bob_timer = 0.0;
+            }
         }
 
         let bob_offset = (weapon.bob_timer.sin() * 20.0).abs() * -1.0;
-        
+
         // Shooting
         if weapon.fire_timer > 0.0 {
             weapon.fire_timer -= time.delta_seconds();
@@ -542,7 +589,7 @@ fn update_weapon(
 
         if btn.just_pressed(MouseButton::Left) && weapon.fire_timer <= 0.0 {
             // "Fire" recoil
-            weapon.fire_timer = 0.5; 
+            weapon.fire_timer = 0.5;
 
             // Play firing sound (PISTOL_FIRE = 3)
             sound_events.send(audio::PlaySoundEvent { sound_id: 3 });
@@ -550,24 +597,24 @@ fn update_weapon(
             // Hitscan Logic
             let ray_pos = camera_transform.translation;
             // The camera looks down its negative Z axis
-            let ray_dir = camera_transform.forward(); 
+            let ray_dir = camera_transform.forward();
             let max_toi = 100.0;
             let solid = true;
             let filter = QueryFilter::exclude_kinematic();
 
-            if let Some((entity, toi)) = rapier_context.cast_ray(
-                ray_pos, *ray_dir, max_toi, solid, filter
-            ) {
+            if let Some((entity, toi)) =
+                rapier_context.cast_ray(ray_pos, *ray_dir, max_toi, solid, filter)
+            {
                 let hit_point = ray_pos + ray_dir * toi;
-                
+
                 // Play ricochet sound (1 = PISTOL_RICOCHET) by default
                 let mut hit_sound_idx = 1;
 
                 if let Ok(mut destructible) = destructibles.get_mut(entity) {
                     destructible.health -= 6; // PISTOL_WEAPON_STRENGTH
-                    
+
                     // 2 = PISTOL_BODYHIT
-                    hit_sound_idx = 2; 
+                    hit_sound_idx = 2;
 
                     if destructible.health <= 0 {
                         if let Ok(barrel_trans) = barrels.get(entity) {
@@ -581,7 +628,9 @@ fn update_weapon(
                     }
                 }
 
-                sound_events.send(audio::PlaySoundEvent { sound_id: hit_sound_idx });
+                sound_events.send(audio::PlaySoundEvent {
+                    sound_id: hit_sound_idx,
+                });
 
                 // Spawn a bullet hole decal (SHOTSPARK1 is tile 2595) using pre-cached material
                 let spark_mat = assets.spark_material.clone();
@@ -614,7 +663,9 @@ fn cursor_grab(
     btn: Res<ButtonInput<MouseButton>>,
     state: Res<State<game_flow::GamePhase>>,
 ) {
-    let Ok(mut window) = windows.get_single_mut() else { return; };
+    let Ok(mut window) = windows.get_single_mut() else {
+        return;
+    };
 
     if *state.get() == game_flow::GamePhase::Playing {
         if btn.just_pressed(MouseButton::Left) {

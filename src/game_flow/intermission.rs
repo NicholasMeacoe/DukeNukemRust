@@ -1,16 +1,16 @@
 #![allow(dead_code)]
 
-use bevy::prelude::*;
 use crate::game_flow::state::*;
+use bevy::prelude::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum IntermissionStage {
     #[default]
     BackgroundFadeIn, // 0.0s .. 0.5s
-    KillsTally,       // 0.5s .. 1.8s
-    SecretsTally,     // 1.8s .. 3.0s
-    TimeReveal,       // 3.0s .. 4.2s
-    ReadyToProceed,   // 4.2s+
+    KillsTally,     // 0.5s .. 1.8s
+    SecretsTally,   // 1.8s .. 3.0s
+    TimeReveal,     // 3.0s .. 4.2s
+    ReadyToProceed, // 4.2s+
 }
 
 #[derive(Resource, Debug, Clone, Default)]

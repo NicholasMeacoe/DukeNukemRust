@@ -1,18 +1,18 @@
 #![allow(dead_code)]
 
-pub mod types;
-pub mod weapons;
-pub mod inventory;
-pub mod movement;
 pub mod cheats;
 pub mod console;
+pub mod inventory;
+pub mod movement;
+pub mod types;
+pub mod weapons;
 
-pub use types::*;
-pub use weapons::*;
-pub use inventory::*;
-pub use movement::*;
 pub use cheats::*;
 pub use console::*;
+pub use inventory::*;
+pub use movement::*;
+pub use types::*;
+pub use weapons::*;
 
 use bevy::prelude::*;
 
@@ -27,10 +27,16 @@ impl Plugin for PlayerPlugin {
                 (
                     (handle_weapon_selection, handle_inventory_input).in_set(crate::GameSet::Input),
                     update_player_movement.in_set(crate::GameSet::Movement),
-                (handle_weapon_firing, update_laser_tripbombs, update_player_pickups).in_set(crate::GameSet::Combat),
-                (update_inventory_timers, update_first_person_viewmodel).in_set(crate::GameSet::Animation),
-            ),
-        );
+                    (
+                        handle_weapon_firing,
+                        update_laser_tripbombs,
+                        update_player_pickups,
+                    )
+                        .in_set(crate::GameSet::Combat),
+                    (update_inventory_timers, update_first_person_viewmodel)
+                        .in_set(crate::GameSet::Animation),
+                ),
+            );
     }
 }
 
@@ -261,7 +267,11 @@ mod tests {
         assert_eq!(base_kick, 15);
 
         player.inventory.steroids_active = true;
-        let steroid_kick = if player.inventory.steroids_active { 40 } else { 15 };
+        let steroid_kick = if player.inventory.steroids_active {
+            40
+        } else {
+            15
+        };
         assert_eq!(steroid_kick, 40);
     }
 
@@ -331,7 +341,10 @@ mod tests {
 
         let dt = 0.016;
         let mut speed_multiplier = 1.0;
-        let is_swimming = matches!(player.movement_mode, PlayerMovementMode::Swimming | PlayerMovementMode::Diving);
+        let is_swimming = matches!(
+            player.movement_mode,
+            PlayerMovementMode::Swimming | PlayerMovementMode::Diving
+        );
         if is_swimming {
             speed_multiplier *= 0.7; // Water fluid drag
         }

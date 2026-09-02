@@ -1,18 +1,18 @@
 #![allow(dead_code)]
 
-pub mod types;
 pub mod effectors;
 pub mod props;
 pub mod props_extended;
+pub mod types;
 
-pub use types::*;
 pub use effectors::*;
 pub use props::*;
 #[allow(unused_imports)]
 pub use props_extended::{DancerProp, ExtendedPropsPlugin, FountainProp, MoneyItem};
+pub use types::*;
 
-use bevy::prelude::*;
 use crate::map::Map;
+use bevy::prelude::*;
 
 pub struct InteractivityPlugin;
 
@@ -33,7 +33,8 @@ impl Plugin for InteractivityPlugin {
                     handle_explosions,
                     handle_barrel_chain_explosions,
                     handle_tag_activations,
-                ).in_set(crate::GameSet::Interactivity),
+                )
+                    .in_set(crate::GameSet::Interactivity),
             )
             .add_systems(
                 Update,
@@ -42,7 +43,8 @@ impl Plugin for InteractivityPlugin {
                     update_surveillance_monitors,
                     update_mirror_props,
                     apply_player_healing,
-                ).in_set(crate::GameSet::Interactivity),
+                )
+                    .in_set(crate::GameSet::Interactivity),
             );
     }
 }
@@ -58,10 +60,7 @@ pub fn apply_player_healing(
     }
 }
 
-pub fn spawn_interactive_elements_from_map(
-    commands: &mut Commands,
-    map: &Map,
-) {
+pub fn spawn_interactive_elements_from_map(commands: &mut Commands, map: &Map) {
     for (_idx, sprite) in map.sprites.iter().enumerate() {
         let pos = Vec3::new(
             sprite.x as f32 / 1024.0,
@@ -103,7 +102,8 @@ pub fn spawn_interactive_elements_from_map(
                         auto_return_timer: None,
                     },
                     7 => EffectorKind::UnderwaterTeleport {
-                        target_sector: (sprite.hitag as usize).min(map.sectors.len().saturating_sub(1)),
+                        target_sector: (sprite.hitag as usize)
+                            .min(map.sectors.len().saturating_sub(1)),
                         target_pos: pos,
                         is_submerged: false,
                     },
@@ -133,7 +133,10 @@ pub fn spawn_interactive_elements_from_map(
                     },
                     30 => EffectorKind::SubwayTrain {
                         stop_a: Vec2::new(pos.x, pos.z),
-                        stop_b: Vec2::new(pos.x + ang_rad.cos() * 50.0, pos.z + ang_rad.sin() * 50.0),
+                        stop_b: Vec2::new(
+                            pos.x + ang_rad.cos() * 50.0,
+                            pos.z + ang_rad.sin() * 50.0,
+                        ),
                         current_pos: Vec2::new(pos.x, pos.z),
                         progress: 0.0,
                         speed: 8.0,
@@ -218,7 +221,12 @@ mod tests {
         };
 
         // Advance 0.25 seconds with speed 2.0 -> progress increases by 0.5
-        if let EffectorKind::SlidingDoor { ref mut progress, speed, .. } = effector.kind {
+        if let EffectorKind::SlidingDoor {
+            ref mut progress,
+            speed,
+            ..
+        } = effector.kind
+        {
             *progress += speed * 0.25;
             assert_eq!(*progress, 0.5);
         }
@@ -244,7 +252,12 @@ mod tests {
             active: true,
         };
 
-        if let EffectorKind::Elevator { ref mut current_floor_z, target_floor_z, .. } = elevator.kind {
+        if let EffectorKind::Elevator {
+            ref mut current_floor_z,
+            target_floor_z,
+            ..
+        } = elevator.kind
+        {
             *current_floor_z = target_floor_z;
             assert_eq!(*current_floor_z, 5000);
         }
@@ -389,11 +402,19 @@ mod tests {
         };
 
         // Trigger drop
-        if let EffectorKind::DropFloor { ref mut is_dropped, .. } = drop_floor {
+        if let EffectorKind::DropFloor {
+            ref mut is_dropped, ..
+        } = drop_floor
+        {
             *is_dropped = true;
         }
 
-        if let EffectorKind::DropFloor { is_dropped, target_floor_z, .. } = drop_floor {
+        if let EffectorKind::DropFloor {
+            is_dropped,
+            target_floor_z,
+            ..
+        } = drop_floor
+        {
             assert!(is_dropped);
             assert_eq!(target_floor_z, 8192);
         }
@@ -411,7 +432,12 @@ mod tests {
             pause_timer: 0.0,
         };
 
-        if let EffectorKind::SubwayTrain { progress, current_pos, .. } = train {
+        if let EffectorKind::SubwayTrain {
+            progress,
+            current_pos,
+            ..
+        } = train
+        {
             assert_eq!(progress, 0.5);
             assert_eq!(current_pos, Vec2::new(50.0, 0.0));
         }
@@ -425,7 +451,12 @@ mod tests {
             speed: 2.0,
         };
 
-        if let EffectorKind::RotatingEngine { ref mut current_ang, speed, .. } = engine {
+        if let EffectorKind::RotatingEngine {
+            ref mut current_ang,
+            speed,
+            ..
+        } = engine
+        {
             *current_ang += speed * 0.5; // dt = 0.5s -> 1.0 rad
         }
 
@@ -447,18 +478,34 @@ mod tests {
         };
 
         // Open door
-        if let EffectorKind::AutoCloseDoor { ref mut is_open, ref mut auto_close_timer, auto_close_delay, .. } = door {
+        if let EffectorKind::AutoCloseDoor {
+            ref mut is_open,
+            ref mut auto_close_timer,
+            auto_close_delay,
+            ..
+        } = door
+        {
             *is_open = true;
             *auto_close_timer = Some(auto_close_delay);
         }
 
-        if let EffectorKind::AutoCloseDoor { is_open, auto_close_timer, .. } = door {
+        if let EffectorKind::AutoCloseDoor {
+            is_open,
+            auto_close_timer,
+            ..
+        } = door
+        {
             assert!(is_open);
             assert_eq!(auto_close_timer, Some(5.0));
         }
 
         // Count down timer to 0
-        if let EffectorKind::AutoCloseDoor { ref mut is_open, ref mut auto_close_timer, .. } = door {
+        if let EffectorKind::AutoCloseDoor {
+            ref mut is_open,
+            ref mut auto_close_timer,
+            ..
+        } = door
+        {
             if let Some(ref mut timer) = auto_close_timer {
                 *timer -= 5.0;
                 if *timer <= 0.0 {
@@ -507,7 +554,12 @@ mod tests {
             speed: 2.0,
             is_open: true,
         };
-        if let EffectorKind::PivotRotatingSector { ref mut current_ang, target_ang, .. } = pivot_door {
+        if let EffectorKind::PivotRotatingSector {
+            ref mut current_ang,
+            target_ang,
+            ..
+        } = pivot_door
+        {
             *current_ang = target_ang;
             assert_eq!(*current_ang, std::f32::consts::FRAC_PI_2);
         }
@@ -519,7 +571,13 @@ mod tests {
             elapsed: 0.0,
             is_triggered: true,
         };
-        if let EffectorKind::Earthquake { ref mut elapsed, duration, ref mut is_triggered, .. } = earthquake {
+        if let EffectorKind::Earthquake {
+            ref mut elapsed,
+            duration,
+            ref mut is_triggered,
+            ..
+        } = earthquake
+        {
             *elapsed += 4.5;
             if *elapsed >= duration {
                 *is_triggered = false;
@@ -533,7 +591,12 @@ mod tests {
             current_ang: 0.0,
             angular_speed: 10.0,
         };
-        if let EffectorKind::ContinuousRotation { ref mut current_ang, angular_speed, .. } = fan {
+        if let EffectorKind::ContinuousRotation {
+            ref mut current_ang,
+            angular_speed,
+            ..
+        } = fan
+        {
             *current_ang += angular_speed * 0.1;
             assert_eq!(*current_ang, 1.0);
         }
@@ -556,7 +619,13 @@ mod tests {
             crushing_ceiling: true,
             moving_down: true,
         };
-        if let EffectorKind::CrusherSector { ref mut current_z, ref mut moving_down, max_z, .. } = crusher {
+        if let EffectorKind::CrusherSector {
+            ref mut current_z,
+            ref mut moving_down,
+            max_z,
+            ..
+        } = crusher
+        {
             *current_z = max_z;
             *moving_down = false;
             assert_eq!(*current_z, 10000);
@@ -568,14 +637,37 @@ mod tests {
     fn test_complete_pickup_matrix_classification() {
         use crate::interactivity::types::PickupKind::*;
         let all_pickups = [
-            SmallMedkit, LargeMedkit, PortableMedkit, AtomicHealth, ArmorVest,
-            PistolClip, ShotgunBox, ChaingunBox, RpgRocket, PipebombBox,
-            ShrinkerAmmo, DevastatorBox, FreezeAmmo, ExpanderAmmo,
-            Steroids, ScubaTank, NightvisionGoggles, ProtectiveBoots, Jetpack, Holoduke,
-            WeaponPistol, WeaponShotgun, WeaponChaingun, WeaponRpg, WeaponPipebomb,
-            WeaponShrinker, WeaponDevastator, WeaponTripbomb, WeaponFreezer, WeaponExpander,
+            SmallMedkit,
+            LargeMedkit,
+            PortableMedkit,
+            AtomicHealth,
+            ArmorVest,
+            PistolClip,
+            ShotgunBox,
+            ChaingunBox,
+            RpgRocket,
+            PipebombBox,
+            ShrinkerAmmo,
+            DevastatorBox,
+            FreezeAmmo,
+            ExpanderAmmo,
+            Steroids,
+            ScubaTank,
+            NightvisionGoggles,
+            ProtectiveBoots,
+            Jetpack,
+            Holoduke,
+            WeaponPistol,
+            WeaponShotgun,
+            WeaponChaingun,
+            WeaponRpg,
+            WeaponPipebomb,
+            WeaponShrinker,
+            WeaponDevastator,
+            WeaponTripbomb,
+            WeaponFreezer,
+            WeaponExpander,
         ];
         assert_eq!(all_pickups.len(), 30);
     }
 }
-

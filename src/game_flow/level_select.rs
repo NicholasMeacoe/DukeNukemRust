@@ -1,8 +1,8 @@
 #![allow(dead_code)]
 
-use bevy::prelude::*;
-use crate::campaign::episodes::{ALL_CAMPAIGN_MAPS, CampaignMapInfo};
+use crate::campaign::episodes::{CampaignMapInfo, ALL_CAMPAIGN_MAPS};
 use crate::game_flow::LoadLevelEvent;
+use bevy::prelude::*;
 
 #[derive(Resource, Debug, Clone)]
 pub struct LevelSelectState {
@@ -23,35 +23,56 @@ impl Default for LevelSelectState {
 
 impl LevelSelectState {
     pub fn next_episode(&mut self) {
-        self.selected_episode = if self.selected_episode >= 4 { 1 } else { self.selected_episode + 1 };
+        self.selected_episode = if self.selected_episode >= 4 {
+            1
+        } else {
+            self.selected_episode + 1
+        };
         self.selected_level = 1;
     }
 
     pub fn prev_episode(&mut self) {
-        self.selected_episode = if self.selected_episode <= 1 { 4 } else { self.selected_episode - 1 };
+        self.selected_episode = if self.selected_episode <= 1 {
+            4
+        } else {
+            self.selected_episode - 1
+        };
         self.selected_level = 1;
     }
 
     pub fn next_level(&mut self) {
         let max_levels = self.get_levels_for_episode(self.selected_episode).len();
         if max_levels > 0 {
-            self.selected_level = if self.selected_level >= max_levels { 1 } else { self.selected_level + 1 };
+            self.selected_level = if self.selected_level >= max_levels {
+                1
+            } else {
+                self.selected_level + 1
+            };
         }
     }
 
     pub fn prev_level(&mut self) {
         let max_levels = self.get_levels_for_episode(self.selected_episode).len();
         if max_levels > 0 {
-            self.selected_level = if self.selected_level <= 1 { max_levels } else { self.selected_level - 1 };
+            self.selected_level = if self.selected_level <= 1 {
+                max_levels
+            } else {
+                self.selected_level - 1
+            };
         }
     }
 
     pub fn get_levels_for_episode(&self, ep: usize) -> Vec<&'static CampaignMapInfo> {
-        ALL_CAMPAIGN_MAPS.iter().filter(|m| m.episode == ep).collect()
+        ALL_CAMPAIGN_MAPS
+            .iter()
+            .filter(|m| m.episode == ep)
+            .collect()
     }
 
     pub fn get_current_map_info(&self) -> Option<&'static CampaignMapInfo> {
-        ALL_CAMPAIGN_MAPS.iter().find(|m| m.episode == self.selected_episode && m.level == self.selected_level)
+        ALL_CAMPAIGN_MAPS
+            .iter()
+            .find(|m| m.episode == self.selected_episode && m.level == self.selected_level)
     }
 
     pub fn warp_to_selected(&mut self, level_event_writer: &mut EventWriter<LoadLevelEvent>) {
@@ -67,11 +88,10 @@ pub struct LevelSelectPlugin;
 
 impl Plugin for LevelSelectPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<LevelSelectState>()
-            .add_systems(
-                Update,
-                handle_level_select_input.in_set(crate::GameSet::Input),
-            );
+        app.init_resource::<LevelSelectState>().add_systems(
+            Update,
+            handle_level_select_input.in_set(crate::GameSet::Input),
+        );
     }
 }
 

@@ -1,18 +1,18 @@
 #![allow(dead_code)]
 
-pub mod state;
-pub mod menu;
 pub mod intermission;
 pub mod level_loader;
-pub mod ui;
 pub mod level_select;
+pub mod menu;
+pub mod state;
+pub mod ui;
 
-pub use state::*;
-pub use menu::*;
 pub use intermission::*;
 pub use level_loader::*;
-pub use ui::*;
 pub use level_select::*;
+pub use menu::*;
+pub use state::*;
+pub use ui::*;
 
 use bevy::prelude::*;
 
@@ -99,23 +99,37 @@ mod tests {
         if let Ok(grp) = crate::grp::Grp::open("dukenukem3d/duke3d.grp") {
             for level in 1..=4 {
                 let map_name = format!("E1L{}.MAP", level);
-                let map_data = grp.read_file(&map_name).expect(&format!("{} must exist in GRP", map_name));
-                let map = crate::map::Map::from_bytes(&map_data).expect(&format!("{} must parse", map_name));
+                let map_data = grp
+                    .read_file(&map_name)
+                    .expect(&format!("{} must exist in GRP", map_name));
+                let map = crate::map::Map::from_bytes(&map_data)
+                    .expect(&format!("{} must parse", map_name));
                 assert!(!map.sectors.is_empty(), "{} must have sectors", map_name);
                 assert!(!map.walls.is_empty(), "{} must have walls", map_name);
 
-                let monster_count = map.sprites.iter()
+                let monster_count = map
+                    .sprites
+                    .iter()
                     .filter(|s| matches!(s.picnum, 2000 | 1680 | 1820 | 2120))
                     .count();
-                println!("{}: {} sectors, {} walls, {} sprites ({} monsters)",
-                    map_name, map.sectors.len(), map.walls.len(), map.sprites.len(), monster_count);
+                println!(
+                    "{}: {} sectors, {} walls, {} sprites ({} monsters)",
+                    map_name,
+                    map.sectors.len(),
+                    map.walls.len(),
+                    map.sprites.len(),
+                    monster_count
+                );
             }
         }
     }
 
     #[test]
     fn test_load_level_event_structure() {
-        let event = LoadLevelEvent { episode: 1, level: 2 };
+        let event = LoadLevelEvent {
+            episode: 1,
+            level: 2,
+        };
         assert_eq!(event.episode, 1);
         assert_eq!(event.level, 2);
 
@@ -131,7 +145,10 @@ mod tests {
         };
 
         // Up wraps to max_items - 1
-        cursor.selected_index = cursor.selected_index.checked_sub(1).unwrap_or(cursor.max_items - 1);
+        cursor.selected_index = cursor
+            .selected_index
+            .checked_sub(1)
+            .unwrap_or(cursor.max_items - 1);
         assert_eq!(cursor.selected_index, 3);
 
         // Down wraps to 0
@@ -158,7 +175,7 @@ mod tests {
     #[test]
     fn test_game_phase_states() {
         let default_phase = GamePhase::default();
-        assert_eq!(default_phase, GamePhase::Playing);
+        assert_eq!(default_phase, GamePhase::MainMenu);
 
         let paused = GamePhase::Paused;
         assert_ne!(paused, GamePhase::Playing);

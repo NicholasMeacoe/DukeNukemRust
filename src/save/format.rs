@@ -1,15 +1,15 @@
 #![allow(dead_code)]
 
-use bevy::prelude::*;
-use crate::player::types::PlayerController;
 use crate::combat::types::{EnemyActor, Projectile};
-use crate::scripting::ConActor;
-use crate::interactivity::types::{
-    InteractiveSwitch, SectorEffectorComponent, ItemPickup, CrackWall, BreakableGlass, 
-    ExplodingBarrel, WaterFountain, ToiletProp, ViewscreenProp, SecurityCamera, 
-    NukeExitSwitch, MasterSwitch
-};
 use crate::interactivity::props_extended::{DancerProp, SecurityCameraMonitor};
+use crate::interactivity::types::{
+    BreakableGlass, CrackWall, ExplodingBarrel, InteractiveSwitch, ItemPickup, MasterSwitch,
+    NukeExitSwitch, SectorEffectorComponent, SecurityCamera, ToiletProp, ViewscreenProp,
+    WaterFountain,
+};
+use crate::player::types::PlayerController;
+use crate::scripting::ConActor;
+use bevy::prelude::*;
 
 pub const SAVEGAME_MAGIC: &[u8; 4] = b"DUKE";
 pub const BYTEVERSION: u32 = 117; // Increment version for new format
@@ -55,19 +55,19 @@ pub struct SaveGameSnapshot {
     pub level_time_seconds: f32,
 
     pub player: Option<(SavedTransform, PlayerController)>,
-    
+
     // Dynamic Entities
     pub enemies: Vec<(SavedTransform, EnemyActor, ConActor)>,
     pub items: Vec<(SavedTransform, ItemPickup)>,
     pub projectiles: Vec<(SavedTransform, Projectile)>,
-    
+
     // Interactivity
     pub sector_effectors: Vec<(SavedTransform, SectorEffectorComponent)>,
     pub switches: Vec<(SavedTransform, InteractiveSwitch)>,
     pub crack_walls: Vec<(SavedTransform, CrackWall)>,
     pub glass_panes: Vec<(SavedTransform, BreakableGlass)>,
     pub barrels: Vec<(SavedTransform, ExplodingBarrel)>,
-    
+
     // Props
     pub fountains: Vec<(SavedTransform, WaterFountain)>,
     pub toilets: Vec<(SavedTransform, ToiletProp)>,
@@ -75,7 +75,7 @@ pub struct SaveGameSnapshot {
     pub viewscreens: Vec<(SavedTransform, ViewscreenProp)>,
     pub cameras: Vec<(SavedTransform, SecurityCamera)>,
     pub camera_monitors: Vec<(SavedTransform, SecurityCameraMonitor)>,
-    
+
     pub nuke_switches: Vec<(SavedTransform, NukeExitSwitch)>,
     pub master_switches: Vec<(SavedTransform, MasterSwitch)>,
 }

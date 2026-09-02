@@ -50,7 +50,11 @@ impl NetPacket {
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut buf = Vec::new();
         match self {
-            NetPacket::Connect { player_id, name, color_pal } => {
+            NetPacket::Connect {
+                player_id,
+                name,
+                color_pal,
+            } => {
                 buf.push(1); // Packet Type ID
                 buf.push(*player_id);
                 buf.push(*color_pal);
@@ -59,7 +63,16 @@ impl NetPacket {
                 buf.push(name_bytes.len() as u8);
                 buf.extend_from_slice(name_bytes);
             }
-            NetPacket::InputSync { player_id, gametic, forward, strafe, yaw, pitch, actions, weapon } => {
+            NetPacket::InputSync {
+                player_id,
+                gametic,
+                forward,
+                strafe,
+                yaw,
+                pitch,
+                actions,
+                weapon,
+            } => {
                 buf.push(2);
                 buf.push(*player_id);
                 buf.extend_from_slice(&gametic.to_le_bytes());
@@ -70,7 +83,16 @@ impl NetPacket {
                 buf.extend_from_slice(&actions.to_le_bytes());
                 buf.push(*weapon);
             }
-            NetPacket::PlayerStateSync { player_id, x, y, z, yaw, pitch, health, armor } => {
+            NetPacket::PlayerStateSync {
+                player_id,
+                x,
+                y,
+                z,
+                yaw,
+                pitch,
+                health,
+                armor,
+            } => {
                 buf.push(3);
                 buf.push(*player_id);
                 buf.extend_from_slice(&x.to_le_bytes());
@@ -81,7 +103,11 @@ impl NetPacket {
                 buf.extend_from_slice(&health.to_le_bytes());
                 buf.extend_from_slice(&armor.to_le_bytes());
             }
-            NetPacket::FragEvent { killer_id, victim_id, weapon_type } => {
+            NetPacket::FragEvent {
+                killer_id,
+                victim_id,
+                weapon_type,
+            } => {
                 buf.push(4);
                 buf.push(*killer_id);
                 buf.push(*victim_id);
@@ -106,16 +132,26 @@ impl NetPacket {
 
         match data[0] {
             1 => {
-                if data.len() < 4 { return Err("Invalid Connect packet".to_string()); }
+                if data.len() < 4 {
+                    return Err("Invalid Connect packet".to_string());
+                }
                 let player_id = data[1];
                 let color_pal = data[2];
                 let name_len = data[3] as usize;
-                if data.len() < 4 + name_len { return Err("Truncated name in Connect".to_string()); }
+                if data.len() < 4 + name_len {
+                    return Err("Truncated name in Connect".to_string());
+                }
                 let name = String::from_utf8_lossy(&data[4..4 + name_len]).to_string();
-                Ok(NetPacket::Connect { player_id, name, color_pal })
+                Ok(NetPacket::Connect {
+                    player_id,
+                    name,
+                    color_pal,
+                })
             }
             2 => {
-                if data.len() < 15 { return Err("Invalid InputSync packet".to_string()); }
+                if data.len() < 15 {
+                    return Err("Invalid InputSync packet".to_string());
+                }
                 let player_id = data[1];
                 let gametic = u32::from_le_bytes([data[2], data[3], data[4], data[5]]);
                 let forward = data[6] as i8;
@@ -124,10 +160,21 @@ impl NetPacket {
                 let pitch = i16::from_le_bytes([data[10], data[11]]);
                 let actions = u16::from_le_bytes([data[12], data[13]]);
                 let weapon = data[14];
-                Ok(NetPacket::InputSync { player_id, gametic, forward, strafe, yaw, pitch, actions, weapon })
+                Ok(NetPacket::InputSync {
+                    player_id,
+                    gametic,
+                    forward,
+                    strafe,
+                    yaw,
+                    pitch,
+                    actions,
+                    weapon,
+                })
             }
             3 => {
-                if data.len() < 26 { return Err("Invalid PlayerStateSync packet".to_string()); }
+                if data.len() < 26 {
+                    return Err("Invalid PlayerStateSync packet".to_string());
+                }
                 let player_id = data[1];
                 let x = f32::from_le_bytes([data[2], data[3], data[4], data[5]]);
                 let y = f32::from_le_bytes([data[6], data[7], data[8], data[9]]);
@@ -136,10 +183,21 @@ impl NetPacket {
                 let pitch = f32::from_le_bytes([data[18], data[19], data[20], data[21]]);
                 let health = i16::from_le_bytes([data[22], data[23]]);
                 let armor = i16::from_le_bytes([data[24], data[25]]);
-                Ok(NetPacket::PlayerStateSync { player_id, x, y, z, yaw, pitch, health, armor })
+                Ok(NetPacket::PlayerStateSync {
+                    player_id,
+                    x,
+                    y,
+                    z,
+                    yaw,
+                    pitch,
+                    health,
+                    armor,
+                })
             }
             4 => {
-                if data.len() < 4 { return Err("Invalid FragEvent packet".to_string()); }
+                if data.len() < 4 {
+                    return Err("Invalid FragEvent packet".to_string());
+                }
                 Ok(NetPacket::FragEvent {
                     killer_id: data[1],
                     victim_id: data[2],
@@ -147,10 +205,14 @@ impl NetPacket {
                 })
             }
             5 => {
-                if data.len() < 3 { return Err("Invalid ChatMessage packet".to_string()); }
+                if data.len() < 3 {
+                    return Err("Invalid ChatMessage packet".to_string());
+                }
                 let sender_id = data[1];
                 let msg_len = data[2] as usize;
-                if data.len() < 3 + msg_len { return Err("Truncated message".to_string()); }
+                if data.len() < 3 + msg_len {
+                    return Err("Truncated message".to_string());
+                }
                 let message = String::from_utf8_lossy(&data[3..3 + msg_len]).to_string();
                 Ok(NetPacket::ChatMessage { sender_id, message })
             }

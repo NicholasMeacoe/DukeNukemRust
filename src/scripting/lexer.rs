@@ -86,7 +86,10 @@ impl<'a> Lexer<'a> {
             }
 
             // Number or Identifier / keyword / formatted string (01:45, E1L1.map, etc.)
-            if ch.is_ascii_digit() || is_ident_char(ch) || (ch == '-' && self.peek(1).map_or(false, |c| c.is_ascii_digit())) {
+            if ch.is_ascii_digit()
+                || is_ident_char(ch)
+                || (ch == '-' && self.peek(1).map_or(false, |c| c.is_ascii_digit()))
+            {
                 let start = self.pos;
                 if ch == '-' {
                     self.pos += 1;

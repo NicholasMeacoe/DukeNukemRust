@@ -1,8 +1,8 @@
 #![allow(dead_code)]
 
-use bevy::prelude::*;
-use crate::player::types::*;
 use crate::audio::PlaySoundEvent;
+use crate::player::types::*;
+use bevy::prelude::*;
 
 pub fn handle_inventory_input(
     keys: Res<ButtonInput<KeyCode>>,
@@ -11,7 +11,9 @@ pub fn handle_inventory_input(
     mut commands: Commands,
     holoduke_query: Query<Entity, With<HoloDukeDecoy>>,
 ) {
-    let Ok((trans, mut player)) = query.get_single_mut() else { return; };
+    let Ok((trans, mut player)) = query.get_single_mut() else {
+        return;
+    };
 
     // 1. Steroids (Key 'U')
     if keys.just_pressed(KeyCode::KeyU) && player.inventory.steroids_amount > 0 {
@@ -22,7 +24,10 @@ pub fn handle_inventory_input(
     }
 
     // 2. Medkit (Key 'M')
-    if keys.just_pressed(KeyCode::KeyM) && player.inventory.medkit_amount > 0 && player.health < player.max_health {
+    if keys.just_pressed(KeyCode::KeyM)
+        && player.inventory.medkit_amount > 0
+        && player.health < player.max_health
+    {
         let needed = player.max_health - player.health;
         let use_amount = needed.min(player.inventory.medkit_amount);
         player.health += use_amount;
@@ -76,7 +81,9 @@ pub fn update_inventory_timers(
     holoduke_query: Query<Entity, With<HoloDukeDecoy>>,
 ) {
     let dt = time.delta_seconds();
-    let Ok(mut player) = query.get_single_mut() else { return; };
+    let Ok(mut player) = query.get_single_mut() else {
+        return;
+    };
 
     player.inventory.inventory_accumulator += dt;
     let tick_interval = 0.1; // Tick 10 times per second
@@ -93,7 +100,8 @@ pub fn update_inventory_timers(
 
         // Nightvision countdown (10 / sec = 1 per tick)
         if player.inventory.nightvision_active {
-            player.inventory.nightvision_amount = player.inventory.nightvision_amount.saturating_sub(1);
+            player.inventory.nightvision_amount =
+                player.inventory.nightvision_amount.saturating_sub(1);
             if player.inventory.nightvision_amount == 0 {
                 player.inventory.nightvision_active = false;
             }
@@ -119,14 +127,20 @@ pub fn update_inventory_timers(
         }
 
         // Scuba consumption while underwater
-        let is_underwater = matches!(player.movement_mode, PlayerMovementMode::Swimming | PlayerMovementMode::Diving);
+        let is_underwater = matches!(
+            player.movement_mode,
+            PlayerMovementMode::Swimming | PlayerMovementMode::Diving
+        );
         if is_underwater && player.inventory.scuba_amount > 0 {
             player.inventory.scuba_amount = player.inventory.scuba_amount.saturating_sub(1);
         }
     }
 
     // Scuba & Underwater Air Supply / Drowning
-    let is_underwater = matches!(player.movement_mode, PlayerMovementMode::Swimming | PlayerMovementMode::Diving);
+    let is_underwater = matches!(
+        player.movement_mode,
+        PlayerMovementMode::Swimming | PlayerMovementMode::Diving
+    );
     if is_underwater {
         if player.inventory.scuba_amount > 0 {
             // Scuba prevents air loss
@@ -160,19 +174,29 @@ pub fn update_inventory_timers(
 }
 
 pub fn update_player_pickups(
-    mut player_query: Query<(&Transform, &mut PlayerController), Without<crate::interactivity::ItemPickup>>,
-    pickup_query: Query<(Entity, &Transform, &crate::interactivity::ItemPickup), Without<PlayerController>>,
+    mut player_query: Query<
+        (&Transform, &mut PlayerController),
+        Without<crate::interactivity::ItemPickup>,
+    >,
+    pickup_query: Query<
+        (Entity, &Transform, &crate::interactivity::ItemPickup),
+        Without<PlayerController>,
+    >,
     mut sbar_query: Query<&mut crate::hud::StatusbarState>,
     mut sound_events: EventWriter<PlaySoundEvent>,
     mut voice_events: EventWriter<crate::audio::PlayDukeVoiceEvent>,
     mut commands: Commands,
     mut tint: Option<ResMut<crate::hud::ScreenTintState>>,
+    mut rng: ResMut<crate::net::DeterministicRng>,
 ) {
-    let Ok((p_trans, mut player)) = player_query.get_single_mut() else { return; };
+    let Ok((p_trans, mut player)) = player_query.get_single_mut() else {
+        return;
+    };
     let mut sbar = sbar_query.get_single_mut().ok();
 
     for (pickup_entity, item_trans, item) in pickup_query.iter() {
-        if p_trans.translation.distance_squared(item_trans.translation) < 4.0 { // 2.0m radius
+        if p_trans.translation.distance_squared(item_trans.translation) < 4.0 {
+            // 2.0m radius
             use crate::interactivity::PickupKind::*;
             let mut collected = false;
             let mut message = "";
@@ -193,7 +217,8 @@ pub fn update_player_pickups(
                     }
                 }
                 PortableMedkit => {
-                    player.inventory.medkit_amount = (player.inventory.medkit_amount + 100).min(100);
+                    player.inventory.medkit_amount =
+                        (player.inventory.medkit_amount + 100).min(100);
                     collected = true;
                     message = "PORTABLE MEDKIT";
                 }
@@ -202,7 +227,9 @@ pub fn update_player_pickups(
                         player.health = (player.health + 50).min(200);
                         collected = true;
                         message = "ATOMIC HEALTH (+50 HEALTH)";
-                        voice_events.send(crate::audio::PlayDukeVoiceEvent { name: Some("GETSOM01.VOC".into()) });
+                        voice_events.send(crate::audio::PlayDukeVoiceEvent {
+                            name: Some("GETSOM01.VOC".into()),
+                        });
                     }
                 }
                 ArmorVest => {
@@ -213,60 +240,70 @@ pub fn update_player_pickups(
                     }
                 }
                 PistolClip => {
-                    player.weapons[WeaponType::Pistol as usize].ammo = (player.weapons[WeaponType::Pistol as usize].ammo + 12).min(200);
+                    player.weapons[WeaponType::Pistol as usize].ammo =
+                        (player.weapons[WeaponType::Pistol as usize].ammo + 12).min(200);
                     collected = true;
                     message = "PISTOL CLIP (+12)";
                 }
                 ShotgunBox => {
-                    player.weapons[WeaponType::Shotgun as usize].ammo = (player.weapons[WeaponType::Shotgun as usize].ammo + 10).min(50);
+                    player.weapons[WeaponType::Shotgun as usize].ammo =
+                        (player.weapons[WeaponType::Shotgun as usize].ammo + 10).min(50);
                     player.weapons[WeaponType::Shotgun as usize].is_unlocked = true;
                     collected = true;
                     message = "SHOTGUN SHELLS (+10)";
                 }
                 ChaingunBox => {
-                    player.weapons[WeaponType::Chaingun as usize].ammo = (player.weapons[WeaponType::Chaingun as usize].ammo + 50).min(400);
+                    player.weapons[WeaponType::Chaingun as usize].ammo =
+                        (player.weapons[WeaponType::Chaingun as usize].ammo + 50).min(400);
                     player.weapons[WeaponType::Chaingun as usize].is_unlocked = true;
                     collected = true;
                     message = "CHAINGUN AMMO BOX (+50)";
                 }
                 RpgRocket => {
-                    player.weapons[WeaponType::Rpg as usize].ammo = (player.weapons[WeaponType::Rpg as usize].ammo + 5).min(50);
+                    player.weapons[WeaponType::Rpg as usize].ammo =
+                        (player.weapons[WeaponType::Rpg as usize].ammo + 5).min(50);
                     player.weapons[WeaponType::Rpg as usize].is_unlocked = true;
                     collected = true;
                     message = "RPG ROCKETS (+5)";
                 }
                 PipebombBox => {
-                    player.weapons[WeaponType::Pipebomb as usize].ammo = (player.weapons[WeaponType::Pipebomb as usize].ammo + 5).min(50);
+                    player.weapons[WeaponType::Pipebomb as usize].ammo =
+                        (player.weapons[WeaponType::Pipebomb as usize].ammo + 5).min(50);
                     player.weapons[WeaponType::Pipebomb as usize].is_unlocked = true;
                     collected = true;
                     message = "PIPEBOMBS (+5)";
                 }
                 ShrinkerAmmo => {
-                    player.weapons[WeaponType::Shrinker as usize].ammo = (player.weapons[WeaponType::Shrinker as usize].ammo + 5).min(50);
+                    player.weapons[WeaponType::Shrinker as usize].ammo =
+                        (player.weapons[WeaponType::Shrinker as usize].ammo + 5).min(50);
                     player.weapons[WeaponType::Shrinker as usize].is_unlocked = true;
                     collected = true;
                     message = "SHRINKER CRYSTALS (+5)";
                 }
                 DevastatorBox => {
-                    player.weapons[WeaponType::Devastator as usize].ammo = (player.weapons[WeaponType::Devastator as usize].ammo + 15).min(99);
+                    player.weapons[WeaponType::Devastator as usize].ammo =
+                        (player.weapons[WeaponType::Devastator as usize].ammo + 15).min(99);
                     player.weapons[WeaponType::Devastator as usize].is_unlocked = true;
                     collected = true;
                     message = "DEVASTATOR ROCKETS (+15)";
                 }
                 FreezeAmmo => {
-                    player.weapons[WeaponType::Freezethrower as usize].ammo = (player.weapons[WeaponType::Freezethrower as usize].ammo + 25).min(99);
+                    player.weapons[WeaponType::Freezethrower as usize].ammo =
+                        (player.weapons[WeaponType::Freezethrower as usize].ammo + 25).min(99);
                     player.weapons[WeaponType::Freezethrower as usize].is_unlocked = true;
                     collected = true;
                     message = "FREEZETHROWER AMMO (+25)";
                 }
                 ExpanderAmmo => {
-                    player.weapons[WeaponType::Expander as usize].ammo = (player.weapons[WeaponType::Expander as usize].ammo + 20).min(99);
+                    player.weapons[WeaponType::Expander as usize].ammo =
+                        (player.weapons[WeaponType::Expander as usize].ammo + 20).min(99);
                     player.weapons[WeaponType::Expander as usize].is_unlocked = true;
                     collected = true;
                     message = "EXPANDER AMMO (+20)";
                 }
                 Steroids => {
-                    player.inventory.steroids_amount = (player.inventory.steroids_amount + 400).min(400);
+                    player.inventory.steroids_amount =
+                        (player.inventory.steroids_amount + 400).min(400);
                     collected = true;
                     message = "STEROIDS";
                 }
@@ -276,7 +313,8 @@ pub fn update_player_pickups(
                     message = "SCUBA GEAR";
                 }
                 NightvisionGoggles => {
-                    player.inventory.nightvision_amount = (player.inventory.nightvision_amount + 100).min(100);
+                    player.inventory.nightvision_amount =
+                        (player.inventory.nightvision_amount + 100).min(100);
                     collected = true;
                     message = "NIGHTVISION GOGGLES";
                 }
@@ -286,79 +324,91 @@ pub fn update_player_pickups(
                     message = "PROTECTIVE BOOTS";
                 }
                 Jetpack => {
-                    player.inventory.jetpack_amount = (player.inventory.jetpack_amount + 100).min(100);
+                    player.inventory.jetpack_amount =
+                        (player.inventory.jetpack_amount + 100).min(100);
                     collected = true;
                     message = "JETPACK";
                 }
                 Holoduke => {
-                    player.inventory.holoduke_amount = (player.inventory.holoduke_amount + 100).min(100);
+                    player.inventory.holoduke_amount =
+                        (player.inventory.holoduke_amount + 100).min(100);
                     collected = true;
                     message = "HOLODUKE";
                 }
                 WeaponPistol => {
-                    player.weapons[WeaponType::Pistol as usize].ammo = (player.weapons[WeaponType::Pistol as usize].ammo + 12).min(200);
+                    player.weapons[WeaponType::Pistol as usize].ammo =
+                        (player.weapons[WeaponType::Pistol as usize].ammo + 12).min(200);
                     collected = true;
                     message = "PISTOL";
                 }
                 WeaponShotgun => {
                     player.weapons[WeaponType::Shotgun as usize].is_unlocked = true;
-                    player.weapons[WeaponType::Shotgun as usize].ammo = (player.weapons[WeaponType::Shotgun as usize].ammo + 10).min(50);
+                    player.weapons[WeaponType::Shotgun as usize].ammo =
+                        (player.weapons[WeaponType::Shotgun as usize].ammo + 10).min(50);
                     player.current_weapon = WeaponType::Shotgun;
                     collected = true;
                     message = "YOU GOT THE SHOTGUN!";
                 }
                 WeaponChaingun => {
                     player.weapons[WeaponType::Chaingun as usize].is_unlocked = true;
-                    player.weapons[WeaponType::Chaingun as usize].ammo = (player.weapons[WeaponType::Chaingun as usize].ammo + 50).min(400);
+                    player.weapons[WeaponType::Chaingun as usize].ammo =
+                        (player.weapons[WeaponType::Chaingun as usize].ammo + 50).min(400);
                     player.current_weapon = WeaponType::Chaingun;
                     collected = true;
                     message = "YOU GOT THE CHAINGUN CANNON!";
                 }
                 WeaponRpg => {
                     player.weapons[WeaponType::Rpg as usize].is_unlocked = true;
-                    player.weapons[WeaponType::Rpg as usize].ammo = (player.weapons[WeaponType::Rpg as usize].ammo + 5).min(50);
+                    player.weapons[WeaponType::Rpg as usize].ammo =
+                        (player.weapons[WeaponType::Rpg as usize].ammo + 5).min(50);
                     player.current_weapon = WeaponType::Rpg;
                     collected = true;
                     message = "YOU GOT THE RPG!";
                 }
                 WeaponPipebomb => {
                     player.weapons[WeaponType::Pipebomb as usize].is_unlocked = true;
-                    player.weapons[WeaponType::Pipebomb as usize].ammo = (player.weapons[WeaponType::Pipebomb as usize].ammo + 5).min(50);
+                    player.weapons[WeaponType::Pipebomb as usize].ammo =
+                        (player.weapons[WeaponType::Pipebomb as usize].ammo + 5).min(50);
                     player.current_weapon = WeaponType::Pipebomb;
                     collected = true;
                     message = "YOU GOT PIPEBOMBS!";
                 }
                 WeaponShrinker => {
                     player.weapons[WeaponType::Shrinker as usize].is_unlocked = true;
-                    player.weapons[WeaponType::Shrinker as usize].ammo = (player.weapons[WeaponType::Shrinker as usize].ammo + 5).min(50);
+                    player.weapons[WeaponType::Shrinker as usize].ammo =
+                        (player.weapons[WeaponType::Shrinker as usize].ammo + 5).min(50);
                     player.current_weapon = WeaponType::Shrinker;
                     collected = true;
                     message = "YOU GOT THE SHRINKER!";
                 }
                 WeaponDevastator => {
                     player.weapons[WeaponType::Devastator as usize].is_unlocked = true;
-                    player.weapons[WeaponType::Devastator as usize].ammo = (player.weapons[WeaponType::Devastator as usize].ammo + 15).min(99);
+                    player.weapons[WeaponType::Devastator as usize].ammo =
+                        (player.weapons[WeaponType::Devastator as usize].ammo + 15).min(99);
                     player.current_weapon = WeaponType::Devastator;
                     collected = true;
                     message = "YOU GOT THE DEVASTATOR!";
                 }
                 WeaponTripbomb => {
                     player.weapons[WeaponType::Tripbomb as usize].is_unlocked = true;
-                    player.weapons[WeaponType::Tripbomb as usize].ammo = (player.weapons[WeaponType::Tripbomb as usize].ammo + 5).min(10);
+                    player.weapons[WeaponType::Tripbomb as usize].ammo =
+                        (player.weapons[WeaponType::Tripbomb as usize].ammo + 5).min(10);
                     player.current_weapon = WeaponType::Tripbomb;
                     collected = true;
                     message = "YOU GOT LASER TRIPBOMBS!";
                 }
                 WeaponFreezer => {
                     player.weapons[WeaponType::Freezethrower as usize].is_unlocked = true;
-                    player.weapons[WeaponType::Freezethrower as usize].ammo = (player.weapons[WeaponType::Freezethrower as usize].ammo + 25).min(99);
+                    player.weapons[WeaponType::Freezethrower as usize].ammo =
+                        (player.weapons[WeaponType::Freezethrower as usize].ammo + 25).min(99);
                     player.current_weapon = WeaponType::Freezethrower;
                     collected = true;
                     message = "YOU GOT THE FREEZETHROWER!";
                 }
                 WeaponExpander => {
                     player.weapons[WeaponType::Expander as usize].is_unlocked = true;
-                    player.weapons[WeaponType::Expander as usize].ammo = (player.weapons[WeaponType::Expander as usize].ammo + 20).min(99);
+                    player.weapons[WeaponType::Expander as usize].ammo =
+                        (player.weapons[WeaponType::Expander as usize].ammo + 20).min(99);
                     player.current_weapon = WeaponType::Expander;
                     collected = true;
                     message = "WEAPON: EXPANDER";
@@ -374,8 +424,10 @@ pub fn update_player_pickups(
                 if let Some(ref mut t) = tint {
                     t.target_color = Color::srgba(0.8, 0.8, 0.2, 0.5);
                 }
-                if rand::random::<f32>() < 0.15 {
-                    voice_events.send(crate::audio::PlayDukeVoiceEvent { name: Some("LOOKING_GOOD".into()) });
+                if rng.next_f32() < 0.15 {
+                    voice_events.send(crate::audio::PlayDukeVoiceEvent {
+                        name: Some("LOOKING_GOOD".into()),
+                    });
                 }
                 commands.entity(pickup_entity).despawn_recursive();
             }

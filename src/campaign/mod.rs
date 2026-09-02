@@ -42,29 +42,68 @@ mod tests {
         assert_eq!(prog.current_map_filename(), "E1L1.MAP");
 
         // L1 -> L2
-        assert_eq!(prog.advance_level(false), LevelAdvanceResult::NextLevel { episode: 1, level: 2 });
+        assert_eq!(
+            prog.advance_level(false),
+            LevelAdvanceResult::NextLevel {
+                episode: 1,
+                level: 2
+            }
+        );
         // L2 -> L3
-        assert_eq!(prog.advance_level(false), LevelAdvanceResult::NextLevel { episode: 1, level: 3 });
+        assert_eq!(
+            prog.advance_level(false),
+            LevelAdvanceResult::NextLevel {
+                episode: 1,
+                level: 3
+            }
+        );
 
         // L3 -> Secret Exit to E1L8
-        assert_eq!(prog.advance_level(true), LevelAdvanceResult::SecretLevel { episode: 1, level: 8 });
+        assert_eq!(
+            prog.advance_level(true),
+            LevelAdvanceResult::SecretLevel {
+                episode: 1,
+                level: 8
+            }
+        );
         assert_eq!(prog.current_level, 8);
         assert_eq!(prog.current_map_filename(), "E1L8.MAP");
 
         // Completing E1L8 returns to E1L4
-        assert_eq!(prog.advance_level(false), LevelAdvanceResult::ReturnFromSecret { episode: 1, level: 4 });
+        assert_eq!(
+            prog.advance_level(false),
+            LevelAdvanceResult::ReturnFromSecret {
+                episode: 1,
+                level: 4
+            }
+        );
         assert_eq!(prog.current_level, 4);
         assert_eq!(prog.current_map_filename(), "E1L4.MAP");
 
         // L4 -> L5
-        assert_eq!(prog.advance_level(false), LevelAdvanceResult::NextLevel { episode: 1, level: 5 });
+        assert_eq!(
+            prog.advance_level(false),
+            LevelAdvanceResult::NextLevel {
+                episode: 1,
+                level: 5
+            }
+        );
 
         // L5 -> L6 (Boss)
-        assert_eq!(prog.advance_level(false), LevelAdvanceResult::NextLevel { episode: 1, level: 6 });
+        assert_eq!(
+            prog.advance_level(false),
+            LevelAdvanceResult::NextLevel {
+                episode: 1,
+                level: 6
+            }
+        );
         assert_eq!(prog.current_map_filename(), "E1L6.MAP");
 
         // Defeating L6 Boss completes Episode 1
-        assert_eq!(prog.advance_level(false), LevelAdvanceResult::EpisodeCompleted { episode: 1 });
+        assert_eq!(
+            prog.advance_level(false),
+            LevelAdvanceResult::EpisodeCompleted { episode: 1 }
+        );
         assert!(prog.episode_completed);
     }
 
@@ -79,23 +118,33 @@ mod tests {
             moves: std::collections::HashMap::new(),
             ais: std::collections::HashMap::new(),
             volumes: vec![
-                crate::scripting::types::DynamicVolumeDef { volume_id: 0, title: "L.A. MELTDOWN".into() },
-                crate::scripting::types::DynamicVolumeDef { volume_id: 1, title: "LUNAR APOCALYPSE".into() },
-            ],
-            skills: vec![
-                crate::scripting::types::DynamicSkillDef { skill_id: 0, title: "PIECE OF CAKE".into() },
-                crate::scripting::types::DynamicSkillDef { skill_id: 1, title: "LET'S ROCK".into() },
-            ],
-            levels: vec![
-                crate::scripting::types::DynamicLevelDef {
-                    volume: 0,
-                    level: 0,
-                    filename: "E1L1.map".into(),
-                    par_time_str: "01:45".into(),
-                    three_dr_time_str: "00:53".into(),
-                    title: "HOLLYWOOD HOLOCAUST".into(),
+                crate::scripting::types::DynamicVolumeDef {
+                    volume_id: 0,
+                    title: "L.A. MELTDOWN".into(),
+                },
+                crate::scripting::types::DynamicVolumeDef {
+                    volume_id: 1,
+                    title: "LUNAR APOCALYPSE".into(),
                 },
             ],
+            skills: vec![
+                crate::scripting::types::DynamicSkillDef {
+                    skill_id: 0,
+                    title: "PIECE OF CAKE".into(),
+                },
+                crate::scripting::types::DynamicSkillDef {
+                    skill_id: 1,
+                    title: "LET'S ROCK".into(),
+                },
+            ],
+            levels: vec![crate::scripting::types::DynamicLevelDef {
+                volume: 0,
+                level: 0,
+                filename: "E1L1.map".into(),
+                par_time_str: "01:45".into(),
+                three_dr_time_str: "00:53".into(),
+                title: "HOLLYWOOD HOLOCAUST".into(),
+            }],
             quotes: {
                 let mut m = std::collections::HashMap::new();
                 m.insert(113, "CLIPPING: OFF".into());

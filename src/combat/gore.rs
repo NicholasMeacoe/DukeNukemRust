@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
-use bevy::prelude::*;
 use crate::combat::types::GibEvent;
+use bevy::prelude::*;
 
 #[derive(Component)]
 pub struct GibParticle {
@@ -29,10 +29,7 @@ pub struct SpawnCasingEvent {
     pub is_shotgun: bool,
 }
 
-pub fn handle_gib_events(
-    mut events: EventReader<GibEvent>,
-    mut commands: Commands,
-) {
+pub fn handle_gib_events(mut events: EventReader<GibEvent>, mut commands: Commands) {
     for ev in events.read() {
         for _ in 0..ev.gib_count {
             let vel = Vec3::new(
@@ -59,7 +56,8 @@ pub fn handle_spawn_casing_events(
 ) {
     for ev in events.read() {
         let right = ev.direction.cross(Vec3::Y).normalize_or_zero();
-        let vel = right * (2.0 + rand::random::<f32>() * 2.0) + Vec3::Y * (1.5 + rand::random::<f32>() * 1.5);
+        let vel = right * (2.0 + rand::random::<f32>() * 2.0)
+            + Vec3::Y * (1.5 + rand::random::<f32>() * 1.5);
         commands.spawn((
             BrassCasing {
                 velocity: vel,

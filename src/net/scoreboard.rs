@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
-use bevy::prelude::*;
 use crate::net::protocol::NetMode;
+use bevy::prelude::*;
 
 #[derive(Resource, Debug, Clone)]
 pub struct DukematchState {

@@ -1,40 +1,72 @@
 #![allow(dead_code)]
 
-use bevy::prelude::*;
-use bevy_rapier3d::prelude::*;
 use crate::combat::types::*;
 use crate::player::types::PlayerController;
-use crate::scripting::{ConActor, ConScriptEngine, VmActorContext, move_flags, getincangle};
+use crate::scripting::{getincangle, move_flags, ConActor, ConScriptEngine, VmActorContext};
+use bevy::prelude::*;
+use bevy_rapier3d::prelude::*;
 
 pub fn update_con_actors(
     time: Res<Time>,
     script_engine: Option<Res<ConScriptEngine>>,
     mut commands: Commands,
-    mut actors: Query<(
-        Entity,
-        &mut Transform,
-        &mut ConActor,
-        Option<&mut EnemyActor>,
-        Option<&mut crate::animation::AnimatedTileMaterial>,
-        Option<&mut FlyingActor>,
-        Option<&mut SituationalSpawn>,
-    ), (Without<PlayerController>, Without<crate::combat::types::Projectile>)>,
-    player_query: Query<(&Transform, &PlayerController), (Without<ConActor>, Without<crate::combat::types::Projectile>)>,
-    projectiles: Query<&Transform, (With<crate::combat::types::Projectile>, Without<ConActor>, Without<PlayerController>)>,
+    mut actors: Query<
+        (
+            Entity,
+            &mut Transform,
+            &mut ConActor,
+            Option<&mut EnemyActor>,
+            Option<&mut crate::animation::AnimatedTileMaterial>,
+            Option<&mut FlyingActor>,
+            Option<&mut SituationalSpawn>,
+            Option<&mut KinematicCharacterController>,
+        ),
+        (
+            Without<PlayerController>,
+            Without<crate::combat::types::Projectile>,
+        ),
+    >,
+    player_query: Query<
+        (&Transform, &PlayerController),
+        (Without<ConActor>, Without<crate::combat::types::Projectile>),
+    >,
+    projectiles: Query<
+        &Transform,
+        (
+            With<crate::combat::types::Projectile>,
+            Without<ConActor>,
+            Without<PlayerController>,
+        ),
+    >,
     rapier_context: Option<Res<RapierContext>>,
     mut projectile_events: EventWriter<SpawnProjectileEvent>,
     mut sound_events: EventWriter<crate::audio::PlaySoundEvent>,
     mut duke_voice_events: EventWriter<crate::audio::PlayDukeVoiceEvent>,
     mut explosion_events: EventWriter<crate::interactivity::ExplosionDamageEvent>,
     mut gib_events: EventWriter<GibEvent>,
+    mut rng: ResMut<crate::net::DeterministicRng>,
 ) {
-    let Some(engine) = script_engine else { return; };
-    let Ok((player_trans, player_ctrl)) = player_query.get_single() else { return; };
+    let Some(engine) = script_engine else {
+        return;
+    };
+    let Ok((player_trans, player_ctrl)) = player_query.get_single() else {
+        return;
+    };
 
     let dt = time.delta_seconds();
     let p_pos = player_trans.translation;
 
-    for (entity, mut trans, mut actor, mut enemy_opt, anim_opt, flying_opt, mut sit_opt) in actors.iter_mut() {
+    for (
+        entity,
+        mut trans,
+        mut actor,
+        mut enemy_opt,
+        anim_opt,
+        flying_opt,
+        mut sit_opt,
+        mut kcc_opt,
+    ) in actors.iter_mut()
+    {
         if let Some(ref mut enemy) = enemy_opt {
             if enemy.is_frozen {
                 enemy.freeze_timer -= dt;
@@ -61,8 +93,11 @@ pub fn update_con_actors(
             can_see = true;
             if let Some(ref rapier) = rapier_context {
                 let ray_origin = trans.translation + Vec3::Y * 0.5;
-                let filter = QueryFilter::exclude_kinematic();
-                if let Some((_hit_entity, toi)) = rapier.cast_ray(ray_origin, dir_to_player, dist_to_player, true, filter) {
+                let filter =
+                    QueryFilter::new().groups(CollisionGroups::new(Group::ALL, Group::GROUP_1));
+                if let Some((_hit_entity, toi)) =
+                    rapier.cast_ray(ray_origin, dir_to_player, dist_to_player, true, filter)
+                {
                     if toi < dist_to_player - 0.5 {
                         can_see = false;
                     }
@@ -82,10 +117,27 @@ pub fn update_con_actors(
         }
 
         // 3D Vertical Flight & Swimming Tracking
-        if flying_opt.is_some() || matches!(enemy_opt.as_ref().map(|e| e.kind), Some(EnemyKind::Octabrain | EnemyKind::SentryDrone | EnemyKind::AssaultCommander | EnemyKind::Shark | EnemyKind::ReconCar)) {
+        let mut vertical_movement = 0.0;
+        let is_flying = flying_opt.is_some()
+            || matches!(
+                enemy_opt.as_ref().map(|e| e.kind),
+                Some(
+                    EnemyKind::Octabrain
+                        | EnemyKind::SentryDrone
+                        | EnemyKind::AssaultCommander
+                        | EnemyKind::Shark
+                        | EnemyKind::ReconCar
+                )
+            );
+
+        if is_flying {
             let target_y = p_pos.y + 0.3;
             let diff_y = target_y - trans.translation.y;
-            trans.translation.y += diff_y.clamp(-3.5 * dt, 3.5 * dt);
+            vertical_movement = diff_y.clamp(-3.5 * dt, 3.5 * dt);
+        } else if let Some(ref mut enemy) = enemy_opt {
+            enemy.velocity.y -= 18.0 * dt;
+            enemy.velocity.y = enemy.velocity.y.clamp(-14.0, 7.0);
+            vertical_movement = enemy.velocity.y * dt;
         }
 
         // Convert world pos to Build units
@@ -94,7 +146,8 @@ pub fn update_con_actors(
         let mut sprite_z = -(trans.translation.y * 1024.0 * 16.0) as i32;
 
         let player_build_ang = ((-player_ctrl.yaw / std::f32::consts::TAU) * 2048.0) as i16;
-        let actor_to_player_angle = ((-dir_to_player.z.atan2(dir_to_player.x) / std::f32::consts::TAU) * 2048.0) as i16;
+        let actor_to_player_angle =
+            ((-dir_to_player.z.atan2(dir_to_player.x) / std::f32::consts::TAU) * 2048.0) as i16;
 
         let player_facing_actor = getincangle(player_build_ang, actor_to_player_angle).abs() < 128;
 
@@ -123,7 +176,10 @@ pub fn update_con_actors(
         let actor_pos = trans.translation;
         for proj_trans in projectiles.iter() {
             let p = proj_trans.translation;
-            if (p.x - actor_pos.x).abs() < 5.0 && (p.z - actor_pos.z).abs() < 5.0 && (p.y - actor_pos.y).abs() < 5.0 {
+            if (p.x - actor_pos.x).abs() < 5.0
+                && (p.z - actor_pos.z).abs() < 5.0
+                && (p.y - actor_pos.y).abs() < 5.0
+            {
                 if actor_pos.distance_squared(p) < 25.0 {
                     bullet_near = true;
                     break;
@@ -139,7 +195,8 @@ pub fn update_con_actors(
             dist_to_player: dist_build,
             can_see_player: can_see,
             hit_by_weapon: last_hit != 0,
-            registers,
+            rng: &mut *rng,
+            registers: registers,
             sprite_x: &mut sprite_x,
             sprite_y: &mut sprite_y,
             sprite_z: &mut sprite_z,
@@ -168,13 +225,19 @@ pub fn update_con_actors(
             hitradius_events: Vec::new(),
             player_health: player_ctrl.health,
             player_ang: player_build_ang,
-            player_on_ground: player_ctrl.movement_mode != crate::player::types::PlayerMovementMode::JetpackFlying,
+            player_on_ground: player_ctrl.movement_mode
+                != crate::player::types::PlayerMovementMode::JetpackFlying,
             player_jumping_counter: 0,
             player_posz_velocity: 0,
-            player_crouching: player_ctrl.movement_mode == crate::player::types::PlayerMovementMode::Crouching,
+            player_crouching: player_ctrl.movement_mode
+                == crate::player::types::PlayerMovementMode::Crouching,
             player_xvel: player_ctrl.speed as i32,
             player_running: player_ctrl.speed > 12.0,
-            player_quick_kick: if player_ctrl.quick_kick_timer > 0.0 { 1 } else { 0 },
+            player_quick_kick: if player_ctrl.quick_kick_timer > 0.0 {
+                1
+            } else {
+                0
+            },
             player_shrunk: player_ctrl.shrink_timer > 0.0,
             player_jetpack_on: player_ctrl.inventory.jetpack_active,
             player_steroids_active: player_ctrl.inventory.steroids_active,
@@ -250,7 +313,14 @@ pub fn update_con_actors(
             }
 
             // Lethal Boss Stomp
-            if matches!(enemy.kind, EnemyKind::Boss1Battlelord | EnemyKind::Boss1Mini | EnemyKind::Boss2Overlord | EnemyKind::Boss3Cycloid | EnemyKind::Boss4Queen) {
+            if matches!(
+                enemy.kind,
+                EnemyKind::Boss1Battlelord
+                    | EnemyKind::Boss1Mini
+                    | EnemyKind::Boss2Overlord
+                    | EnemyKind::Boss3Cycloid
+                    | EnemyKind::Boss4Queen
+            ) {
                 if dist_to_player <= 1.25 && player_ctrl.health > 0 {
                     projectile_events.send(SpawnProjectileEvent {
                         projectile_type: ProjectileType::MightyBoot,
@@ -264,7 +334,10 @@ pub fn update_con_actors(
             }
 
             // Slimer facehugger attack
-            if enemy.kind == EnemyKind::ProtozoidSlimer && dist_to_player <= 0.8 && player_ctrl.health > 0 {
+            if enemy.kind == EnemyKind::ProtozoidSlimer
+                && dist_to_player <= 0.8
+                && player_ctrl.health > 0
+            {
                 enemy.attack_timer += dt;
                 if enemy.attack_timer >= 0.5 {
                     enemy.attack_timer = 0.0;
@@ -306,21 +379,23 @@ pub fn update_con_actors(
         // Handle Shoot Events
         for (tile, _, _, _, ang_shot) in shoot_events {
             let shoot_ang_rad = -(ang_shot as f32 / 2048.0) * std::f32::consts::TAU;
-            let fire_dir = Vec3::new(shoot_ang_rad.cos(), 0.0, shoot_ang_rad.sin()).normalize_or_zero();
+            let fire_dir =
+                Vec3::new(shoot_ang_rad.cos(), 0.0, shoot_ang_rad.sin()).normalize_or_zero();
             let fire_origin = trans.translation + Vec3::Y * 0.4 + fire_dir * 0.4;
 
             let (proj_type, vel, dmg) = map_tile_to_projectile(tile);
             if proj_type == ProjectileType::ShotgunPellet {
+                let right = fire_dir.cross(Vec3::Y).normalize_or_zero();
+                let up = Vec3::Y;
                 for _ in 0..7 {
-                    let spread = Vec3::new(
-                        (rand::random::<f32>() - 0.5) * 0.08,
-                        (rand::random::<f32>() - 0.5) * 0.08,
-                        (rand::random::<f32>() - 0.5) * 0.08,
-                    );
+                    let spread_x = (rng.next_f32() - 0.5) * 0.08;
+                    let spread_y = (rng.next_f32() - 0.5) * 0.08;
+                    let final_dir =
+                        (fire_dir + right * spread_x + up * spread_y).normalize_or_zero();
                     projectile_events.send(SpawnProjectileEvent {
                         projectile_type: proj_type,
                         origin: fire_origin,
-                        direction: (fire_dir + spread).normalize_or_zero(),
+                        direction: final_dir,
                         velocity: vel,
                         damage: dmg,
                         is_player_source: false,
@@ -360,13 +435,16 @@ pub fn update_con_actors(
             });
         }
 
+        let mut final_movement = Vec3::new(0.0, vertical_movement, 0.0);
+
         // Movement application from active MoveDef & AI flags
         if let Some(move_ptr) = registers.move_ptr {
             if move_ptr + 1 < engine.compiled.bytecode.len() {
                 let hvel = engine.compiled.bytecode[move_ptr];
                 let flags = *hitag as i32;
 
-                if (flags & move_flags::FACE_PLAYER) != 0 || (flags & move_flags::SEEK_PLAYER) != 0 {
+                if (flags & move_flags::FACE_PLAYER) != 0 || (flags & move_flags::SEEK_PLAYER) != 0
+                {
                     *ang = actor_to_player_angle;
                     let look_dir = dir_to_player.with_y(0.0);
                     if look_dir.length_squared() > 0.001 {
@@ -378,45 +456,16 @@ pub fn update_con_actors(
                     let move_speed = (hvel as f32) / 8.0;
                     let ang_rad = -(*ang as f32 / 2048.0) * std::f32::consts::TAU;
                     let move_dir = Vec3::new(ang_rad.cos(), 0.0, ang_rad.sin());
-                    let step_vec = move_dir * move_speed * dt;
-                    let step_dist = step_vec.length();
-
-                    let mut can_step = true;
-                    let mut actual_step = step_vec;
-
-                    if let Some(ref rapier) = rapier_context {
-                        if step_dist > 0.001 {
-                            let ray_dir = step_vec / step_dist;
-                            let right_vec = Vec3::new(-ray_dir.z, 0.0, ray_dir.x) * 0.25;
-                            let ray_center = trans.translation + Vec3::Y * 0.4;
-                            let origins = [ray_center, ray_center + right_vec, ray_center - right_vec];
-                            let filter = QueryFilter::only_fixed();
-
-                            for ray_origin in origins {
-                                if let Some((_hit_entity, intersection)) = rapier.cast_ray_and_get_normal(
-                                    ray_origin,
-                                    ray_dir,
-                                    step_dist + 0.35,
-                                    true,
-                                    filter,
-                                ) {
-                                    let n = intersection.normal.with_y(0.0).normalize_or_zero();
-                                    if n.length_squared() > 0.01 {
-                                        let tangent_step = step_vec - step_vec.dot(n) * n;
-                                        actual_step = tangent_step;
-                                    } else {
-                                        can_step = false;
-                                    }
-                                    break;
-                                }
-                            }
-                        }
-                    }
-
-                    if can_step {
-                        trans.translation += actual_step;
-                    }
+                    final_movement += move_dir * move_speed * dt;
                 }
+            }
+        }
+
+        if final_movement.length_squared() > 0.0 {
+            if let Some(ref mut kcc) = kcc_opt {
+                kcc.translation = Some(final_movement);
+            } else {
+                trans.translation += final_movement;
             }
         }
 
@@ -429,16 +478,15 @@ pub fn update_con_actors(
 
 pub fn map_tile_to_projectile(tile: i16) -> (ProjectileType, f32, i32) {
     match tile {
-        1625 => (ProjectileType::AlienBlaster, 50.0, 7),     // FIRELASER
-        1636 => (ProjectileType::Spit, 35.0, 8),             // SPIT (Enforcer venom)
-        1641 => (ProjectileType::FreezeShard, 45.0, 20),     // FREEZEBLAST
+        1625 => (ProjectileType::AlienBlaster, 50.0, 7), // FIRELASER
+        1636 => (ProjectileType::Spit, 35.0, 8),         // SPIT (Enforcer venom)
+        1641 => (ProjectileType::FreezeShard, 45.0, 20), // FREEZEBLAST
         1646 | 2556 => (ProjectileType::ShrinkRay, 40.0, 0), // SHRINKSPARK / SHRINKER
-        1650 => (ProjectileType::Mortar, 30.0, 50),          // MORTER (Battlelord / Tank artillery)
-        2595 => (ProjectileType::HitscanBullet, 150.0, 9),   // SHOTSPARK1 (Chaingun / Enforcer / Battlelord)
-        2605 => (ProjectileType::Rocket, 45.0, 140),         // RPG (Commander / Overlord / Cycloid)
-        2613 => (ProjectileType::ShotgunPellet, 80.0, 10),   // SHOTGUN (Pigcop)
-        1360 => (ProjectileType::PsiBlast, 30.0, 38),        // COOLEXPLOSION1 (Octabrain)
+        1650 => (ProjectileType::Mortar, 30.0, 50),      // MORTER (Battlelord / Tank artillery)
+        2595 => (ProjectileType::HitscanBullet, 150.0, 9), // SHOTSPARK1 (Chaingun / Enforcer / Battlelord)
+        2605 => (ProjectileType::Rocket, 45.0, 140),       // RPG (Commander / Overlord / Cycloid)
+        2613 => (ProjectileType::ShotgunPellet, 80.0, 10), // SHOTGUN (Pigcop)
+        1360 => (ProjectileType::PsiBlast, 30.0, 38),      // COOLEXPLOSION1 (Octabrain)
         _ => (ProjectileType::HitscanBullet, 100.0, 10),
     }
 }
-

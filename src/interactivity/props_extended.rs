@@ -1,8 +1,8 @@
 #![allow(dead_code)]
 
-use bevy::prelude::*;
-use crate::player::types::PlayerController;
 use crate::game_flow::state::GamePhase;
+use crate::player::types::PlayerController;
+use bevy::prelude::*;
 
 use crate::interactivity::types::ToiletProp;
 
@@ -48,7 +48,10 @@ pub struct DancerProp {
 
 impl Default for DancerProp {
     fn default() -> Self {
-        Self { tip_timer: 0.0, total_tips: 0 }
+        Self {
+            tip_timer: 0.0,
+            total_tips: 0,
+        }
     }
 }
 
@@ -81,10 +84,7 @@ impl Default for MoneyItem {
     }
 }
 
-pub fn update_toilet_cooldowns(
-    time: Res<Time>,
-    mut toilets: Query<&mut ToiletProp>,
-) {
+pub fn update_toilet_cooldowns(time: Res<Time>, mut toilets: Query<&mut ToiletProp>) {
     let dt = time.delta_seconds();
     for mut toilet in toilets.iter_mut() {
         if toilet.cooldown_timer > 0.0 {
@@ -131,8 +131,7 @@ impl Plugin for ExtendedPropsPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             Update,
-            (update_toilet_cooldowns, update_money_physics)
-                .run_if(in_state(GamePhase::Playing)),
+            (update_toilet_cooldowns, update_money_physics).run_if(in_state(GamePhase::Playing)),
         );
     }
 }

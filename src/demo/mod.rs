@@ -1,14 +1,14 @@
 #![allow(dead_code)]
 
-pub mod format;
-pub mod recorder;
-pub mod player;
 pub mod attract;
+pub mod format;
+pub mod player;
+pub mod recorder;
 
-pub use format::*;
-pub use recorder::*;
-pub use player::*;
 pub use attract::*;
+pub use format::*;
+pub use player::*;
+pub use recorder::*;
 
 use bevy::prelude::*;
 
@@ -76,9 +76,27 @@ mod tests {
         recorder.start(1, 1, 1);
         assert!(recorder.is_recording);
 
-        recorder.record_frame(GameticInput { avel: 10, horz: 0, fvel: 100, svel: 0, bits: demo_bits::RUN });
-        recorder.record_frame(GameticInput { avel: 20, horz: 5, fvel: 100, svel: 0, bits: demo_bits::FIRE });
-        recorder.record_frame(GameticInput { avel: 0, horz: 0, fvel: 0, svel: 0, bits: demo_bits::JUMP });
+        recorder.record_frame(GameticInput {
+            avel: 10,
+            horz: 0,
+            fvel: 100,
+            svel: 0,
+            bits: demo_bits::RUN,
+        });
+        recorder.record_frame(GameticInput {
+            avel: 20,
+            horz: 5,
+            fvel: 100,
+            svel: 0,
+            bits: demo_bits::FIRE,
+        });
+        recorder.record_frame(GameticInput {
+            avel: 0,
+            horz: 0,
+            fvel: 0,
+            svel: 0,
+            bits: demo_bits::JUMP,
+        });
 
         assert_eq!(recorder.inputs.len(), 3);
 

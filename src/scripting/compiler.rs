@@ -1,8 +1,8 @@
 #![allow(dead_code)]
 
-use std::collections::HashMap;
 use crate::scripting::lexer::{Lexer, Token};
 use crate::scripting::types::*;
+use std::collections::HashMap;
 
 pub struct CompiledScript {
     pub bytecode: Vec<i32>,
@@ -83,7 +83,11 @@ impl Compiler {
         Ok(self.build_compiled_script())
     }
 
-    pub fn compile_with_loader<F>(&mut self, source: &str, include_loader: &F) -> Result<CompiledScript, String>
+    pub fn compile_with_loader<F>(
+        &mut self,
+        source: &str,
+        include_loader: &F,
+    ) -> Result<CompiledScript, String>
     where
         F: Fn(&str) -> Option<String>,
     {
@@ -149,7 +153,8 @@ impl Compiler {
                             let delay = self.expect_num_or_symbol(tokens, &mut pos)?;
 
                             let action_addr = self.bytecode.len();
-                            self.bytecode.extend_from_slice(&[start, num, view, inc, delay]);
+                            self.bytecode
+                                .extend_from_slice(&[start, num, view, inc, delay]);
                             self.symbols.insert(name.clone(), action_addr as i32);
                             self.actions.insert(
                                 name,
@@ -188,7 +193,8 @@ impl Compiler {
                             }
 
                             let ai_addr = self.bytecode.len();
-                            self.bytecode.extend_from_slice(&[action_val, move_val, flags]);
+                            self.bytecode
+                                .extend_from_slice(&[action_val, move_val, flags]);
                             self.symbols.insert(name.clone(), ai_addr as i32);
                             self.ais.insert(
                                 name,
@@ -253,7 +259,8 @@ impl Compiler {
                                 self.actor_script_ptrs[picnum] = Some(actor_entry);
                                 self.actor_types[picnum] = actortype;
                                 // 4-word header
-                                self.bytecode.extend_from_slice(&[strength, action, mov, flags]);
+                                self.bytecode
+                                    .extend_from_slice(&[strength, action, mov, flags]);
 
                                 while pos < tokens.len() {
                                     if let Token::Ident(s) = &tokens[pos] {
@@ -281,7 +288,9 @@ impl Compiler {
                                         break;
                                     }
                                     Token::Ident(s) => {
-                                        if is_keyword(s) { break; }
+                                        if is_keyword(s) {
+                                            break;
+                                        }
                                         title_words.push(s.clone());
                                         pos += 1;
                                     }
@@ -293,7 +302,10 @@ impl Compiler {
                                 }
                             }
                             let title = title_words.join(" ");
-                            self.volumes.push(DynamicVolumeDef { volume_id: vol_id, title });
+                            self.volumes.push(DynamicVolumeDef {
+                                volume_id: vol_id,
+                                title,
+                            });
                         }
                         "defineskillname" => {
                             pos += 1;
@@ -307,7 +319,9 @@ impl Compiler {
                                         break;
                                     }
                                     Token::Ident(s) => {
-                                        if is_keyword(s) { break; }
+                                        if is_keyword(s) {
+                                            break;
+                                        }
                                         title_words.push(s.clone());
                                         pos += 1;
                                     }
@@ -337,7 +351,9 @@ impl Compiler {
                                         break;
                                     }
                                     Token::Ident(s) => {
-                                        if is_keyword(s) { break; }
+                                        if is_keyword(s) {
+                                            break;
+                                        }
                                         title_words.push(s.clone());
                                         pos += 1;
                                     }
@@ -349,7 +365,14 @@ impl Compiler {
                                 }
                             }
                             let title = title_words.join(" ");
-                            self.levels.push(DynamicLevelDef { volume, level, filename, par_time_str, three_dr_time_str, title });
+                            self.levels.push(DynamicLevelDef {
+                                volume,
+                                level,
+                                filename,
+                                par_time_str,
+                                three_dr_time_str,
+                                title,
+                            });
                         }
                         "definequote" => {
                             pos += 1;
@@ -363,7 +386,9 @@ impl Compiler {
                                         break;
                                     }
                                     Token::Ident(s) => {
-                                        if is_keyword(s) { break; }
+                                        if is_keyword(s) {
+                                            break;
+                                        }
                                         text_words.push(s.clone());
                                         pos += 1;
                                     }
@@ -385,7 +410,15 @@ impl Compiler {
                             let priority = self.expect_num_or_symbol(&tokens, &mut pos)?;
                             let sound_type = self.expect_num_or_symbol(&tokens, &mut pos)?;
                             let volume = self.expect_num_or_symbol(&tokens, &mut pos)?;
-                            self.sounds.push(DynamicSoundDef { sound_id, filename, pitch1, pitch2, priority, sound_type, volume });
+                            self.sounds.push(DynamicSoundDef {
+                                sound_id,
+                                filename,
+                                pitch1,
+                                pitch2,
+                                priority,
+                                sound_type,
+                                volume,
+                            });
                         }
                         _ => {
                             // Other top level keywords
@@ -436,14 +469,20 @@ impl Compiler {
                     "ifphealthl" => self.compile_if_1arg(Opcode::IfPHealthL, tokens, pos)?,
                     "ifangdiffl" => self.compile_if_1arg(Opcode::IfAngDiffL, tokens, pos)?,
                     "iffloordistl" => self.compile_if_1arg(Opcode::IfFloorDistL, tokens, pos)?,
-                    "ifceilingdistl" => self.compile_if_1arg(Opcode::IfCeilingDistL, tokens, pos)?,
+                    "ifceilingdistl" => {
+                        self.compile_if_1arg(Opcode::IfCeilingDistL, tokens, pos)?
+                    }
                     "ifgapzl" => self.compile_if_1arg(Opcode::IfGapZL, tokens, pos)?,
                     "ifp" => self.compile_if_flags(Opcode::IfP, tokens, pos)?,
 
                     // 0-argument Conditionals
                     "ifcansee" => self.compile_if_0arg(Opcode::IfCanSee, tokens, pos)?,
-                    "ifcanseetarget" => self.compile_if_0arg(Opcode::IfCanSeeTarget, tokens, pos)?,
-                    "ifcanshoottarget" => self.compile_if_0arg(Opcode::IfCanShootTarget, tokens, pos)?,
+                    "ifcanseetarget" => {
+                        self.compile_if_0arg(Opcode::IfCanSeeTarget, tokens, pos)?
+                    }
+                    "ifcanshoottarget" => {
+                        self.compile_if_0arg(Opcode::IfCanShootTarget, tokens, pos)?
+                    }
                     "ifhitweapon" => self.compile_if_0arg(Opcode::IfHitWeapon, tokens, pos)?,
                     "ifdead" => self.compile_if_0arg(Opcode::IfDead, tokens, pos)?,
                     "ifsquished" => self.compile_if_0arg(Opcode::IfSquished, tokens, pos)?,
@@ -452,14 +491,20 @@ impl Compiler {
                     "ifoutside" => self.compile_if_0arg(Opcode::IfOutside, tokens, pos)?,
                     "ifmultiplayer" => self.compile_if_0arg(Opcode::IfMultiplayer, tokens, pos)?,
                     "ifinspace" => self.compile_if_0arg(Opcode::IfInSpace, tokens, pos)?,
-                    "ifinouterspace" => self.compile_if_0arg(Opcode::IfInOuterSpace, tokens, pos)?,
+                    "ifinouterspace" => {
+                        self.compile_if_0arg(Opcode::IfInOuterSpace, tokens, pos)?
+                    }
                     "ifbulletnear" => self.compile_if_0arg(Opcode::IfBulletNear, tokens, pos)?,
                     "ifrespawn" => self.compile_if_0arg(Opcode::IfRespawn, tokens, pos)?,
                     "ifnotmoving" => self.compile_if_0arg(Opcode::IfNotMoving, tokens, pos)?,
-                    "ifawayfromwall" => self.compile_if_0arg(Opcode::IfAwayFromWall, tokens, pos)?,
+                    "ifawayfromwall" => {
+                        self.compile_if_0arg(Opcode::IfAwayFromWall, tokens, pos)?
+                    }
                     "ifnosounds" => self.compile_if_0arg(Opcode::IfNoSounds, tokens, pos)?,
                     "ifhitspace" => self.compile_if_0arg(Opcode::IfHitSpace, tokens, pos)?,
-                    "ifactornotstayput" => self.compile_if_0arg(Opcode::IfActorNotStayput, tokens, pos)?,
+                    "ifactornotstayput" => {
+                        self.compile_if_0arg(Opcode::IfActorNotStayput, tokens, pos)?
+                    }
                     "ifgotweaponce" => self.compile_if_1arg(Opcode::IfGotWeaponCe, tokens, pos)?,
 
                     // State / Subroutine invocation
@@ -495,22 +540,70 @@ impl Compiler {
                     }
 
                     // 0-argument Commands
-                    "killit" => { *pos += 1; self.bytecode.push(Opcode::Killit as i32); }
-                    "fall" => { *pos += 1; self.bytecode.push(Opcode::Fall as i32); }
-                    "break" => { *pos += 1; self.bytecode.push(Opcode::Break as i32); }
-                    "resetcount" => { *pos += 1; self.bytecode.push(Opcode::ResetCount as i32); }
-                    "resetactioncount" => { *pos += 1; self.bytecode.push(Opcode::ResetActionCount as i32); }
-                    "resetplayer" => { *pos += 1; self.bytecode.push(Opcode::ResetPlayer as i32); }
-                    "pstomp" => { *pos += 1; self.bytecode.push(Opcode::PStomp as i32); }
-                    "wackplayer" => { *pos += 1; self.bytecode.push(Opcode::WackPlayer as i32); }
-                    "operate" => { *pos += 1; self.bytecode.push(Opcode::Operate as i32); }
-                    "respawnhitag" => { *pos += 1; self.bytecode.push(Opcode::RespawnHitag as i32); }
-                    "tip" => { *pos += 1; self.bytecode.push(Opcode::Tip as i32); }
-                    "getlastpal" => { *pos += 1; self.bytecode.push(Opcode::GetLastPal as i32); }
-                    "pkick" => { *pos += 1; self.bytecode.push(Opcode::PKick as i32); }
-                    "mikesnd" => { *pos += 1; self.bytecode.push(Opcode::MikeSnd as i32); }
-                    "tossweapon" => { *pos += 1; self.bytecode.push(Opcode::TossWeapon as i32); }
-                    "nullop" => { *pos += 1; self.bytecode.push(Opcode::NullOp as i32); }
+                    "killit" => {
+                        *pos += 1;
+                        self.bytecode.push(Opcode::Killit as i32);
+                    }
+                    "fall" => {
+                        *pos += 1;
+                        self.bytecode.push(Opcode::Fall as i32);
+                    }
+                    "break" => {
+                        *pos += 1;
+                        self.bytecode.push(Opcode::Break as i32);
+                    }
+                    "resetcount" => {
+                        *pos += 1;
+                        self.bytecode.push(Opcode::ResetCount as i32);
+                    }
+                    "resetactioncount" => {
+                        *pos += 1;
+                        self.bytecode.push(Opcode::ResetActionCount as i32);
+                    }
+                    "resetplayer" => {
+                        *pos += 1;
+                        self.bytecode.push(Opcode::ResetPlayer as i32);
+                    }
+                    "pstomp" => {
+                        *pos += 1;
+                        self.bytecode.push(Opcode::PStomp as i32);
+                    }
+                    "wackplayer" => {
+                        *pos += 1;
+                        self.bytecode.push(Opcode::WackPlayer as i32);
+                    }
+                    "operate" => {
+                        *pos += 1;
+                        self.bytecode.push(Opcode::Operate as i32);
+                    }
+                    "respawnhitag" => {
+                        *pos += 1;
+                        self.bytecode.push(Opcode::RespawnHitag as i32);
+                    }
+                    "tip" => {
+                        *pos += 1;
+                        self.bytecode.push(Opcode::Tip as i32);
+                    }
+                    "getlastpal" => {
+                        *pos += 1;
+                        self.bytecode.push(Opcode::GetLastPal as i32);
+                    }
+                    "pkick" => {
+                        *pos += 1;
+                        self.bytecode.push(Opcode::PKick as i32);
+                    }
+                    "mikesnd" => {
+                        *pos += 1;
+                        self.bytecode.push(Opcode::MikeSnd as i32);
+                    }
+                    "tossweapon" => {
+                        *pos += 1;
+                        self.bytecode.push(Opcode::TossWeapon as i32);
+                    }
+                    "nullop" => {
+                        *pos += 1;
+                        self.bytecode.push(Opcode::NullOp as i32);
+                    }
 
                     // 1-argument Commands
                     "strength" => self.compile_1arg(Opcode::Strength, tokens, pos)?,
@@ -554,7 +647,8 @@ impl Compiler {
                         let a2 = self.expect_num_or_symbol(tokens, pos)?;
                         let a3 = self.expect_num_or_symbol(tokens, pos)?;
                         let a4 = self.expect_num_or_symbol(tokens, pos)?;
-                        self.bytecode.extend_from_slice(&[Opcode::PalFrom as i32, a1, a2, a3, a4]);
+                        self.bytecode
+                            .extend_from_slice(&[Opcode::PalFrom as i32, a1, a2, a3, a4]);
                     }
 
                     // 5-argument Commands
@@ -565,7 +659,14 @@ impl Compiler {
                         let a3 = self.expect_num_or_symbol(tokens, pos)?;
                         let a4 = self.expect_num_or_symbol(tokens, pos)?;
                         let a5 = self.expect_num_or_symbol(tokens, pos)?;
-                        self.bytecode.extend_from_slice(&[Opcode::HitRadius as i32, a1, a2, a3, a4, a5]);
+                        self.bytecode.extend_from_slice(&[
+                            Opcode::HitRadius as i32,
+                            a1,
+                            a2,
+                            a3,
+                            a4,
+                            a5,
+                        ]);
                     }
 
                     _ => {
@@ -579,7 +680,12 @@ impl Compiler {
         Ok(())
     }
 
-    fn compile_1arg(&mut self, op: Opcode, tokens: &[Token], pos: &mut usize) -> Result<(), String> {
+    fn compile_1arg(
+        &mut self,
+        op: Opcode,
+        tokens: &[Token],
+        pos: &mut usize,
+    ) -> Result<(), String> {
         *pos += 1;
         let arg = self.expect_num_or_symbol(tokens, pos)?;
         self.bytecode.push(op as i32);
@@ -587,7 +693,12 @@ impl Compiler {
         Ok(())
     }
 
-    fn compile_2args(&mut self, op: Opcode, tokens: &[Token], pos: &mut usize) -> Result<(), String> {
+    fn compile_2args(
+        &mut self,
+        op: Opcode,
+        tokens: &[Token],
+        pos: &mut usize,
+    ) -> Result<(), String> {
         *pos += 1;
         let arg1 = self.expect_num_or_symbol(tokens, pos)?;
         let arg2 = self.expect_num_or_symbol(tokens, pos)?;
@@ -597,7 +708,12 @@ impl Compiler {
         Ok(())
     }
 
-    fn compile_if_0arg(&mut self, op: Opcode, tokens: &[Token], pos: &mut usize) -> Result<(), String> {
+    fn compile_if_0arg(
+        &mut self,
+        op: Opcode,
+        tokens: &[Token],
+        pos: &mut usize,
+    ) -> Result<(), String> {
         *pos += 1;
         self.bytecode.push(op as i32);
         let fail_jump_pos = self.bytecode.len();
@@ -612,7 +728,12 @@ impl Compiler {
         Ok(())
     }
 
-    fn compile_if_1arg(&mut self, op: Opcode, tokens: &[Token], pos: &mut usize) -> Result<(), String> {
+    fn compile_if_1arg(
+        &mut self,
+        op: Opcode,
+        tokens: &[Token],
+        pos: &mut usize,
+    ) -> Result<(), String> {
         *pos += 1;
         let arg = self.expect_num_or_symbol(tokens, pos)?;
         self.bytecode.push(op as i32);
@@ -629,7 +750,12 @@ impl Compiler {
         Ok(())
     }
 
-    fn compile_if_2args(&mut self, op: Opcode, tokens: &[Token], pos: &mut usize) -> Result<(), String> {
+    fn compile_if_2args(
+        &mut self,
+        op: Opcode,
+        tokens: &[Token],
+        pos: &mut usize,
+    ) -> Result<(), String> {
         *pos += 1;
         let arg1 = self.expect_num_or_symbol(tokens, pos)?;
         let arg2 = self.expect_num_or_symbol(tokens, pos)?;
@@ -648,7 +774,12 @@ impl Compiler {
         Ok(())
     }
 
-    fn compile_if_flags(&mut self, op: Opcode, tokens: &[Token], pos: &mut usize) -> Result<(), String> {
+    fn compile_if_flags(
+        &mut self,
+        op: Opcode,
+        tokens: &[Token],
+        pos: &mut usize,
+    ) -> Result<(), String> {
         *pos += 1;
         let mut flags = 0;
         while *pos < tokens.len() && self.is_value(&tokens[*pos]) {
@@ -668,7 +799,12 @@ impl Compiler {
         Ok(())
     }
 
-    fn check_else(&mut self, tokens: &[Token], pos: &mut usize, if_fail_pos: usize) -> Result<(), String> {
+    fn check_else(
+        &mut self,
+        tokens: &[Token],
+        pos: &mut usize,
+        if_fail_pos: usize,
+    ) -> Result<(), String> {
         if *pos < tokens.len() {
             if let Token::Ident(s) = &tokens[*pos] {
                 if s.eq_ignore_ascii_case("else") {
@@ -757,23 +893,113 @@ pub fn is_keyword(s: &str) -> bool {
     let kw = s.to_lowercase();
     matches!(
         kw.as_str(),
-        "include" | "define" | "definevolumename" | "defineskillname" | "definelevelname" | "definequote" | "definesound"
-        | "action" | "move" | "ai" | "state" | "ends" | "actor" | "useractor" | "enda"
-        | "ifpdistl" | "ifpdistg" | "ifcansee" | "ifhitweapon" | "ifdead" | "sound" | "killit"
-        | "else" | "{" | "}" | "ifrnd" | "ifcount" | "ifactioncount" | "ifaction" | "ifmove"
-        | "ifai" | "ifactor" | "ifstrength" | "ifwasweapon" | "ifspawnedby" | "ifpinventory"
-        | "ifspritepal" | "ifphealthl" | "ifangdiffl" | "iffloordistl" | "ifceilingdistl"
-        | "ifgapzl" | "ifp" | "ifcanseetarget" | "ifcanshoottarget" | "ifsquished" | "ifonwater"
-        | "ifinwater" | "ifoutside" | "ifmultiplayer" | "ifinspace" | "ifinouterspace"
-        | "ifbulletnear" | "ifrespawn" | "ifnotmoving" | "ifawayfromwall" | "ifnosounds"
-        | "ifhitspace" | "ifactornotstayput" | "ifgotweaponce" | "strength" | "addstrength"
-        | "addphealth" | "count" | "cactor" | "cstat" | "cstator" | "spritepal" | "clipdist"
-        | "soundonce" | "stopsound" | "globalsound" | "spawn" | "shoot" | "money" | "mail"
-        | "paper" | "lotsofglass" | "sleeptime" | "quote" | "addkills" | "endofgame" | "debug"
-        | "addammo" | "addweapon" | "addinventory" | "debris" | "guts" | "sizeto" | "sizeat"
-        | "palfrom" | "hitradius" | "fall" | "break" | "resetcount" | "resetactioncount"
-        | "resetplayer" | "pstomp" | "wackplayer" | "operate" | "respawnhitag" | "tip"
-        | "getlastpal" | "pkick" | "mikesnd" | "tossweapon" | "nullop"
+        "include"
+            | "define"
+            | "definevolumename"
+            | "defineskillname"
+            | "definelevelname"
+            | "definequote"
+            | "definesound"
+            | "action"
+            | "move"
+            | "ai"
+            | "state"
+            | "ends"
+            | "actor"
+            | "useractor"
+            | "enda"
+            | "ifpdistl"
+            | "ifpdistg"
+            | "ifcansee"
+            | "ifhitweapon"
+            | "ifdead"
+            | "sound"
+            | "killit"
+            | "else"
+            | "{"
+            | "}"
+            | "ifrnd"
+            | "ifcount"
+            | "ifactioncount"
+            | "ifaction"
+            | "ifmove"
+            | "ifai"
+            | "ifactor"
+            | "ifstrength"
+            | "ifwasweapon"
+            | "ifspawnedby"
+            | "ifpinventory"
+            | "ifspritepal"
+            | "ifphealthl"
+            | "ifangdiffl"
+            | "iffloordistl"
+            | "ifceilingdistl"
+            | "ifgapzl"
+            | "ifp"
+            | "ifcanseetarget"
+            | "ifcanshoottarget"
+            | "ifsquished"
+            | "ifonwater"
+            | "ifinwater"
+            | "ifoutside"
+            | "ifmultiplayer"
+            | "ifinspace"
+            | "ifinouterspace"
+            | "ifbulletnear"
+            | "ifrespawn"
+            | "ifnotmoving"
+            | "ifawayfromwall"
+            | "ifnosounds"
+            | "ifhitspace"
+            | "ifactornotstayput"
+            | "ifgotweaponce"
+            | "strength"
+            | "addstrength"
+            | "addphealth"
+            | "count"
+            | "cactor"
+            | "cstat"
+            | "cstator"
+            | "spritepal"
+            | "clipdist"
+            | "soundonce"
+            | "stopsound"
+            | "globalsound"
+            | "spawn"
+            | "shoot"
+            | "money"
+            | "mail"
+            | "paper"
+            | "lotsofglass"
+            | "sleeptime"
+            | "quote"
+            | "addkills"
+            | "endofgame"
+            | "debug"
+            | "addammo"
+            | "addweapon"
+            | "addinventory"
+            | "debris"
+            | "guts"
+            | "sizeto"
+            | "sizeat"
+            | "palfrom"
+            | "hitradius"
+            | "fall"
+            | "break"
+            | "resetcount"
+            | "resetactioncount"
+            | "resetplayer"
+            | "pstomp"
+            | "wackplayer"
+            | "operate"
+            | "respawnhitag"
+            | "tip"
+            | "getlastpal"
+            | "pkick"
+            | "mikesnd"
+            | "tossweapon"
+            | "nullop"
     )
 }
 
@@ -889,7 +1115,10 @@ mod tests {
         assert_eq!(compiled.levels[0].par_time_str, "01:45");
         assert_eq!(compiled.levels[0].title, "HOLLYWOOD HOLOCAUST");
 
-        assert_eq!(compiled.quotes.get(&113).map(|s| s.as_str()), Some("CLIPPING: OFF"));
+        assert_eq!(
+            compiled.quotes.get(&113).map(|s| s.as_str()),
+            Some("CLIPPING: OFF")
+        );
 
         assert_eq!(compiled.sounds.len(), 1);
         assert_eq!(compiled.sounds[0].sound_id, 78);
@@ -931,7 +1160,10 @@ mod tests {
         assert_eq!(compiled.symbols.get("PIGHEALTH"), Some(&100));
         assert_eq!(compiled.volumes.len(), 1);
         assert_eq!(compiled.volumes[0].title, "SHUDDERS");
-        assert_eq!(compiled.quotes.get(&50).map(|s| s.as_str()), Some("READY FOR ACTION"));
+        assert_eq!(
+            compiled.quotes.get(&50).map(|s| s.as_str()),
+            Some("READY FOR ACTION")
+        );
         assert!(compiled.actor_script_ptrs[2000].is_some());
     }
 }

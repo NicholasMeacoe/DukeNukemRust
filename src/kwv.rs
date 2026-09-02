@@ -1,6 +1,6 @@
 #![allow(dead_code)]
-use std::io::{Read, Cursor};
-use hound::{WavSpec, WavWriter, SampleFormat};
+use hound::{SampleFormat, WavSpec, WavWriter};
+use std::io::{Cursor, Read};
 
 #[derive(Debug)]
 pub struct KvvWave {
@@ -17,10 +17,11 @@ impl KvvWave {
             bits_per_sample: 16,
             sample_format: SampleFormat::Int,
         };
-        
+
         let mut out = Vec::new();
         {
-            let mut writer = WavWriter::new(Cursor::new(&mut out), spec).expect("Failed to create WavWriter");
+            let mut writer =
+                WavWriter::new(Cursor::new(&mut out), spec).expect("Failed to create WavWriter");
             for &b in &self.data {
                 // Convert 8-bit unsigned (0-255, 128 mid) to 16-bit signed (-32768-32767, 0 mid)
                 let sample = (b as i16 - 128) << 8;
@@ -28,7 +29,7 @@ impl KvvWave {
             }
             writer.finalize().expect("Failed to finalize WAV");
         }
-        
+
         out
     }
 }
@@ -39,13 +40,16 @@ pub struct Kwv {
 
 fn read_u32(reader: &mut Cursor<&[u8]>) -> Result<u32, String> {
     let mut buf = [0u8; 4];
-    reader.read_exact(&mut buf).map(|_| u32::from_le_bytes(buf)).map_err(|e| e.to_string())
+    reader
+        .read_exact(&mut buf)
+        .map(|_| u32::from_le_bytes(buf))
+        .map_err(|e| e.to_string())
 }
 
 impl Kwv {
     pub fn from_bytes(data: &[u8]) -> Result<Self, String> {
         let mut reader = Cursor::new(data);
-        
+
         let version = read_u32(&mut reader)?;
         if version != 0 {
             return Err(format!("Unsupported KWV version: {}", version));
@@ -53,23 +57,28 @@ impl Kwv {
 
         let num_waves = read_u32(&mut reader)?;
         if num_waves > 10_000 {
-            return Err(format!("KWV num_waves ({}) exceeds safety limit", num_waves));
+            return Err(format!(
+                "KWV num_waves ({}) exceeds safety limit",
+                num_waves
+            ));
         }
         let mut headers = Vec::with_capacity(num_waves as usize);
 
         for _ in 0..num_waves {
             let mut name_buf = [0u8; 16];
-            reader.read_exact(&mut name_buf).map_err(|e| e.to_string())?;
+            reader
+                .read_exact(&mut name_buf)
+                .map_err(|e| e.to_string())?;
             let name = String::from_utf8_lossy(&name_buf)
                 .trim_matches('\0')
                 .trim()
                 .to_string();
-            
+
             let length = read_u32(&mut reader)?;
             let _rep_start = read_u32(&mut reader)?;
             let _rep_length = read_u32(&mut reader)?;
             let _fine_tune = read_u32(&mut reader)?;
-            
+
             headers.push((name, length));
         }
 
@@ -79,8 +88,10 @@ impl Kwv {
                 return Err("KWV wave length exceeds safety limit".to_string());
             }
             let mut wave_data = vec![0u8; length as usize];
-            reader.read_exact(&mut wave_data).map_err(|e| e.to_string())?;
-            
+            reader
+                .read_exact(&mut wave_data)
+                .map_err(|e| e.to_string())?;
+
             waves.push(KvvWave {
                 name,
                 data: wave_data,
