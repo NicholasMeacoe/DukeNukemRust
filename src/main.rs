@@ -195,14 +195,14 @@ fn setup(
                                         art.get_tile_rgba(tile_idx, &pal.colors)
                                     {
                                         if w > 0 && h > 0 {
-                                            let mut image = Image::new_fill(
+                                            let mut image = Image::new(
                                                 bevy::render::render_resource::Extent3d {
                                                     width: w,
                                                     height: h,
                                                     depth_or_array_layers: 1,
                                                 },
                                                 bevy::render::render_resource::TextureDimension::D2,
-                                                &rgba,
+                                                rgba,
                                                 bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb,
                                                 RenderAssetUsages::default(),
                                             );
@@ -227,7 +227,7 @@ fn setup(
         }
     }
 
-    let default_material = materials.add(Color::srgb(0.5, 0.5, 0.6));
+    let default_material = materials.add(StandardMaterial { base_color: Color::srgb(0.5, 0.5, 0.6), unlit: true, double_sided: true, ..default() });
 
     let spark_tile = 2595;
     let spark_material = if let Some(handle) = tile_textures.get(&spark_tile) {
