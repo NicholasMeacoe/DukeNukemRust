@@ -309,7 +309,7 @@ fn setup(
                 offset: CharacterLength::Absolute(0.02),
                 slide: true,
                 autostep: Some(CharacterAutostep {
-                    max_height: CharacterLength::Absolute(0.35),
+                    max_height: CharacterLength::Absolute(0.55),
                     min_width: CharacterLength::Absolute(0.1),
                     include_dynamic_bodies: false,
                 }),
