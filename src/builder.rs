@@ -518,16 +518,28 @@ impl<'a> MapMeshBuilder<'a> {
         sec_idx: usize,
         p1: Vec2,
         p2: Vec2,
-        bottom_y1: f32,
-        bottom_y2: f32,
-        top_y1: f32,
-        top_y2: f32,
+        mut bottom_y1: f32,
+        mut bottom_y2: f32,
+        mut top_y1: f32,
+        mut top_y2: f32,
         wall: &Wall,
         picnum: i16,
         is_solid: bool,
         is_masked: bool,
     ) {
         let (tw, th) = self.get_tile_size(picnum);
+        
+        if is_masked {
+            let actual_height = (th as f32 * 2048.0) / (wall.yrepeat.max(1) as f32 * 1024.0 * 16.0);
+            if wall.align_bottom() {
+                top_y1 = bottom_y1 + actual_height;
+                top_y2 = bottom_y2 + actual_height;
+            } else {
+                bottom_y1 = top_y1 - actual_height;
+                bottom_y2 = top_y2 - actual_height;
+            }
+        }
+
         let wall_len = (p2 - p1).length();
         let avg_height = ((top_y1 - bottom_y1) + (top_y2 - bottom_y2)) / 2.0;
         if wall_len < 0.001 || avg_height.abs() < 0.001 {
