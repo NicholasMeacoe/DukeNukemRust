@@ -206,9 +206,11 @@ fn setup(
                                                 bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb,
                                                 RenderAssetUsages::default(),
                                             );
-                                            image.sampler = ImageSampler::Descriptor(
-                                                ImageSamplerDescriptor::nearest(),
-                                            );
+                                            let mut sampler = ImageSamplerDescriptor::nearest();
+                                            sampler.address_mode_u = bevy::render::texture::ImageAddressMode::Repeat;
+                                            sampler.address_mode_v = bevy::render::texture::ImageAddressMode::Repeat;
+                                            sampler.address_mode_w = bevy::render::texture::ImageAddressMode::Repeat;
+                                            image.sampler = ImageSampler::Descriptor(sampler);
                                             tile_textures
                                                 .insert(tile_idx as i16, images.add(image));
                                             tile_sizes.insert(tile_idx as i16, (w, h));

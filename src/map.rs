@@ -366,6 +366,16 @@ mod tests {
     use super::*;
 
     #[test]
+    fn dump_251() {
+        let mut grp = crate::grp::Grp::open("dukenukem3d/duke3d.grp").unwrap();
+        let map_data = grp.read_file("E1L1.MAP").unwrap();
+        let map = crate::map::Map::from_bytes(&map_data).unwrap();
+        let sec = &map.sectors[268];
+        println!("Sect 251 floorpicnum: {}, shade: {}", sec.floorpicnum, sec.floorshade);
+    }
+
+
+    #[test]
     fn test_flat_sector_height() {
         let sector = Sector {
             wallptr: 0,
