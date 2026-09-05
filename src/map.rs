@@ -368,10 +368,11 @@ mod tests {
     #[test]
     fn dump_251() {
         let mut grp = crate::grp::Grp::open("dukenukem3d/duke3d.grp").unwrap();
-        let map_data = grp.read_file("E1L1.MAP").unwrap();
-        let map = crate::map::Map::from_bytes(&map_data).unwrap();
-        let sec = &map.sectors[268];
-        println!("Sect 251 floorpicnum: {}, shade: {}", sec.floorpicnum, sec.floorshade);
+        let art_data = grp.read_file("TILES000.ART").unwrap();
+        let art = crate::art::Art::from_bytes(&art_data).unwrap();
+        let tile = art.tiles[79].as_ref().unwrap();
+        let tile89 = art.tiles[89].as_ref().unwrap();
+        println!("Tile 79: {}x{}, Tile 89: {}x{}", tile.width, tile.height, tile89.width, tile89.height);
     }
 
 
