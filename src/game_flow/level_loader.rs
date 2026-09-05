@@ -131,7 +131,7 @@ pub fn handle_load_level_events(
                         let sky_tile = match event.episode {
                             1 => 89, // LA_SKY (L.A. Meltdown)
                             2 => 80, // MOONSKY1 (Lunar Apocalypse)
-                            _ => 97, // DEFAULT
+                            _ => 79, // DEFAULT
                         };
                         crate::sky::spawn_skybox(
                             &mut commands,
