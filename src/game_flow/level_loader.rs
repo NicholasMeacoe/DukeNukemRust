@@ -129,7 +129,7 @@ pub fn handle_load_level_events(
                     let has_sky = map.sectors.iter().any(|s| s.is_ceiling_parallax());
                     if has_sky {
                         let sky_tile = match event.episode {
-                            1 => 89, // LA_SKY (L.A. Meltdown)
+                            1 => 79, // LA_SKY (L.A. Meltdown)
                             2 => 80, // MOONSKY1 (Lunar Apocalypse)
                             _ => 79, // DEFAULT
                         };

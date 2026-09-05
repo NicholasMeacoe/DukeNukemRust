@@ -143,8 +143,9 @@ impl Palette {
     /// Convert Build engine signed shade (-128..127) into a RGBA tint factor [0.0..1.0] for Bevy vertex color modulation.
     pub fn shade_to_tint(shade: i8) -> [f32; 4] {
         // Build shade: 0 is normal, positive is darker
-        // We use a less aggressive scaling so dark sectors remain visible
-        let factor = (1.0 - (shade as f32 / 64.0)).clamp(0.2, 1.5);
+        // Duke 3D's software renderer doesn't darken as aggressively as a linear multiplier.
+        // We clamp it to a very forgiving 0.5 so even the darkest sectors are fully visible.
+        let factor = (1.0 - (shade as f32 / 128.0)).clamp(0.5, 1.5);
         [factor, factor, factor, 1.0]
     }
 }
