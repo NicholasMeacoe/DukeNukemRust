@@ -722,14 +722,17 @@ impl<'a> MapMeshBuilder<'a> {
                     sprite.y as f32 / 1024.0,
                 );
 
-                let scale_x = (sprite.xrepeat as f32 * tw as f32) / 4096.0;
-                let scale_y = (sprite.yrepeat as f32 * th as f32) / 4096.0;
+                let is_wall_aligned = (sprite.cstat & 16) != 0;
+                let is_floor_aligned = (sprite.cstat & 32) != 0;
+
+                // Wall-aligned and floor-aligned sprites use a different scaling factor in Build Engine
+                let divisor = if is_wall_aligned || is_floor_aligned { 2048.0 } else { 4096.0 };
+                let scale_x = (sprite.xrepeat as f32 * tw as f32) / divisor;
+                let scale_y = (sprite.yrepeat as f32 * th as f32) / divisor;
+
                 let is_enemy = sprite.picnum == 2000; // PIGCOP
 
                 let sprite_mat = self.get_material(sprite.picnum, true, materials);
-
-                let is_wall_aligned = (sprite.cstat & 16) != 0;
-                let is_floor_aligned = (sprite.cstat & 32) != 0;
 
                 // In Build Engine, Z is the bottom of the sprite unless cstat & 128 is set (Centered)
                 let is_centered = (sprite.cstat & 128) != 0;
