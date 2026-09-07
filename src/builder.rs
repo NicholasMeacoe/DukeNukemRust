@@ -63,7 +63,12 @@ impl<'a> MapMeshBuilder<'a> {
                 ..default()
             })
         } else {
-            self.default_material.clone()
+            println!("WARNING: Texture {} not found in tile_textures!", picnum);
+            materials.add(StandardMaterial {
+                base_color: Color::BLACK,
+                unlit: true,
+                ..default()
+            })
         };
 
         self.material_cache.borrow_mut().insert(key, handle.clone());
@@ -200,8 +205,26 @@ impl<'a> MapMeshBuilder<'a> {
                     .vertices
                     .iter()
                     .map(|v| {
-                        let bx = v[0] * 1024.0;
-                        let by = v[1] * 1024.0;
+                        let mut bx = v[0] * 1024.0;
+                        let mut by = v[1] * 1024.0;
+                        
+                        if sector.floorstat & 64 != 0 && sector.wallnum > 0 {
+                            let w0 = &self.map.walls[sector.wallptr as usize];
+                            let w1 = &self.map.walls[w0.point2 as usize];
+                            let dx = (w1.x - w0.x) as f32;
+                            let dy = (w1.y - w0.y) as f32;
+                            let len = (dx * dx + dy * dy).sqrt();
+                            if len > 0.001 {
+                                let ux = dx / len;
+                                let uy = dy / len;
+                                let px = bx - (w0.x as f32);
+                                let py = by - (w0.y as f32);
+                                // Rotate relative to first wall
+                                bx = px * ux + py * uy;
+                                by = px * uy - py * ux; 
+                            }
+                        }
+
                         let u =
                             (bx / (floor_tw as f32 * 16.0)) + (sector.floorxpanning as f32 / 256.0);
                         let v_coord =
@@ -283,8 +306,25 @@ impl<'a> MapMeshBuilder<'a> {
                     .vertices
                     .iter()
                     .map(|v| {
-                        let bx = v[0] * 1024.0;
-                        let by = v[1] * 1024.0;
+                        let mut bx = v[0] * 1024.0;
+                        let mut by = v[1] * 1024.0;
+                        
+                        if sector.ceilingstat & 64 != 0 && sector.wallnum > 0 {
+                            let w0 = &self.map.walls[sector.wallptr as usize];
+                            let w1 = &self.map.walls[w0.point2 as usize];
+                            let dx = (w1.x - w0.x) as f32;
+                            let dy = (w1.y - w0.y) as f32;
+                            let len = (dx * dx + dy * dy).sqrt();
+                            if len > 0.001 {
+                                let ux = dx / len;
+                                let uy = dy / len;
+                                let px = bx - (w0.x as f32);
+                                let py = by - (w0.y as f32);
+                                bx = px * ux + py * uy;
+                                by = px * uy - py * ux;
+                            }
+                        }
+
                         let u = (bx / (ceil_tw as f32 * 16.0))
                             + (sector.ceilingxpanning as f32 / 256.0);
                         let v_coord = (by / (ceil_th as f32 * 16.0))
@@ -424,7 +464,11 @@ impl<'a> MapMeshBuilder<'a> {
                         next_sec.get_ceiling_y_at(&self.map.walls, next_wall.x, next_wall.y);
 
                     // 1. Upper Wall (Step down from ceiling)
-                    if next_ceil_y1 < cur_ceil_y1 - 0.001 || next_ceil_y2 < cur_ceil_y2 - 0.001 {
+                    let cur_sec = &self.map.sectors[sec_idx];
+                    if (next_ceil_y1 < cur_ceil_y1 - 0.001 || next_ceil_y2 < cur_ceil_y2 - 0.001)
+                        && !cur_sec.is_ceiling_parallax()
+                        && !next_sec.is_ceiling_parallax()
+                    {
                         self.spawn_wall_quad(
                             commands,
                             meshes,
@@ -443,8 +487,11 @@ impl<'a> MapMeshBuilder<'a> {
                         );
                     }
 
-                    // 2. Lower Wall (Step up from floor)
-                    if next_floor_y1 > cur_floor_y1 + 0.001 || next_floor_y2 > cur_floor_y2 + 0.001
+                    // 2. Lower Wall (Step up from floor or drop down to abyss)
+                    let cur_sec = &self.map.sectors[sec_idx];
+                    if (next_floor_y1 > cur_floor_y1 + 0.001 || next_floor_y2 > cur_floor_y2 + 0.001) 
+                        && !cur_sec.is_floor_parallax()
+                        && !next_sec.is_floor_parallax()
                     {
                         let lower_picnum = if wall.bottoms_swapped() {
                             wall.picnum
@@ -602,8 +649,6 @@ impl<'a> MapMeshBuilder<'a> {
         let collider_indices: Vec<[u32; 3]> = vec![
             [0, 1, 2],
             [0, 2, 3],
-            [0, 2, 1],
-            [0, 3, 2], // Double-sided wall collision
         ];
 
         let visibility = if wall.yrepeat == 0 || picnum == 79 || picnum == 89 || picnum == 97 {
@@ -660,9 +705,9 @@ impl<'a> MapMeshBuilder<'a> {
                 // In Duke 3D, lotag 1-4 is exclusively for difficulty on these actors.
                 // We'll skip spawning them entirely.
                 match sprite.picnum {
-                    // Items & Monsters
+                    // Items & Monsters & Multiplayer Starts
                     2000 | 1680 | 1820 | 2120 | 1960 | 2370 | 2710 | 4610 | 21 | 22 | 23 | 27
-                    | 28 | 29 | 33 | 37 | 40 | 44 | 51 | 52 | 53 | 54 | 55 | 56 | 57 | 60 | 61 => {
+                    | 28 | 29 | 33 | 37 | 40 | 44 | 51 | 52 | 53 | 54 | 55 | 56 | 57 | 60 | 61 | 1405 => {
                         continue;
                     }
                     _ => {} // Other things with lotag (like sector effectors) are logic IDs!
@@ -671,35 +716,104 @@ impl<'a> MapMeshBuilder<'a> {
 
             if self.tile_textures.contains_key(&sprite.picnum) {
                 let (tw, th) = self.get_tile_size(sprite.picnum);
-                let pos = Vec3::new(
+                let mut pos = Vec3::new(
                     sprite.x as f32 / 1024.0,
                     -(sprite.z as f32) / (1024.0 * 16.0),
                     sprite.y as f32 / 1024.0,
                 );
 
-                let scale_x = (sprite.xrepeat as f32 * tw as f32) / 4096.0 * 3.0;
-                let scale_y = (sprite.yrepeat as f32 * th as f32) / 4096.0 * 3.0;
+                let scale_x = (sprite.xrepeat as f32 * tw as f32) / 4096.0;
+                let scale_y = (sprite.yrepeat as f32 * th as f32) / 4096.0;
                 let is_enemy = sprite.picnum == 2000; // PIGCOP
 
                 let sprite_mat = self.get_material(sprite.picnum, true, materials);
 
+                let is_wall_aligned = (sprite.cstat & 16) != 0;
+                let is_floor_aligned = (sprite.cstat & 32) != 0;
+
+                // In Build Engine, Z is the bottom of the sprite unless cstat & 128 is set (Centered)
+                let is_centered = (sprite.cstat & 128) != 0;
+                if !is_centered {
+                    pos.y += scale_y / 2.0;
+                }
+
+                let mut transform = Transform::from_translation(pos);
+
+                if is_wall_aligned {
+                    // Wall aligned sprite: rotate around Y axis
+                    // ang represents the NORMAL. So the plane extends along ang + 512.
+                    // Bevy Rectangle extends along X. 
+                    let angle_rad = ((sprite.ang as f32 - 512.0) / 2048.0) * std::f32::consts::TAU;
+                    transform.rotation = Quat::from_rotation_y(angle_rad);
+                } else if is_floor_aligned {
+                    // Floor aligned sprite: lay flat
+                    let angle_rad = ((sprite.ang as f32 - 512.0) / 2048.0) * std::f32::consts::TAU;
+                    transform.rotation = Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2) * Quat::from_rotation_z(angle_rad);
+                }
+
+                transform.scale = Vec3::new(scale_x, scale_y, 1.0);
+
+                // Create a custom mesh for the sprite with slightly clamped UVs to prevent
+                // texture wrap-around streaks when using Repeat sampler globally.
+                let mut sprite_mesh = Mesh::new(
+                    bevy::render::mesh::PrimitiveTopology::TriangleList,
+                    bevy::render::render_asset::RenderAssetUsages::default(),
+                );
+                // 1.0x1.0 quad, centered
+                sprite_mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, vec![
+                    [-0.5, -0.5, 0.0],
+                    [0.5, -0.5, 0.0],
+                    [0.5, 0.5, 0.0],
+                    [-0.5, 0.5, 0.0],
+                ]);
+                // UVs clamped slightly inside to avoid edge bleeding
+                sprite_mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, vec![
+                    [0.001, 0.999], // Bottom-left
+                    [0.999, 0.999], // Bottom-right
+                    [0.999, 0.001], // Top-right
+                    [0.001, 0.001], // Top-left
+                ]);
+                sprite_mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, vec![
+                    [0.0, 0.0, 1.0],
+                    [0.0, 0.0, 1.0],
+                    [0.0, 0.0, 1.0],
+                    [0.0, 0.0, 1.0],
+                ]);
+                sprite_mesh.insert_indices(bevy::render::mesh::Indices::U32(vec![0, 1, 2, 0, 2, 3]));
+
                 let mut entity_cmds = commands.spawn((
                     PbrBundle {
-                        mesh: meshes.add(Rectangle::new(1.0, 1.0)),
+                        mesh: meshes.add(sprite_mesh),
                         material: sprite_mat.clone(),
-                        transform: Transform::from_translation(pos)
-                            .with_scale(Vec3::new(scale_x, scale_y, 1.0)),
+                        transform,
                         ..default()
                     },
-                    crate::SpriteBillboard,
-                    RigidBody::Fixed,
-                    Collider::cuboid(0.5, 0.5, 0.1),
                     crate::Destructible {
                         health: if is_enemy { 100 } else { 10 },
                         _picnum: sprite.picnum,
                     },
                     crate::game_flow::LevelEntity,
                 ));
+
+                let is_blocking = (sprite.cstat & 1) != 0;
+                if is_blocking || is_enemy {
+                    entity_cmds.insert(RigidBody::Fixed);
+                    
+                    if !is_wall_aligned && !is_floor_aligned {
+                        // Face sprites: narrow cylinder
+                        entity_cmds.insert(Collider::cylinder(0.4, 0.4));
+                    } else if is_wall_aligned {
+                        // Wall aligned: thin cuboid
+                        entity_cmds.insert(Collider::cuboid(0.5, 0.5, 0.05));
+                    } else {
+                        // Floor aligned: flat cuboid
+                        entity_cmds.insert(Collider::cuboid(0.5, 0.05, 0.5));
+                    }
+                }
+
+                if !is_wall_aligned && !is_floor_aligned {
+                    entity_cmds.insert(crate::SpriteBillboard);
+                }
 
                 // Attach Phase 4 Interactive Components directly to visual entities!
                 match sprite.picnum {

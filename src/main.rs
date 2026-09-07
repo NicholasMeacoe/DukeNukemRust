@@ -115,26 +115,11 @@ fn main() {
                     update_billboards,
                     update_directional_sprites,
                     sky::update_skybox,
-                    capture_debug_screenshot,
                 )
                     .in_set(GameSet::RenderSync),
             ),
         )
         .run();
-}
-
-fn capture_debug_screenshot(
-    main_window: Query<Entity, With<bevy::window::PrimaryWindow>>,
-    mut screenshot_manager: ResMut<bevy::render::view::screenshot::ScreenshotManager>,
-    keys: Res<ButtonInput<KeyCode>>,
-) {
-    if keys.just_pressed(KeyCode::F12) || keys.just_pressed(KeyCode::F10) {
-        if let Ok(window_entity) = main_window.get_single() {
-            let path = "debug_screenshot.png";
-            let _ = screenshot_manager.save_screenshot_to_disk(window_entity, path);
-            println!("Saved in-game screenshot to {}", path);
-        }
-    }
 }
 
 fn play_duke_quotes(
@@ -218,6 +203,57 @@ fn setup(
                                                 picanm_map.insert(tile_idx as i16, picanm);
                                             }
                                         }
+                                    }
+                                }
+
+                                // Stitch LA panorama if we have tiles 89..93
+                                if art.local_tile_start <= 89 && art.local_tile_end >= 93 {
+                                    let psky = [90, 91, 90, 92, 93, 89, 91, 92];
+                                    let mut pieces = Vec::new();
+                                    let mut valid = true;
+                                    let mut common_h = 0;
+                                    for t in psky {
+                                        if let Some((w, h, rgba)) = art.get_tile_rgba(t, &pal.colors) {
+                                            if w == 128 {
+                                                common_h = h;
+                                                pieces.push(rgba);
+                                            } else {
+                                                valid = false;
+                                                break;
+                                            }
+                                        } else {
+                                            valid = false;
+                                            break;
+                                        }
+                                    }
+                                    if valid && pieces.len() == 8 && common_h > 0 {
+                                        let mut pan_rgba = Vec::with_capacity(1024 * common_h as usize * 4);
+                                        for y in 0..common_h as usize {
+                                            for piece in &pieces {
+                                                let row_start = y * 128 * 4;
+                                                let row_end = row_start + 128 * 4;
+                                                pan_rgba.extend_from_slice(&piece[row_start..row_end]);
+                                            }
+                                        }
+                                        let mut image = Image::new(
+                                            bevy::render::render_resource::Extent3d {
+                                                width: 1024,
+                                                height: common_h,
+                                                depth_or_array_layers: 1,
+                                            },
+                                            bevy::render::render_resource::TextureDimension::D2,
+                                            pan_rgba,
+                                            bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb,
+                                            bevy::render::render_asset::RenderAssetUsages::default(),
+                                        );
+                                        let mut sampler = bevy::render::texture::ImageSamplerDescriptor::nearest();
+                                        sampler.address_mode_u = bevy::render::texture::ImageAddressMode::Repeat;
+                                        sampler.address_mode_v = bevy::render::texture::ImageAddressMode::Repeat;
+                                        sampler.address_mode_w = bevy::render::texture::ImageAddressMode::Repeat;
+                                        image.sampler = ImageSampler::Descriptor(sampler);
+                                        tile_textures.insert(89, images.add(image));
+                                        tile_sizes.insert(89, (1024, common_h));
+                                        println!("Stitched LA_SKY panorama for tile 89");
                                     }
                                 }
                             }
@@ -326,6 +362,10 @@ fn setup(
     let _camera_entity = commands
         .spawn((
             Camera3dBundle {
+                projection: Projection::Perspective(PerspectiveProjection {
+                    fov: 90.0_f32.to_radians(),
+                    ..default()
+                }),
                 transform: Transform::from_xyz(0.0, 0.4, 0.0)
                     .with_rotation(Quat::from_rotation_y(start_yaw)),
                 ..default()

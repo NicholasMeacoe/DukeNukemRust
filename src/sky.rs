@@ -17,6 +17,7 @@ pub fn spawn_skybox(
         unlit: true,
         cull_mode: None, // Render inside of dome/cylinder
         double_sided: true,
+        fog_enabled: false,
         ..default()
     });
 
@@ -28,9 +29,12 @@ pub fn spawn_skybox(
     
     // Scale UVs so the sky texture tiles correctly around the panorama
     if let Some(bevy::render::mesh::VertexAttributeValues::Float32x2(uvs)) = cylinder_mesh.attribute_mut(Mesh::ATTRIBUTE_UV_0) {
+        println!("Modifying sky UVs!");
         for uv in uvs.iter_mut() {
             uv[0] *= 16.0; // Tile 16 times around the cylinder
         }
+    } else {
+        println!("WARNING: NO SKY UVS FOUND!");
     }
 
     // Invert U coordinate so textures are not mirrored when viewed from the inside
