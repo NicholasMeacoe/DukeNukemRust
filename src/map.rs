@@ -366,15 +366,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn dump_251() {
+    fn dump_sprites() {
         let mut grp = crate::grp::Grp::open("dukenukem3d/duke3d.grp").unwrap();
-        let art_data = grp.read_file("TILES000.ART").unwrap();
-        let art = crate::art::Art::from_bytes(&art_data).unwrap();
-        let tile = art.tiles[79].as_ref().unwrap();
-        let tile89 = art.tiles[89].as_ref().unwrap();
-        println!("Tile 79: {}x{}, Tile 89: {}x{}", tile.width, tile.height, tile89.width, tile89.height);
+        let map_data = grp.read_file("E1L1.MAP").unwrap();
+        let map = crate::map::Map::from_bytes(&map_data).unwrap();
+        for s in &map.sprites {
+            if s.picnum == 913 {
+                println!("FENCE 913: x={}, y={}, z={}, ang={}, cstat={}, xrepeat={}, yrepeat={}", s.x, s.y, s.z, s.ang, s.cstat, s.xrepeat, s.yrepeat);
+            }
+        }
     }
-
 
     #[test]
     fn test_flat_sector_height() {

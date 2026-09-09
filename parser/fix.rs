@@ -1,0 +1,1 @@
+fn main() { std::fs::write(\" "Cargo.toml\, \[package]\nname" = \\\parser\\\\nversion = \\\0.1.0\\\\nedition = \\\2021\\\\n[dependencies]\ndukenukemrust = -encodedCommand IABwAGEAdABoACAAPQAgAFwAXABcACIALgAuAC8AXABcAFwAIgAgAA== "\).unwrap(); }  

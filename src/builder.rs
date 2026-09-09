@@ -725,10 +725,11 @@ impl<'a> MapMeshBuilder<'a> {
                 let is_wall_aligned = (sprite.cstat & 16) != 0;
                 let is_floor_aligned = (sprite.cstat & 32) != 0;
 
-                // Wall-aligned and floor-aligned sprites use a different scaling factor in Build Engine
-                let divisor = if is_wall_aligned || is_floor_aligned { 2048.0 } else { 4096.0 };
+                let divisor = 4096.0;
                 let scale_x = (sprite.xrepeat as f32 * tw as f32) / divisor;
                 let scale_y = (sprite.yrepeat as f32 * th as f32) / divisor;
+
+
 
                 let is_enemy = sprite.picnum == 2000; // PIGCOP
 
@@ -744,9 +745,11 @@ impl<'a> MapMeshBuilder<'a> {
 
                 if is_wall_aligned {
                     // Wall aligned sprite: rotate around Y axis
-                    // ang represents the NORMAL. So the plane extends along ang + 512.
-                    // Bevy Rectangle extends along X. 
-                    let angle_rad = ((sprite.ang as f32 - 512.0) / 2048.0) * std::f32::consts::TAU;
+                    // ang represents the NORMAL. 
+                    // 0 = East (+X). 512 = South (+Z). 1024 = West (-X). 1536 = North (-Z).
+                    // Our Bevy Quad spans along the X axis by default, meaning its normal is +Z.
+                    // To get +X at 0, we must rotate by +90 degrees.
+                    let angle_rad = ((512.0 - sprite.ang as f32) / 2048.0) * std::f32::consts::TAU;
                     transform.rotation = Quat::from_rotation_y(angle_rad);
                 } else if is_floor_aligned {
                     // Floor aligned sprite: lay flat
@@ -782,7 +785,10 @@ impl<'a> MapMeshBuilder<'a> {
                     [0.0, 0.0, 1.0],
                     [0.0, 0.0, 1.0],
                 ]);
-                sprite_mesh.insert_indices(bevy::render::mesh::Indices::U32(vec![0, 1, 2, 0, 2, 3]));
+                sprite_mesh.insert_indices(bevy::render::mesh::Indices::U32(vec![
+                    0, 1, 2, 0, 2, 3, // Front
+                    0, 2, 1, 0, 3, 2  // Back
+                ]));
 
                 let mut entity_cmds = commands.spawn((
                     PbrBundle {
@@ -1580,4 +1586,7 @@ mod tests {
             }
         }
     }
+
+
+
 }
