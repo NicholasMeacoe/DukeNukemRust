@@ -64,11 +64,7 @@ impl<'a> MapMeshBuilder<'a> {
             })
         } else {
             println!("WARNING: Texture {} not found in tile_textures!", picnum);
-            materials.add(StandardMaterial {
-                base_color: Color::BLACK,
-                unlit: true,
-                ..default()
-            })
+            self.default_material.clone()
         };
 
         self.material_cache.borrow_mut().insert(key, handle.clone());
@@ -233,7 +229,7 @@ impl<'a> MapMeshBuilder<'a> {
                     })
                     .collect();
 
-                let floor_tint = Palette::shade_to_tint(sector.floorshade);
+                let floor_tint = Palette::authentic_shade_to_tint(sector.floorshade);
                 let floor_colors: Vec<[f32; 4]> = vec![floor_tint; floor_vertices.len()];
 
                 let floor_indices = buffers.indices.clone();
@@ -270,7 +266,7 @@ impl<'a> MapMeshBuilder<'a> {
                         Collider::trimesh(floor_collider_vertices, floor_collider_indices),
                         crate::interactivity::DynamicSectorMesh {
                             sector_idx: sec_idx,
-                            orig_translation: Vec3::ZERO,
+                            part: crate::interactivity::SectorMeshPart::Floor,
                         },
                         crate::game_flow::LevelEntity,
                     ));
@@ -333,7 +329,7 @@ impl<'a> MapMeshBuilder<'a> {
                     })
                     .collect();
 
-                let ceil_tint = Palette::shade_to_tint(sector.ceilingshade);
+                let ceil_tint = Palette::authentic_shade_to_tint(sector.ceilingshade);
                 let ceil_colors: Vec<[f32; 4]> = vec![ceil_tint; ceil_vertices.len()];
 
                 // Reverse ceiling winding order so normals face downwards
@@ -377,7 +373,7 @@ impl<'a> MapMeshBuilder<'a> {
                         Collider::trimesh(ceil_collider_vertices, ceil_collider_indices),
                         crate::interactivity::DynamicSectorMesh {
                             sector_idx: sec_idx,
-                            orig_translation: Vec3::ZERO,
+                            part: crate::interactivity::SectorMeshPart::Ceiling,
                         },
                         crate::game_flow::LevelEntity,
                     ));
@@ -437,6 +433,7 @@ impl<'a> MapMeshBuilder<'a> {
                         meshes,
                         materials,
                         sec_idx,
+                        crate::interactivity::SectorMeshPart::MiddleWall,
                         p1,
                         p2,
                         cur_floor_y1,
@@ -474,6 +471,7 @@ impl<'a> MapMeshBuilder<'a> {
                             meshes,
                             materials,
                             sec_idx,
+                            crate::interactivity::SectorMeshPart::UpperWall,
                             p1,
                             p2,
                             next_ceil_y1,
@@ -506,6 +504,7 @@ impl<'a> MapMeshBuilder<'a> {
                             meshes,
                             materials,
                             sec_idx,
+                            crate::interactivity::SectorMeshPart::LowerWall,
                             p1,
                             p2,
                             cur_floor_y1,
@@ -539,6 +538,7 @@ impl<'a> MapMeshBuilder<'a> {
                                 meshes,
                                 materials,
                                 sec_idx,
+                                crate::interactivity::SectorMeshPart::MiddleWall,
                                 p1,
                                 p2,
                                 mid_floor_y1,
@@ -563,6 +563,7 @@ impl<'a> MapMeshBuilder<'a> {
         meshes: &mut Assets<Mesh>,
         materials: &mut Assets<StandardMaterial>,
         sec_idx: usize,
+        part: crate::interactivity::SectorMeshPart,
         p1: Vec2,
         p2: Vec2,
         mut bottom_y1: f32,
@@ -625,7 +626,7 @@ impl<'a> MapMeshBuilder<'a> {
         let positions = vec![v0_pos, v1_pos, v2_pos, v3_pos];
         // v0/v1 are bottom vertices, v2/v3 are top vertices
         let uvs = vec![[u0, v_bottom], [u1, v_bottom], [u1, v_top], [u0, v_top]];
-        let tint = Palette::shade_to_tint(wall.shade);
+        let tint = Palette::authentic_shade_to_tint(wall.shade);
         let colors = vec![tint; 4];
         let indices = vec![0u32, 1, 2, 0, 2, 3];
 
@@ -666,7 +667,7 @@ impl<'a> MapMeshBuilder<'a> {
             },
             crate::interactivity::DynamicSectorMesh {
                 sector_idx: sec_idx,
-                orig_translation: Vec3::ZERO,
+                part,
             },
             crate::game_flow::LevelEntity,
         ));
@@ -699,15 +700,67 @@ impl<'a> MapMeshBuilder<'a> {
         skill_level: u8,
     ) {
         for sprite in &self.map.sprites {
+            // Editor utility sprites (picnum 1..=8: SECTOREFFECTOR, ACTIVATOR, TOUCHPLATE, etc.)
+            // are logic markers and should not be rendered as visible 3D textured quads in the world.
+            if (1..=8).contains(&sprite.picnum) {
+                let pos = Vec3::new(
+                    sprite.x as f32 / 1024.0,
+                    -(sprite.z as f32) / (1024.0 * 16.0),
+                    sprite.y as f32 / 1024.0,
+                );
+                let transform = Transform::from_translation(pos);
+
+                match sprite.picnum {
+                    MASTERSWITCH => {
+                        commands.spawn((
+                            SpatialBundle::from_transform(transform),
+                            crate::interactivity::MasterSwitch {
+                                lotag: sprite.lotag,
+                                hitag: sprite.hitag,
+                                delay: (sprite.extra.max(0) as f32) * 0.1,
+                                timer: None,
+                                is_triggered: false,
+                            },
+                            crate::game_flow::LevelEntity,
+                        ));
+                    }
+                    MUSICANDSFX => {
+                        let sound_id = sprite.lotag as i32;
+                        let range = if sprite.hitag > 0 {
+                            (sprite.hitag as f32) / 1024.0 * 16.0
+                        } else {
+                            20.0
+                        };
+                        commands.spawn((
+                            SpatialBundle::from_transform(transform),
+                            crate::audio::AmbientSoundEmitter {
+                                sound_id,
+                                range,
+                                repeat_delay: 4.0,
+                                timer: 0.5,
+                            },
+                            crate::game_flow::LevelEntity,
+                        ));
+                    }
+                    _ => {}
+                }
+                continue;
+            }
+
             // Difficulty filtering (only affects enemies, items, etc. mapped to lotag > 0)
             if sprite.lotag > 0 && sprite.lotag <= 4 && sprite.lotag > (skill_level as i16 + 1) {
                 // If it's a known monster or item, we should skip it.
                 // In Duke 3D, lotag 1-4 is exclusively for difficulty on these actors.
                 // We'll skip spawning them entirely.
                 match sprite.picnum {
-                    // Items & Monsters & Multiplayer Starts
-                    2000 | 1680 | 1820 | 2120 | 1960 | 2370 | 2710 | 4610 | 21 | 22 | 23 | 27
-                    | 28 | 29 | 33 | 37 | 40 | 44 | 51 | 52 | 53 | 54 | 55 | 56 | 57 | 60 | 61 | 1405 => {
+                    // Enemies
+                    p if p == PIGCOP || p == LIZTROOP || p == OCTABRAIN || p == ENFORCER
+                        || p == 1960 || p == 2370 || p == 2710 || p == 4610 => {
+                        continue;
+                    }
+                    // Weapons & pickups & multiplayer starts
+                    21 | 22 | 23 | 27 | 28 | 29 | 33 | 37 | 40 | 44
+                    | 51 | 52 | 53 | 54 | 55 | 56 | 57 | 60 | 61 | 1405 => {
                         continue;
                     }
                     _ => {} // Other things with lotag (like sector effectors) are logic IDs!
@@ -731,7 +784,7 @@ impl<'a> MapMeshBuilder<'a> {
 
 
 
-                let is_enemy = sprite.picnum == 2000; // PIGCOP
+                let is_enemy = sprite.picnum == PIGCOP; // PIGCOP
 
                 let sprite_mat = self.get_material(sprite.picnum, true, materials);
 
@@ -785,6 +838,8 @@ impl<'a> MapMeshBuilder<'a> {
                     [0.0, 0.0, 1.0],
                     [0.0, 0.0, 1.0],
                 ]);
+                let sprite_tint = Palette::authentic_shade_to_tint(sprite.shade);
+                sprite_mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, vec![sprite_tint; 4]);
                 sprite_mesh.insert_indices(bevy::render::mesh::Indices::U32(vec![
                     0, 1, 2, 0, 2, 3, // Front
                     0, 2, 1, 0, 3, 2  // Back
@@ -841,7 +896,15 @@ impl<'a> MapMeshBuilder<'a> {
                         });
                     }
                     // KEYCARDS (Tiles ACCESSCARD..=177: Blue, Red, Yellow)
-                    ACCESSCARD | 175 => {
+                    ACCESSCARD => {
+                        let key_type = match sprite.pal {
+                            21 => 2, // Red keycard
+                            23 => 3, // Yellow keycard
+                            _ => 1,  // Blue keycard
+                        };
+                        entity_cmds.insert(crate::interactivity::KeycardPickup { key_type });
+                    }
+                    175 => {
                         entity_cmds.insert(crate::interactivity::KeycardPickup { key_type: 1 });
                     }
                     176 => {
@@ -1095,6 +1158,17 @@ impl<'a> MapMeshBuilder<'a> {
                             wall_idx: None,
                             sector_idx: Some(sprite.sectnum as usize),
                         });
+                    }
+                    // FIRE EXTINGUISHER
+                    FIREEXT => {
+                        entity_cmds.insert(crate::interactivity::FireExtinguisher {
+                            health: 10,
+                            is_exploded: false,
+                        });
+                    }
+                    // MIRROR
+                    MIRROR => {
+                        entity_cmds.insert(crate::interactivity::MirrorProp::default());
                     }
                     // ENEMIES & BOSSES
                     // 1. Assault Trooper & Captain (LIZTROOP..=LIZTROOPDUCKING)
@@ -1587,6 +1661,23 @@ mod tests {
         }
     }
 
-
-
+    #[test]
+    fn test_editor_marker_sprites_hidden() {
+        let marker_picnums = [
+            SECTOREFFECTOR,
+            ACTIVATOR,
+            TOUCHPLATE,
+            ACTIVATORLOCKED,
+            MUSICANDSFX,
+            LOCATORS,
+            CYCLER,
+            MASTERSWITCH,
+        ];
+        for &picnum in &marker_picnums {
+            assert!(
+                (1..=8).contains(&picnum),
+                "Sprite {picnum} must be in editor utility range 1..=8"
+            );
+        }
+    }
 }

@@ -148,6 +148,33 @@ impl Palette {
         let factor = (1.0 - (shade as f32 / 128.0)).clamp(0.5, 1.5);
         [factor, factor, factor, 1.0]
     }
+
+    /// Calculate authentic Build engine distance-attenuated shade table index (0..31).
+    /// In the original Build engine: `shade = curshade + ((dist * visibility) >> 8)`
+    pub fn calculate_build_distance_shade(base_shade: i8, distance_world: f32, visibility: f32) -> i8 {
+        let build_dist = distance_world * 100.0;
+        let shade_delta = ((build_dist * visibility) / 256.0) as i32;
+        (base_shade as i32 + shade_delta).clamp(0, 31) as i8
+    }
+
+    /// Convert a 32-level Build shade value into an authentic photometric light multiplier.
+    /// In authentic Build, shade 0 is 100% full brightness, shade 31 is near pitch-black (~2-5% light),
+    /// and negative shades provide overbrightening (e.g. muzzle flashes and bright lamps).
+    pub fn build_shade_to_light_multiplier(shade: i8) -> f32 {
+        if shade < 0 {
+            (1.0 + (-shade as f32 / 32.0) * 0.5).min(1.75)
+        } else {
+            let clamped = shade.min(31) as f32;
+            let normalized = 1.0 - (clamped / 31.0);
+            (normalized.powf(1.4) * 0.97 + 0.03).clamp(0.02, 1.0)
+        }
+    }
+
+    /// Convert Build shade to authentic 4-component RGBA light tint with true dark levels.
+    pub fn authentic_shade_to_tint(shade: i8) -> [f32; 4] {
+        let factor = Self::build_shade_to_light_multiplier(shade);
+        [factor, factor, factor, 1.0]
+    }
 }
 
 #[derive(Resource, Debug, Clone, PartialEq)]
@@ -246,7 +273,60 @@ mod tests {
         assert!((tint0[0] - 1.0).abs() < 0.01);
 
         let tint32 = Palette::shade_to_tint(32);
-        assert!((tint32[0] - 0.05).abs() < 0.05);
+        assert!((tint32[0] - 0.75).abs() < 0.05);
+    }
+
+    #[test]
+    fn test_build_shade_table_clamping() {
+        // Negative shade should be overbright (> 1.0)
+        let overbright = Palette::build_shade_to_light_multiplier(-16);
+        assert!(overbright > 1.0 && overbright <= 1.5, "Expected overbright > 1.0, got {}", overbright);
+
+        // Neutral shade (0) should be 1.0
+        let neutral = Palette::build_shade_to_light_multiplier(0);
+        assert!((neutral - 1.0).abs() < 0.01, "Expected ~1.0, got {}", neutral);
+
+        // Medium shade (16) should be moderately dark (~0.3-0.5)
+        let med = Palette::build_shade_to_light_multiplier(16);
+        assert!(med > 0.25 && med < 0.55, "Expected medium shade in [0.25, 0.55], got {}", med);
+
+        // Maximum dark shade (31) and beyond should be near pitch black (<= 0.05)
+        let max_dark = Palette::build_shade_to_light_multiplier(31);
+        assert!(max_dark <= 0.05, "Expected shade 31 <= 0.05, got {}", max_dark);
+
+        let beyond_dark = Palette::build_shade_to_light_multiplier(64);
+        assert_eq!(beyond_dark, max_dark, "Shades beyond 31 should clamp to shade 31 value");
+    }
+
+    #[test]
+    fn test_build_distance_falloff_formula() {
+        let base_shade = 0i8;
+        let visibility = 1.0f32; // Normal visibility
+
+        // Distance 0 should yield base shade
+        let shade_close = Palette::calculate_build_distance_shade(base_shade, 0.0, visibility);
+        assert_eq!(shade_close, 0);
+
+        // Moderate distance (5 meters) should increase shade
+        let shade_mid = Palette::calculate_build_distance_shade(base_shade, 5.0, visibility);
+        assert!(shade_mid > 0 && shade_mid < 15, "Expected shade_mid in 1..15, got {}", shade_mid);
+
+        // Long distance (100 meters) should hit maximum dark shade (31)
+        let shade_far = Palette::calculate_build_distance_shade(base_shade, 100.0, visibility);
+        assert_eq!(shade_far, 31);
+    }
+
+    #[test]
+    fn test_build_authentic_shade_to_tint_levels() {
+        let tint_bright = Palette::authentic_shade_to_tint(-10);
+        assert!(tint_bright[0] > 1.0);
+        assert_eq!(tint_bright[3], 1.0);
+
+        let tint_normal = Palette::authentic_shade_to_tint(0);
+        assert!((tint_normal[0] - 1.0).abs() < 0.02);
+
+        let tint_dark = Palette::authentic_shade_to_tint(31);
+        assert!(tint_dark[0] <= 0.05);
     }
 
     #[test]

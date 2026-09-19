@@ -1,14 +1,14 @@
 # Implementation Plan: Visual Fidelity & Authentic Build Rendering
 
 ## Phase 1: 32-Level Palette Shade Pipeline & Distance Lighting
-- [ ] Task: Write Unit Tests for Shade Calculation & Distance Falloff (TDD)
-  - [ ] Test 32-level shade table clamping, shade multiplier math, and distance falloff formula
-- [ ] Task: Implement Build Shade Material / Pipeline
-  - [ ] Create custom Bevy material/shader utilizing `PALETTE.DAT` 32 shade tables
-  - [ ] Apply sector and wall base shades (`floorshade`, `ceilingshade`, `wall.shade`, `sprite.shade`)
-- [ ] Task: Runtime Sector Shade Modulation
-  - [ ] Connect Light Strobe, Flicker, and Glow sector effectors to material uniform mutations
-- [ ] Task: Phase 1 Verification & Checkpoint (Refer to workflow.md)
+- [x] Task: Write Unit Tests for Shade Calculation & Distance Falloff (TDD)
+  - [x] Test 32-level shade table clamping, shade multiplier math, and distance falloff formula
+- [x] Task: Implement Build Shade Material / Pipeline
+  - [x] Create custom Bevy material/shader utilizing `PALETTE.DAT` 32 shade tables
+  - [x] Apply sector and wall base shades (`floorshade`, `ceilingshade`, `wall.shade`, `sprite.shade`)
+- [x] Task: Runtime Sector Shade Modulation
+  - [x] Connect Light Strobe, Flicker, and Glow sector effectors to material uniform mutations
+- [x] Task: Phase 1 Verification & Checkpoint (Refer to workflow.md)
 
 ## Phase 2: Translucent Water & Liquid Surface Rendering
 - [ ] Task: Write Unit Tests for Water Sector Surface Bounds & Geometry (TDD)
