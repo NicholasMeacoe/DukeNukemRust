@@ -160,6 +160,14 @@ pub fn handle_player_interactions(
                                 sound_events.send(PlaySoundEvent { sound_id: 110 });
                                 // DOOR_OPERATE1
                             }
+                            EffectorKind::Earthquake {
+                                is_triggered,
+                                elapsed,
+                                ..
+                            } => {
+                                *is_triggered = true;
+                                *elapsed = 0.0;
+                            }
                             _ => {}
                         }
                     }
@@ -227,7 +235,7 @@ pub fn handle_player_interactions(
                 if facing > 0.3 {
                     mirror.cooldown_timer = 15.0;
                     duke_voice_events.send(crate::audio::PlayDukeVoiceEvent {
-                        name: Some("LOOKING_GOOD".into()),
+                        name: Some("LOOK01".into()),
                     });
                 }
             }
@@ -263,26 +271,100 @@ pub fn handle_touchplates(
     }
 }
 
+#[inline]
+pub fn calculate_hitradius_damage(dist: f32, radius: f32, max_damage: i32) -> i32 {
+    if dist > radius || radius <= 0.0 {
+        return 0;
+    }
+    let fraction = dist / radius;
+    if fraction <= 0.25 {
+        max_damage
+    } else if fraction <= 0.50 {
+        max_damage * 3 / 4
+    } else if fraction <= 0.75 {
+        max_damage / 2
+    } else {
+        max_damage / 4
+    }
+}
+
 pub fn handle_explosions(
     mut explosion_events: EventReader<ExplosionDamageEvent>,
     mut barrel_explode_events: EventWriter<BarrelExplodeEvent>,
     mut barrels: Query<(Entity, &Transform, &mut ExplodingBarrel)>,
     mut crack_walls: Query<(&Transform, &mut CrackWall)>,
     mut glass_windows: Query<(Entity, &Transform, &mut BreakableGlass)>,
+    mut players: Query<(&Transform, &mut crate::player::PlayerController)>,
+    mut enemies: Query<(
+        Entity,
+        &Transform,
+        &mut crate::combat::EnemyActor,
+        Option<&mut crate::scripting::ConActor>,
+    )>,
     mut tag_events: EventWriter<ActivateTagEvent>,
     mut sound_events: EventWriter<PlaySoundEvent>,
+    mut gib_events: EventWriter<crate::combat::GibEvent>,
+    mut tint: Option<ResMut<crate::hud::ScreenTintState>>,
     mut commands: Commands,
 ) {
     for exp in explosion_events.read() {
         let origin = exp.origin;
-        let radius_sq = exp.radius * exp.radius;
 
-        // 1. Check exploding barrels
+        // 1. Damage Player with 4-tier hitradius falloff and armor mitigation
+        for (p_trans, mut player) in players.iter_mut() {
+            let dist = p_trans.translation.distance(origin);
+            if dist <= exp.radius && !player.god_mode && player.health > 0 {
+                let mut damage = calculate_hitradius_damage(dist, exp.radius, exp.damage);
+                if damage > 0 {
+                    if player.armor > 0 {
+                        let absorbed = (damage * 3 / 4).min(player.armor);
+                        player.armor -= absorbed;
+                        damage -= absorbed;
+                    }
+                    player.health = player.health.saturating_sub(damage);
+                    if player.health == 0 {
+                        player.death_timer = 3.0;
+                        sound_events.send(PlaySoundEvent { sound_id: 41 }); // DUKE_DEAD
+                    } else {
+                        sound_events.send(PlaySoundEvent { sound_id: 37 }); // DUKE_PAIN
+                    }
+                    if let Some(ref mut t) = tint {
+                        t.target_color = Color::srgba(0.9, 0.2, 0.0, 0.7);
+                    }
+                }
+            }
+        }
+
+        // 2. Damage Enemies with 4-tier hitradius falloff & gibbing
+        for (_e_entity, e_trans, mut enemy, con_actor) in enemies.iter_mut() {
+            let dist = e_trans.translation.distance(origin);
+            if dist <= exp.radius && enemy.health > 0 {
+                let damage = calculate_hitradius_damage(dist, exp.radius, exp.damage);
+                if damage > 0 {
+                    enemy.health -= damage;
+                    if let Some(mut con) = con_actor {
+                        con.extra = enemy.health as i16;
+                    }
+                    if enemy.health <= 0 {
+                        enemy.state = crate::combat::EnemyAiState::Gibbed;
+                        gib_events.send(crate::combat::GibEvent {
+                            origin: e_trans.translation,
+                            gib_count: 8,
+                        });
+                    } else {
+                        enemy.state = crate::combat::EnemyAiState::Flinching;
+                    }
+                }
+            }
+        }
+
+        // 3. Damage Exploding Barrels
         for (entity, trans, mut barrel) in barrels.iter_mut() {
             if !barrel.is_exploded {
-                let dist_sq = trans.translation.distance_squared(origin);
-                if dist_sq <= radius_sq {
-                    barrel.health -= exp.damage;
+                let dist = trans.translation.distance(origin);
+                if dist <= exp.radius {
+                    let dmg = calculate_hitradius_damage(dist, exp.radius, exp.damage);
+                    barrel.health -= dmg;
                     if barrel.health <= 0 {
                         barrel.is_exploded = true;
                         sound_events.send(PlaySoundEvent { sound_id: 14 }); // PIPEBOMB_EXPLODE
@@ -297,12 +379,13 @@ pub fn handle_explosions(
             }
         }
 
-        // 2. Check crack walls
+        // 4. Damage Crack Walls
         for (trans, mut crack) in crack_walls.iter_mut() {
             if !crack.is_blown {
-                let dist_sq = trans.translation.distance_squared(origin);
-                if dist_sq <= radius_sq {
-                    crack.health -= exp.damage;
+                let dist = trans.translation.distance(origin);
+                if dist <= exp.radius {
+                    let dmg = calculate_hitradius_damage(dist, exp.radius, exp.damage);
+                    crack.health -= dmg;
                     if crack.health <= 0 {
                         crack.is_blown = true;
                         crack.stage = 4;
@@ -315,11 +398,11 @@ pub fn handle_explosions(
             }
         }
 
-        // 3. Check breakable glass
+        // 5. Break Glass Windows
         for (entity, trans, mut glass) in glass_windows.iter_mut() {
             if !glass.is_broken {
-                let dist_sq = trans.translation.distance_squared(origin);
-                if dist_sq <= radius_sq {
+                let dist = trans.translation.distance(origin);
+                if dist <= exp.radius {
                     glass.is_broken = true;
                     sound_events.send(PlaySoundEvent { sound_id: 19 }); // GLASS_BREAKING
                     commands.entity(entity).despawn_recursive();
@@ -388,5 +471,36 @@ pub fn update_mirror_props(time: Res<Time>, mut mirrors: Query<&mut MirrorProp>)
         if mirror.cooldown_timer > 0.0 {
             mirror.cooldown_timer -= dt;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_calculate_hitradius_damage_tiers() {
+        let max_dmg = 100;
+        let radius = 10.0;
+
+        // Tier 1: <= 25% distance -> 100% damage
+        assert_eq!(calculate_hitradius_damage(0.0, radius, max_dmg), 100);
+        assert_eq!(calculate_hitradius_damage(2.5, radius, max_dmg), 100);
+
+        // Tier 2: <= 50% distance -> 75% damage
+        assert_eq!(calculate_hitradius_damage(3.0, radius, max_dmg), 75);
+        assert_eq!(calculate_hitradius_damage(5.0, radius, max_dmg), 75);
+
+        // Tier 3: <= 75% distance -> 50% damage
+        assert_eq!(calculate_hitradius_damage(6.0, radius, max_dmg), 50);
+        assert_eq!(calculate_hitradius_damage(7.5, radius, max_dmg), 50);
+
+        // Tier 4: <= 100% distance -> 25% damage
+        assert_eq!(calculate_hitradius_damage(8.0, radius, max_dmg), 25);
+        assert_eq!(calculate_hitradius_damage(10.0, radius, max_dmg), 25);
+
+        // Outside radius -> 0 damage
+        assert_eq!(calculate_hitradius_damage(10.1, radius, max_dmg), 0);
+        assert_eq!(calculate_hitradius_damage(15.0, radius, max_dmg), 0);
     }
 }

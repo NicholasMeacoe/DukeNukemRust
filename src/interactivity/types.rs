@@ -150,6 +150,27 @@ pub enum EffectorKind {
     ShootingGlassPane { health: i32, is_shattered: bool },
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub enum SectorMeshPart {
+    Floor,
+    Ceiling,
+    UpperWall,
+    LowerWall,
+    MiddleWall,
+}
+
+#[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct DynamicSectorMesh {
+    pub sector_idx: usize,
+    pub part: SectorMeshPart,
+}
+
+impl DynamicSectorMesh {
+    pub fn new(sector_idx: usize, part: SectorMeshPart) -> Self {
+        Self { sector_idx, part }
+    }
+}
+
 #[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SectorEffectorComponent {
     pub sector_idx: usize,
@@ -350,9 +371,21 @@ pub struct NukeExitSwitch {
 }
 
 #[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct FireExtinguisher {
+    pub health: i32,
+    pub is_exploded: bool,
+}
+
+#[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct MasterSwitch {
     pub lotag: i16,
     pub hitag: i16,
+    #[serde(default)]
+    pub delay: f32,
+    #[serde(default)]
+    pub timer: Option<f32>,
+    #[serde(default)]
+    pub is_triggered: bool,
 }
 
 #[derive(Event, Debug, Clone)]
@@ -408,6 +441,7 @@ pub struct CarrierPlatform {
     pub velocity: Vec3,
     pub sector_bounds_min: Vec2,
     pub sector_bounds_max: Vec2,
+    pub sector_idx: Option<usize>,
 }
 
 impl Default for CarrierPlatform {
@@ -416,6 +450,42 @@ impl Default for CarrierPlatform {
             velocity: Vec3::ZERO,
             sector_bounds_min: Vec2::splat(-1000.0),
             sector_bounds_max: Vec2::splat(1000.0),
+            sector_idx: None,
+        }
+    }
+}
+
+impl CarrierPlatform {
+    pub fn new(velocity: Vec3) -> Self {
+        Self {
+            velocity,
+            sector_bounds_min: Vec2::splat(-1000.0),
+            sector_bounds_max: Vec2::splat(1000.0),
+            sector_idx: None,
+        }
+    }
+
+    pub fn with_sector(velocity: Vec3, sector_idx: usize) -> Self {
+        Self {
+            velocity,
+            sector_bounds_min: Vec2::splat(-1000.0),
+            sector_bounds_max: Vec2::splat(1000.0),
+            sector_idx: Some(sector_idx),
+        }
+    }
+}
+
+#[derive(Resource, Debug, Clone, Default, PartialEq)]
+pub struct EarthquakeCameraShake {
+    pub intensity: f32,
+    pub offset: Vec3,
+}
+
+impl EarthquakeCameraShake {
+    pub fn new() -> Self {
+        Self {
+            intensity: 0.0,
+            offset: Vec3::ZERO,
         }
     }
 }

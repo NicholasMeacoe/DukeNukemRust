@@ -367,7 +367,7 @@ mod tests {
 
     #[test]
     fn dump_sprites() {
-        let mut grp = crate::grp::Grp::open("dukenukem3d/duke3d.grp").unwrap();
+        let grp = crate::grp::Grp::open("dukenukem3d/duke3d.grp").unwrap();
         let map_data = grp.read_file("E1L1.MAP").unwrap();
         let map = crate::map::Map::from_bytes(&map_data).unwrap();
         for s in &map.sprites {

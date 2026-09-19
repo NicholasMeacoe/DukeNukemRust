@@ -153,8 +153,15 @@ pub fn update_inventory_timers(
                 player.inventory.drowning_damage_timer += dt;
                 if player.inventory.drowning_damage_timer >= 1.0 {
                     player.inventory.drowning_damage_timer = 0.0;
-                    player.health = player.health.saturating_sub(10);
-                    sound_events.send(PlaySoundEvent { sound_id: 39 }); // DUKE_PAIN
+                    if !player.god_mode {
+                        player.health = (player.health - 10).max(0);
+                        if player.health == 0 {
+                            player.death_timer = 3.0;
+                            sound_events.send(PlaySoundEvent { sound_id: 41 }); // DUKE_DEAD
+                        } else {
+                            sound_events.send(PlaySoundEvent { sound_id: 37 }); // DUKE_PAIN
+                        }
+                    }
                 }
             }
         }
@@ -180,6 +187,10 @@ pub fn update_player_pickups(
     >,
     pickup_query: Query<
         (Entity, &Transform, &crate::interactivity::ItemPickup),
+        Without<PlayerController>,
+    >,
+    keycard_query: Query<
+        (Entity, &Transform, &crate::interactivity::KeycardPickup),
         Without<PlayerController>,
     >,
     mut sbar_query: Query<&mut crate::hud::StatusbarState>,
@@ -217,10 +228,12 @@ pub fn update_player_pickups(
                     }
                 }
                 PortableMedkit => {
-                    player.inventory.medkit_amount =
-                        (player.inventory.medkit_amount + 100).min(100);
-                    collected = true;
-                    message = "PORTABLE MEDKIT";
+                    if player.health < 100 && player.inventory.medkit_amount < 100 {
+                        player.inventory.medkit_amount =
+                            (player.inventory.medkit_amount + 100).min(100);
+                        collected = true;
+                        message = "PORTABLE MEDKIT";
+                    }
                 }
                 AtomicHealth => {
                     if player.health < 200 {
@@ -240,178 +253,230 @@ pub fn update_player_pickups(
                     }
                 }
                 PistolClip => {
-                    player.weapons[WeaponType::Pistol as usize].ammo =
-                        (player.weapons[WeaponType::Pistol as usize].ammo + 12).min(200);
-                    collected = true;
-                    message = "PISTOL CLIP (+12)";
+                    let w = &mut player.weapons[WeaponType::Pistol as usize];
+                    if w.ammo < w.max_ammo {
+                        w.ammo = (w.ammo + 12).min(w.max_ammo);
+                        collected = true;
+                        message = "PISTOL CLIP (+12)";
+                    }
                 }
                 ShotgunBox => {
-                    player.weapons[WeaponType::Shotgun as usize].ammo =
-                        (player.weapons[WeaponType::Shotgun as usize].ammo + 10).min(50);
-                    player.weapons[WeaponType::Shotgun as usize].is_unlocked = true;
-                    collected = true;
-                    message = "SHOTGUN SHELLS (+10)";
+                    let w = &mut player.weapons[WeaponType::Shotgun as usize];
+                    if w.ammo < w.max_ammo {
+                        w.ammo = (w.ammo + 10).min(w.max_ammo);
+                        w.is_unlocked = true;
+                        collected = true;
+                        message = "SHOTGUN SHELLS (+10)";
+                    }
                 }
                 ChaingunBox => {
-                    player.weapons[WeaponType::Chaingun as usize].ammo =
-                        (player.weapons[WeaponType::Chaingun as usize].ammo + 50).min(400);
-                    player.weapons[WeaponType::Chaingun as usize].is_unlocked = true;
-                    collected = true;
-                    message = "CHAINGUN AMMO BOX (+50)";
+                    let w = &mut player.weapons[WeaponType::Chaingun as usize];
+                    if w.ammo < w.max_ammo {
+                        w.ammo = (w.ammo + 50).min(w.max_ammo);
+                        w.is_unlocked = true;
+                        collected = true;
+                        message = "CHAINGUN AMMO BOX (+50)";
+                    }
                 }
                 RpgRocket => {
-                    player.weapons[WeaponType::Rpg as usize].ammo =
-                        (player.weapons[WeaponType::Rpg as usize].ammo + 5).min(50);
-                    player.weapons[WeaponType::Rpg as usize].is_unlocked = true;
-                    collected = true;
-                    message = "RPG ROCKETS (+5)";
+                    let w = &mut player.weapons[WeaponType::Rpg as usize];
+                    if w.ammo < w.max_ammo {
+                        w.ammo = (w.ammo + 5).min(w.max_ammo);
+                        w.is_unlocked = true;
+                        collected = true;
+                        message = "RPG ROCKETS (+5)";
+                    }
                 }
                 PipebombBox => {
-                    player.weapons[WeaponType::Pipebomb as usize].ammo =
-                        (player.weapons[WeaponType::Pipebomb as usize].ammo + 5).min(50);
-                    player.weapons[WeaponType::Pipebomb as usize].is_unlocked = true;
-                    collected = true;
-                    message = "PIPEBOMBS (+5)";
+                    let w = &mut player.weapons[WeaponType::Pipebomb as usize];
+                    if w.ammo < w.max_ammo {
+                        w.ammo = (w.ammo + 5).min(w.max_ammo);
+                        w.is_unlocked = true;
+                        collected = true;
+                        message = "PIPEBOMBS (+5)";
+                    }
                 }
                 ShrinkerAmmo => {
-                    player.weapons[WeaponType::Shrinker as usize].ammo =
-                        (player.weapons[WeaponType::Shrinker as usize].ammo + 5).min(50);
-                    player.weapons[WeaponType::Shrinker as usize].is_unlocked = true;
-                    collected = true;
-                    message = "SHRINKER CRYSTALS (+5)";
+                    let w = &mut player.weapons[WeaponType::Shrinker as usize];
+                    if w.ammo < w.max_ammo {
+                        w.ammo = (w.ammo + 5).min(w.max_ammo);
+                        w.is_unlocked = true;
+                        collected = true;
+                        message = "SHRINKER CRYSTALS (+5)";
+                    }
                 }
                 DevastatorBox => {
-                    player.weapons[WeaponType::Devastator as usize].ammo =
-                        (player.weapons[WeaponType::Devastator as usize].ammo + 15).min(99);
-                    player.weapons[WeaponType::Devastator as usize].is_unlocked = true;
-                    collected = true;
-                    message = "DEVASTATOR ROCKETS (+15)";
+                    let w = &mut player.weapons[WeaponType::Devastator as usize];
+                    if w.ammo < w.max_ammo {
+                        w.ammo = (w.ammo + 15).min(w.max_ammo);
+                        w.is_unlocked = true;
+                        collected = true;
+                        message = "DEVASTATOR ROCKETS (+15)";
+                    }
                 }
                 FreezeAmmo => {
-                    player.weapons[WeaponType::Freezethrower as usize].ammo =
-                        (player.weapons[WeaponType::Freezethrower as usize].ammo + 25).min(99);
-                    player.weapons[WeaponType::Freezethrower as usize].is_unlocked = true;
-                    collected = true;
-                    message = "FREEZETHROWER AMMO (+25)";
+                    let w = &mut player.weapons[WeaponType::Freezethrower as usize];
+                    if w.ammo < w.max_ammo {
+                        w.ammo = (w.ammo + 25).min(w.max_ammo);
+                        w.is_unlocked = true;
+                        collected = true;
+                        message = "FREEZETHROWER AMMO (+25)";
+                    }
                 }
                 ExpanderAmmo => {
-                    player.weapons[WeaponType::Expander as usize].ammo =
-                        (player.weapons[WeaponType::Expander as usize].ammo + 20).min(99);
-                    player.weapons[WeaponType::Expander as usize].is_unlocked = true;
-                    collected = true;
-                    message = "EXPANDER AMMO (+20)";
+                    let w = &mut player.weapons[WeaponType::Expander as usize];
+                    if w.ammo < w.max_ammo {
+                        w.ammo = (w.ammo + 20).min(w.max_ammo);
+                        w.is_unlocked = true;
+                        collected = true;
+                        message = "EXPANDER AMMO (+20)";
+                    }
                 }
                 Steroids => {
-                    player.inventory.steroids_amount =
-                        (player.inventory.steroids_amount + 400).min(400);
-                    collected = true;
-                    message = "STEROIDS";
+                    if player.inventory.steroids_amount < 400 {
+                        player.inventory.steroids_amount =
+                            (player.inventory.steroids_amount + 400).min(400);
+                        collected = true;
+                        message = "STEROIDS";
+                    }
                 }
                 ScubaTank => {
-                    player.inventory.scuba_amount = (player.inventory.scuba_amount + 100).min(100);
-                    collected = true;
-                    message = "SCUBA GEAR";
+                    if player.inventory.scuba_amount < 100 {
+                        player.inventory.scuba_amount =
+                            (player.inventory.scuba_amount + 100).min(100);
+                        collected = true;
+                        message = "SCUBA GEAR";
+                    }
                 }
                 NightvisionGoggles => {
-                    player.inventory.nightvision_amount =
-                        (player.inventory.nightvision_amount + 100).min(100);
-                    collected = true;
-                    message = "NIGHTVISION GOGGLES";
+                    if player.inventory.nightvision_amount < 100 {
+                        player.inventory.nightvision_amount =
+                            (player.inventory.nightvision_amount + 100).min(100);
+                        collected = true;
+                        message = "NIGHTVISION GOGGLES";
+                    }
                 }
                 ProtectiveBoots => {
-                    player.inventory.boots_amount = (player.inventory.boots_amount + 100).min(100);
-                    collected = true;
-                    message = "PROTECTIVE BOOTS";
+                    if player.inventory.boots_amount < 100 {
+                        player.inventory.boots_amount =
+                            (player.inventory.boots_amount + 100).min(100);
+                        collected = true;
+                        message = "PROTECTIVE BOOTS";
+                    }
                 }
                 Jetpack => {
-                    player.inventory.jetpack_amount =
-                        (player.inventory.jetpack_amount + 100).min(100);
-                    collected = true;
-                    message = "JETPACK";
+                    if player.inventory.jetpack_amount < 100 {
+                        player.inventory.jetpack_amount =
+                            (player.inventory.jetpack_amount + 100).min(100);
+                        collected = true;
+                        message = "JETPACK";
+                    }
                 }
                 Holoduke => {
-                    player.inventory.holoduke_amount =
-                        (player.inventory.holoduke_amount + 100).min(100);
-                    collected = true;
-                    message = "HOLODUKE";
+                    if player.inventory.holoduke_amount < 100 {
+                        player.inventory.holoduke_amount =
+                            (player.inventory.holoduke_amount + 100).min(100);
+                        collected = true;
+                        message = "HOLODUKE";
+                    }
                 }
                 WeaponPistol => {
-                    player.weapons[WeaponType::Pistol as usize].ammo =
-                        (player.weapons[WeaponType::Pistol as usize].ammo + 12).min(200);
-                    collected = true;
-                    message = "PISTOL";
+                    let w = &mut player.weapons[WeaponType::Pistol as usize];
+                    if w.ammo < w.max_ammo {
+                        w.ammo = (w.ammo + 12).min(w.max_ammo);
+                        collected = true;
+                        message = "PISTOL";
+                    }
                 }
                 WeaponShotgun => {
-                    player.weapons[WeaponType::Shotgun as usize].is_unlocked = true;
-                    player.weapons[WeaponType::Shotgun as usize].ammo =
-                        (player.weapons[WeaponType::Shotgun as usize].ammo + 10).min(50);
-                    player.current_weapon = WeaponType::Shotgun;
-                    collected = true;
-                    message = "YOU GOT THE SHOTGUN!";
+                    let w = &mut player.weapons[WeaponType::Shotgun as usize];
+                    if !w.is_unlocked || w.ammo < w.max_ammo {
+                        w.is_unlocked = true;
+                        w.ammo = (w.ammo + 10).min(w.max_ammo);
+                        player.current_weapon = WeaponType::Shotgun;
+                        collected = true;
+                        message = "YOU GOT THE SHOTGUN!";
+                    }
                 }
                 WeaponChaingun => {
-                    player.weapons[WeaponType::Chaingun as usize].is_unlocked = true;
-                    player.weapons[WeaponType::Chaingun as usize].ammo =
-                        (player.weapons[WeaponType::Chaingun as usize].ammo + 50).min(400);
-                    player.current_weapon = WeaponType::Chaingun;
-                    collected = true;
-                    message = "YOU GOT THE CHAINGUN CANNON!";
+                    let w = &mut player.weapons[WeaponType::Chaingun as usize];
+                    if !w.is_unlocked || w.ammo < w.max_ammo {
+                        w.is_unlocked = true;
+                        w.ammo = (w.ammo + 50).min(w.max_ammo);
+                        player.current_weapon = WeaponType::Chaingun;
+                        collected = true;
+                        message = "YOU GOT THE CHAINGUN CANNON!";
+                    }
                 }
                 WeaponRpg => {
-                    player.weapons[WeaponType::Rpg as usize].is_unlocked = true;
-                    player.weapons[WeaponType::Rpg as usize].ammo =
-                        (player.weapons[WeaponType::Rpg as usize].ammo + 5).min(50);
-                    player.current_weapon = WeaponType::Rpg;
-                    collected = true;
-                    message = "YOU GOT THE RPG!";
+                    let w = &mut player.weapons[WeaponType::Rpg as usize];
+                    if !w.is_unlocked || w.ammo < w.max_ammo {
+                        w.is_unlocked = true;
+                        w.ammo = (w.ammo + 5).min(w.max_ammo);
+                        player.current_weapon = WeaponType::Rpg;
+                        collected = true;
+                        message = "YOU GOT THE RPG!";
+                    }
                 }
                 WeaponPipebomb => {
-                    player.weapons[WeaponType::Pipebomb as usize].is_unlocked = true;
-                    player.weapons[WeaponType::Pipebomb as usize].ammo =
-                        (player.weapons[WeaponType::Pipebomb as usize].ammo + 5).min(50);
-                    player.current_weapon = WeaponType::Pipebomb;
-                    collected = true;
-                    message = "YOU GOT PIPEBOMBS!";
+                    let w = &mut player.weapons[WeaponType::Pipebomb as usize];
+                    if !w.is_unlocked || w.ammo < w.max_ammo {
+                        w.is_unlocked = true;
+                        w.ammo = (w.ammo + 5).min(w.max_ammo);
+                        player.current_weapon = WeaponType::Pipebomb;
+                        collected = true;
+                        message = "YOU GOT PIPEBOMBS!";
+                    }
                 }
                 WeaponShrinker => {
-                    player.weapons[WeaponType::Shrinker as usize].is_unlocked = true;
-                    player.weapons[WeaponType::Shrinker as usize].ammo =
-                        (player.weapons[WeaponType::Shrinker as usize].ammo + 5).min(50);
-                    player.current_weapon = WeaponType::Shrinker;
-                    collected = true;
-                    message = "YOU GOT THE SHRINKER!";
+                    let w = &mut player.weapons[WeaponType::Shrinker as usize];
+                    if !w.is_unlocked || w.ammo < w.max_ammo {
+                        w.is_unlocked = true;
+                        w.ammo = (w.ammo + 5).min(w.max_ammo);
+                        player.current_weapon = WeaponType::Shrinker;
+                        collected = true;
+                        message = "YOU GOT THE SHRINKER!";
+                    }
                 }
                 WeaponDevastator => {
-                    player.weapons[WeaponType::Devastator as usize].is_unlocked = true;
-                    player.weapons[WeaponType::Devastator as usize].ammo =
-                        (player.weapons[WeaponType::Devastator as usize].ammo + 15).min(99);
-                    player.current_weapon = WeaponType::Devastator;
-                    collected = true;
-                    message = "YOU GOT THE DEVASTATOR!";
+                    let w = &mut player.weapons[WeaponType::Devastator as usize];
+                    if !w.is_unlocked || w.ammo < w.max_ammo {
+                        w.is_unlocked = true;
+                        w.ammo = (w.ammo + 15).min(w.max_ammo);
+                        player.current_weapon = WeaponType::Devastator;
+                        collected = true;
+                        message = "YOU GOT THE DEVASTATOR!";
+                    }
                 }
                 WeaponTripbomb => {
-                    player.weapons[WeaponType::Tripbomb as usize].is_unlocked = true;
-                    player.weapons[WeaponType::Tripbomb as usize].ammo =
-                        (player.weapons[WeaponType::Tripbomb as usize].ammo + 5).min(10);
-                    player.current_weapon = WeaponType::Tripbomb;
-                    collected = true;
-                    message = "YOU GOT LASER TRIPBOMBS!";
+                    let w = &mut player.weapons[WeaponType::Tripbomb as usize];
+                    if !w.is_unlocked || w.ammo < w.max_ammo {
+                        w.is_unlocked = true;
+                        w.ammo = (w.ammo + 5).min(w.max_ammo);
+                        player.current_weapon = WeaponType::Tripbomb;
+                        collected = true;
+                        message = "YOU GOT LASER TRIPBOMBS!";
+                    }
                 }
                 WeaponFreezer => {
-                    player.weapons[WeaponType::Freezethrower as usize].is_unlocked = true;
-                    player.weapons[WeaponType::Freezethrower as usize].ammo =
-                        (player.weapons[WeaponType::Freezethrower as usize].ammo + 25).min(99);
-                    player.current_weapon = WeaponType::Freezethrower;
-                    collected = true;
-                    message = "YOU GOT THE FREEZETHROWER!";
+                    let w = &mut player.weapons[WeaponType::Freezethrower as usize];
+                    if !w.is_unlocked || w.ammo < w.max_ammo {
+                        w.is_unlocked = true;
+                        w.ammo = (w.ammo + 25).min(w.max_ammo);
+                        player.current_weapon = WeaponType::Freezethrower;
+                        collected = true;
+                        message = "YOU GOT THE FREEZETHROWER!";
+                    }
                 }
                 WeaponExpander => {
-                    player.weapons[WeaponType::Expander as usize].is_unlocked = true;
-                    player.weapons[WeaponType::Expander as usize].ammo =
-                        (player.weapons[WeaponType::Expander as usize].ammo + 20).min(99);
-                    player.current_weapon = WeaponType::Expander;
-                    collected = true;
-                    message = "WEAPON: EXPANDER";
+                    let w = &mut player.weapons[WeaponType::Expander as usize];
+                    if !w.is_unlocked || w.ammo < w.max_ammo {
+                        w.is_unlocked = true;
+                        w.ammo = (w.ammo + 20).min(w.max_ammo);
+                        player.current_weapon = WeaponType::Expander;
+                        collected = true;
+                        message = "WEAPON: EXPANDER";
+                    }
                 }
             }
 
@@ -426,11 +491,216 @@ pub fn update_player_pickups(
                 }
                 if rng.next_f32() < 0.15 {
                     voice_events.send(crate::audio::PlayDukeVoiceEvent {
-                        name: Some("LOOKING_GOOD".into()),
+                        name: Some("LOOK01".into()),
                     });
                 }
                 commands.entity(pickup_entity).despawn_recursive();
             }
         }
+    }
+
+    // Auto-collect keycards when walking over them
+    for (k_entity, k_trans, k_pickup) in keycard_query.iter() {
+        if p_trans.translation.distance_squared(k_trans.translation) < 4.0 {
+            let key_name = match k_pickup.key_type {
+                1 => {
+                    player.has_blue_key = true;
+                    "BLUE ACCESS CARD"
+                }
+                2 => {
+                    player.has_red_key = true;
+                    "RED ACCESS CARD"
+                }
+                3 => {
+                    player.has_yellow_key = true;
+                    "YELLOW ACCESS CARD"
+                }
+                _ => "ACCESS CARD",
+            };
+            sound_events.send(PlaySoundEvent { sound_id: 65 }); // KEYCARD_GET
+            if let Some(ref mut sb) = sbar {
+                sb.message_text = key_name.to_string();
+                sb.message_timer = 2.5;
+            }
+            if let Some(ref mut t) = tint {
+                t.target_color = Color::srgba(0.2, 0.4, 0.9, 0.4);
+            }
+            commands.entity(k_entity).despawn_recursive();
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn create_pickup_test_app() -> App {
+        let mut app = App::new();
+        app.add_event::<PlaySoundEvent>();
+        app.add_event::<crate::audio::PlayDukeVoiceEvent>();
+        app.init_resource::<crate::net::DeterministicRng>();
+        app.add_systems(Update, update_player_pickups);
+        app
+    }
+
+    #[test]
+    fn test_health_pickups_not_consumed_at_max_capacity() {
+        let mut app = create_pickup_test_app();
+
+        // Spawn player with full health (100)
+        let mut player = PlayerController::default();
+        player.health = 100;
+        app.world_mut().spawn((
+            Transform::from_xyz(0.0, 0.0, 0.0),
+            player,
+        ));
+
+        // Spawn SmallMedkit (Cola)
+        let cola = app.world_mut().spawn((
+            Transform::from_xyz(0.0, 0.0, 0.0),
+            crate::interactivity::ItemPickup {
+                kind: crate::interactivity::PickupKind::SmallMedkit,
+                respawn_timer: None,
+            },
+        )).id();
+
+        // Spawn LargeMedkit (Sixpak)
+        let sixpak = app.world_mut().spawn((
+            Transform::from_xyz(0.0, 0.0, 0.0),
+            crate::interactivity::ItemPickup {
+                kind: crate::interactivity::PickupKind::LargeMedkit,
+                respawn_timer: None,
+            },
+        )).id();
+
+        // Spawn PortableMedkit (FirstAid)
+        let firstaid = app.world_mut().spawn((
+            Transform::from_xyz(0.0, 0.0, 0.0),
+            crate::interactivity::ItemPickup {
+                kind: crate::interactivity::PickupKind::PortableMedkit,
+                respawn_timer: None,
+            },
+        )).id();
+
+        app.update();
+
+        // None of these should be consumed when health >= 100
+        assert!(app.world().get_entity(cola).is_some(), "Cola must not be picked up at 100 HP");
+        assert!(app.world().get_entity(sixpak).is_some(), "Sixpak must not be picked up at 100 HP");
+        assert!(app.world().get_entity(firstaid).is_some(), "FirstAid must not be picked up at 100 HP");
+    }
+
+    #[test]
+    fn test_atomic_health_not_consumed_at_200_hp() {
+        let mut app = create_pickup_test_app();
+
+        let mut player = PlayerController::default();
+        player.health = 200;
+        let p_entity = app.world_mut().spawn((
+            Transform::from_xyz(0.0, 0.0, 0.0),
+            player,
+        )).id();
+
+        let atomic = app.world_mut().spawn((
+            Transform::from_xyz(0.0, 0.0, 0.0),
+            crate::interactivity::ItemPickup {
+                kind: crate::interactivity::PickupKind::AtomicHealth,
+                respawn_timer: None,
+            },
+        )).id();
+
+        app.update();
+
+        assert!(app.world().get_entity(atomic).is_some(), "Atomic health must not be picked up at 200 HP");
+
+        // Now lower health to 150 and verify it is consumed
+        app.world_mut().get_mut::<PlayerController>(p_entity).unwrap().health = 150;
+        app.update();
+
+        assert!(app.world().get_entity(atomic).is_none(), "Atomic health must be picked up when below 200 HP");
+        let new_hp = app.world().get_entity(p_entity).unwrap().get::<PlayerController>().unwrap().health;
+        assert_eq!(new_hp, 200);
+    }
+
+    #[test]
+    fn test_armor_vest_not_consumed_at_max_armor() {
+        let mut app = create_pickup_test_app();
+
+        let mut player = PlayerController::default();
+        player.armor = 100;
+        let p_entity = app.world_mut().spawn((
+            Transform::from_xyz(0.0, 0.0, 0.0),
+            player,
+        )).id();
+
+        let armor = app.world_mut().spawn((
+            Transform::from_xyz(0.0, 0.0, 0.0),
+            crate::interactivity::ItemPickup {
+                kind: crate::interactivity::PickupKind::ArmorVest,
+                respawn_timer: None,
+            },
+        )).id();
+
+        app.update();
+
+        assert!(app.world().get_entity(armor).is_some(), "Armor vest must not be picked up at 100 armor");
+
+        // Damage armor and verify pickup
+        app.world_mut().get_mut::<PlayerController>(p_entity).unwrap().armor = 50;
+        app.update();
+
+        assert!(app.world().get_entity(armor).is_none(), "Armor vest must be picked up when armor < 100");
+        let new_armor = app.world().get_entity(p_entity).unwrap().get::<PlayerController>().unwrap().armor;
+        assert_eq!(new_armor, 100);
+    }
+
+    #[test]
+    fn test_ammo_pickups_not_consumed_at_max_ammo() {
+        let mut app = create_pickup_test_app();
+
+        let mut player = PlayerController::default();
+        // Max out pistol and shotgun ammo
+        let pistol_max = player.weapons[WeaponType::Pistol as usize].max_ammo;
+        let shotgun_max = player.weapons[WeaponType::Shotgun as usize].max_ammo;
+        player.weapons[WeaponType::Pistol as usize].ammo = pistol_max;
+        player.weapons[WeaponType::Shotgun as usize].ammo = shotgun_max;
+
+        let p_entity = app.world_mut().spawn((
+            Transform::from_xyz(0.0, 0.0, 0.0),
+            player,
+        )).id();
+
+        let pistol_clip = app.world_mut().spawn((
+            Transform::from_xyz(0.0, 0.0, 0.0),
+            crate::interactivity::ItemPickup {
+                kind: crate::interactivity::PickupKind::PistolClip,
+                respawn_timer: None,
+            },
+        )).id();
+
+        let shotgun_box = app.world_mut().spawn((
+            Transform::from_xyz(0.0, 0.0, 0.0),
+            crate::interactivity::ItemPickup {
+                kind: crate::interactivity::PickupKind::ShotgunBox,
+                respawn_timer: None,
+            },
+        )).id();
+
+        app.update();
+
+        assert!(app.world().get_entity(pistol_clip).is_some(), "Pistol clip must not be picked up at max ammo");
+        assert!(app.world().get_entity(shotgun_box).is_some(), "Shotgun box must not be picked up at max ammo");
+
+        // Spend some ammo and verify they are picked up
+        {
+            let mut p = app.world_mut().get_mut::<PlayerController>(p_entity).unwrap();
+            p.weapons[WeaponType::Pistol as usize].ammo -= 20;
+            p.weapons[WeaponType::Shotgun as usize].ammo -= 10;
+        }
+
+        app.update();
+
+        assert!(app.world().get_entity(pistol_clip).is_none(), "Pistol clip should be picked up when below max ammo");
+        assert!(app.world().get_entity(shotgun_box).is_none(), "Shotgun box should be picked up when below max ammo");
     }
 }

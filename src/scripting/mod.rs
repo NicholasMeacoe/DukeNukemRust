@@ -76,10 +76,18 @@ impl ConScriptEngine {
         Ok(Self { vm, trig, compiled })
     }
 
-    pub fn from_grp(_grp: &crate::grp::Grp) -> Self {
-        // Use optimized built-in core script for 100% stable execution
-        Self::from_source(DEFAULT_CORE_CON_SCRIPT)
-            .expect("Default core CON script must compile cleanly")
+    pub fn from_grp(grp: &crate::grp::Grp) -> Self {
+        if let Ok(engine) = Self::from_grp_files(grp) {
+            println!(
+                "Compiled real GAME.CON from GRP with {} actors ({} bytecode instructions)",
+                engine.compiled.actor_script_ptrs.len(),
+                engine.vm.bytecode.len(),
+            );
+            engine
+        } else {
+            Self::from_source(DEFAULT_CORE_CON_SCRIPT)
+                .expect("Default core CON script must compile cleanly")
+        }
     }
 
     pub fn from_grp_files(grp: &crate::grp::Grp) -> Result<Self, String> {
@@ -111,8 +119,8 @@ define PIGCOP 2000
 define LIZTROOP 1680
 define OCTABRAIN 1820
 define ENFORCER 2120
-define FIRELASER 1600
-define SPIT 1605
+define FIRELASER 1625
+define SPIT 1636
 define SHOTGUN 2605
 define CHAINGUN 2548
 
@@ -163,6 +171,40 @@ move ENFSTOP 0 0
 
 ai AIENFWALK AENFWALK ENFWALKVEL seekplayer face_player
 ai AIENFATTACK AENFATTACK ENFSTOP face_player
+
+// DRONE (Sentry Drone) Actions & Moves
+define DRONE 1880
+action ADRONESTAND 0 1 5 1 1
+action ADRONEFLY 0 4 5 1 8
+action ADRONEATTACK 20 2 5 1 10
+action ADRONEDIE 30 4 1 1 8
+move DRONEVEL 48 0
+move DRONESTOP 0 0
+ai AIDRONEFLY ADRONEFLY DRONEVEL seekplayer face_player
+ai AIDRONEATTACK ADRONEATTACK DRONESTOP face_player
+
+// COMMANDER Actions & Moves
+define COMMANDER 1920
+action ACOMMSTAND 0 1 5 1 1
+action ACOMMWALK 0 4 5 1 12
+action ACOMMATTACK 20 2 5 1 15
+action ACOMMDIE 30 5 1 1 12
+move COMMWALKVEL 24 0
+move COMMSTOP 0 0
+ai AICOMMWALK ACOMMWALK COMMWALKVEL seekplayer face_player
+ai AICOMMATTACK ACOMMATTACK COMMSTOP face_player
+
+// BOSS1 (Battlelord) Actions & Moves
+define BOSS1 2630
+define RPG 2605
+action ABOSS1STAND 0 1 5 1 1
+action ABOSS1WALK 0 4 5 1 16
+action ABOSS1ATTACK 20 2 5 1 10
+action ABOSS1DIE 30 6 1 1 14
+move BOSS1WALKVEL 20 0
+move BOSS1STOP 0 0
+ai AIBOSS1WALK ABOSS1WALK BOSS1WALKVEL seekplayer face_player
+ai AIBOSS1ATTACK ABOSS1ATTACK BOSS1STOP face_player
 
 // ---------------- ACTORS ----------------
 
@@ -270,6 +312,85 @@ actor ENFORCER 100 AENFSTAND ENFSTOP
         } else {
             action AENFSTAND
             move ENFSTOP
+        }
+    }
+enda
+
+actor DRONE 40 ADRONESTAND DRONESTOP
+    ifdead {
+        action ADRONEDIE
+        sound 14
+        ifactioncount 4 {
+            debris 1000 3
+            killit
+        }
+    } else {
+        ifcansee {
+            ifpdistl 1024 {
+                ai AIDRONEATTACK
+                sound 14
+                killit
+            } else {
+                ai AIDRONEFLY
+            }
+        } else {
+            action ADRONESTAND
+            move DRONESTOP
+        }
+    }
+enda
+
+actor COMMANDER 350 ACOMMSTAND COMMSTOP
+    ifdead {
+        action ACOMMDIE
+        sound 511
+        ifactioncount 5 {
+            debris 1000 6
+            killit
+        }
+    } else {
+        ifcansee {
+            ifpdistl 4096 {
+                ai AICOMMATTACK
+                ifactioncount 2 {
+                    resetactioncount
+                    sound 7
+                    shoot RPG
+                }
+            } else {
+                ai AICOMMWALK
+            }
+        } else {
+            action ACOMMSTAND
+            move COMMSTOP
+        }
+    }
+enda
+
+actor BOSS1 1000 ABOSS1STAND BOSS1STOP
+    ifdead {
+        action ABOSS1DIE
+        sound 538
+        ifactioncount 6 {
+            debris 1000 10
+            endofgame 52
+            killit
+        }
+    } else {
+        ifcansee {
+            ifpdistl 5120 {
+                ai AIBOSS1ATTACK
+                ifactioncount 1 {
+                    resetactioncount
+                    sound 6
+                    shoot CHAINGUN
+                }
+            } else {
+                ai AIBOSS1WALK
+            }
+        } else {
+            action ABOSS1STAND
+            move BOSS1STOP
         }
     }
 enda
@@ -392,11 +513,30 @@ mod tests {
             can_shoot_target: false,
             bullet_near: false,
             not_moving: false,
+            away_from_wall: true,
+            has_active_sound: false,
             shoot_events: Vec::new(),
         };
 
         engine.vm.execute(&mut ctx);
         assert_eq!(ctx.sound_events.len(), 1);
         assert_eq!(ctx.sound_events[0].0, 15);
+    }
+
+    #[test]
+    fn test_default_core_con_script_tile_ids_and_projectile_mapping() {
+        let engine = ConScriptEngine::from_source(DEFAULT_CORE_CON_SCRIPT).unwrap();
+        assert_eq!(engine.compiled.symbols.get("FIRELASER"), Some(&1625));
+        assert_eq!(engine.compiled.symbols.get("SPIT"), Some(&1636));
+
+        let (laser_proj, laser_vel, laser_dmg) = crate::combat::ai::map_tile_to_projectile(1625);
+        assert_eq!(laser_proj, crate::combat::types::ProjectileType::AlienBlaster);
+        assert_eq!(laser_vel, 50.0);
+        assert_eq!(laser_dmg, 7);
+
+        let (spit_proj, spit_vel, spit_dmg) = crate::combat::ai::map_tile_to_projectile(1636);
+        assert_eq!(spit_proj, crate::combat::types::ProjectileType::Spit);
+        assert_eq!(spit_vel, 35.0);
+        assert_eq!(spit_dmg, 8);
     }
 }

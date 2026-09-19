@@ -3,9 +3,9 @@
 use crate::combat::types::{EnemyActor, Projectile};
 use crate::interactivity::props_extended::{DancerProp, SecurityCameraMonitor};
 use crate::interactivity::types::{
-    BreakableGlass, CrackWall, ExplodingBarrel, InteractiveSwitch, ItemPickup, MasterSwitch,
-    NukeExitSwitch, SectorEffectorComponent, SecurityCamera, ToiletProp, ViewscreenProp,
-    WaterFountain,
+    BreakableGlass, CrackWall, ExplodingBarrel, FireExtinguisher, InteractiveSwitch, ItemPickup,
+    MasterSwitch, MirrorProp, NukeExitSwitch, SectorEffectorComponent, SecurityCamera, ToiletProp,
+    ViewscreenProp, WaterFountain,
 };
 use crate::player::types::PlayerController;
 use crate::scripting::ConActor;
@@ -78,6 +78,14 @@ pub struct SaveGameSnapshot {
 
     pub nuke_switches: Vec<(SavedTransform, NukeExitSwitch)>,
     pub master_switches: Vec<(SavedTransform, MasterSwitch)>,
+    #[serde(default)]
+    pub fire_extinguishers: Vec<(SavedTransform, FireExtinguisher)>,
+    #[serde(default)]
+    pub mirrors: Vec<(SavedTransform, MirrorProp)>,
+    #[serde(default)]
+    pub sector_elevations: Vec<(usize, i32, i32)>,
+    #[serde(default)]
+    pub found_secrets: Vec<usize>,
 }
 
 impl SaveGameSnapshot {
@@ -118,6 +126,10 @@ impl SaveGameSnapshot {
             camera_monitors: Vec::new(),
             nuke_switches: Vec::new(),
             master_switches: Vec::new(),
+            fire_extinguishers: Vec::new(),
+            mirrors: Vec::new(),
+            sector_elevations: Vec::new(),
+            found_secrets: Vec::new(),
         }
     }
 }

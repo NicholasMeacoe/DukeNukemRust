@@ -85,7 +85,7 @@ pub fn update_intermission_animation(
 
             if anim_state.timer >= 1.8 {
                 anim_state.displayed_kills = stats.kill_percentage;
-                sound_events.send(crate::audio::PlaySoundEvent { sound_id: 110 }); // PISTOL_FIRE tally sound
+                sound_events.send(crate::audio::PlaySoundEvent { sound_id: 3 }); // PISTOL_FIRE tally sound
                 anim_state.stage = IntermissionStage::SecretsTally;
             }
         }
@@ -95,7 +95,7 @@ pub fn update_intermission_animation(
 
             if anim_state.timer >= 3.0 {
                 anim_state.displayed_secrets = stats.secret_percentage;
-                sound_events.send(crate::audio::PlaySoundEvent { sound_id: 110 });
+                sound_events.send(crate::audio::PlaySoundEvent { sound_id: 3 }); // PISTOL_FIRE tally sound
                 anim_state.stage = IntermissionStage::TimeReveal;
             }
         }
@@ -104,10 +104,10 @@ pub fn update_intermission_animation(
                 anim_state.speech_played = true;
                 if stats.time_taken_seconds <= stats.par_time_seconds {
                     // Beat par time -> "Damn, I'm good!"
-                    sound_events.send(crate::audio::PlaySoundEvent { sound_id: 40 });
+                    sound_events.send(crate::audio::PlaySoundEvent { sound_id: 195 });
                 } else if stats.secret_percentage >= 100 {
                     // All secrets -> "Groovy!"
-                    sound_events.send(crate::audio::PlaySoundEvent { sound_id: 41 });
+                    sound_events.send(crate::audio::PlaySoundEvent { sound_id: 196 });
                 }
             }
 

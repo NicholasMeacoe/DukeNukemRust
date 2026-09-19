@@ -6,6 +6,8 @@ use crate::player::types::PlayerController;
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
 
+pub use crate::combat::ai::map_tile_to_projectile;
+
 pub fn spawn_projectiles(mut events: EventReader<SpawnProjectileEvent>, mut commands: Commands) {
     for ev in events.read() {
         let vel = ev.direction.normalize_or_zero() * ev.velocity;
@@ -14,7 +16,7 @@ pub fn spawn_projectiles(mut events: EventReader<SpawnProjectileEvent>, mut comm
             | ProjectileType::ShotgunPellet
             | ProjectileType::MightyBoot => 0.05,
             ProjectileType::Rocket | ProjectileType::DevastatorMissile => 4.0,
-            ProjectileType::Pipebomb => 8.0,
+            ProjectileType::Pipebomb => f32::INFINITY,
             _ => 3.0,
         };
 
@@ -51,7 +53,9 @@ pub fn update_projectiles(
     mut explosion_events: EventWriter<ExplosionDamageEvent>,
     mut sound_events: EventWriter<crate::audio::PlaySoundEvent>,
     mut decal_events: EventWriter<crate::combat::decals::SpawnDecalEvent>,
+    mut wall_damage_events: EventWriter<crate::interactivity::WallDamageEvent>,
     rapier_context: Option<Res<RapierContext>>,
+    mut gib_events: EventWriter<GibEvent>,
 ) {
     let dt = time.delta_seconds();
 
@@ -59,7 +63,7 @@ pub fn update_projectiles(
     for (_, player_trans, _) in players.iter() {
         let p_pos = player_trans.translation;
         for (e_entity, enemy_trans, mut enemy) in enemies.iter_mut() {
-            if enemy.is_shrunk
+            if (enemy.is_shrunk || enemy.state == EnemyAiState::Shrunk)
                 && enemy.state != EnemyAiState::Gibbed
                 && enemy.state != EnemyAiState::Dying
             {
@@ -67,20 +71,29 @@ pub fn update_projectiles(
                 let horizontal_dist_sq = (p_pos.x - e_pos.x).powi(2) + (p_pos.z - e_pos.z).powi(2);
                 let vertical_dist = (p_pos.y - e_pos.y).abs();
                 if horizontal_dist_sq < 0.64 && vertical_dist < 1.0 {
+                    enemy.is_shrunk = false;
+                    enemy.state = EnemyAiState::Gibbed;
+                    enemy.health = -100;
+                    sound_events.send(crate::audio::PlaySoundEvent { sound_id: 69 }); // SQUISHED
+                    gib_events.send(GibEvent {
+                        origin: enemy_trans.translation,
+                        gib_count: 8,
+                    });
                     damage_events.send(EntityDamageEvent {
                         target: e_entity,
                         amount: 1000,
                         source: DamageSource::PlayerWeapon(ProjectileType::MightyBoot),
                         hit_origin: enemy_trans.translation,
                     });
-                    enemy.is_shrunk = false;
                 }
             }
         }
     }
 
     for (proj_entity, mut trans, mut proj) in projectiles.iter_mut() {
-        proj.lifetime -= dt;
+        if proj.projectile_type != ProjectileType::Pipebomb {
+            proj.lifetime -= dt;
+        }
 
         // Pipebomb trajectory with gravity
         if proj.projectile_type == ProjectileType::Pipebomb {
@@ -91,6 +104,7 @@ pub fn update_projectiles(
         let step_vec = proj.velocity * dt;
         let step_dist = step_vec.length();
         let mut hit_wall = false;
+        let mut hit_wall_entity = None;
         let mut hit_enemy_entity = None;
         let mut hit_player_entity = None;
         let mut hit_point = old_pos + step_vec;
@@ -123,6 +137,7 @@ pub fn update_projectiles(
                         hit_normal = intersection.normal;
                     } else {
                         hit_wall = true;
+                        hit_wall_entity = Some(hit_entity);
                         hit_point = intersection.point;
                         hit_normal = intersection.normal;
                     }
@@ -132,6 +147,22 @@ pub fn update_projectiles(
 
         if hit_wall {
             trans.translation = hit_point;
+
+            let is_explosive = matches!(
+                proj.projectile_type,
+                ProjectileType::Rocket
+                    | ProjectileType::DevastatorMissile
+                    | ProjectileType::Mortar
+                    | ProjectileType::Pipebomb
+            );
+
+            wall_damage_events.send(crate::interactivity::WallDamageEvent {
+                hit_point,
+                hit_normal,
+                damage: proj.damage,
+                is_explosive,
+                hit_entity: hit_wall_entity,
+            });
 
             match proj.projectile_type {
                 ProjectileType::Rocket
@@ -195,6 +226,7 @@ pub fn update_projectiles(
                         ProjectileType::ShrinkRay => {
                             enemy.is_shrunk = true;
                             enemy.shrink_timer = 9.0;
+                            enemy.state = EnemyAiState::Shrunk;
                             enemy.speed *= 0.5;
                         }
                         ProjectileType::FreezeShard => {
@@ -266,17 +298,21 @@ pub fn update_enemy_status_effects(
     let dt = time.delta_seconds();
 
     for (mut trans, mut enemy) in enemies.iter_mut() {
-        if enemy.is_shrunk {
+        if enemy.is_shrunk || enemy.state == EnemyAiState::Shrunk {
             enemy.shrink_timer -= dt;
             if enemy.shrink_timer > 0.0 {
                 trans.scale = Vec3::splat(0.25);
+                enemy.state = EnemyAiState::Shrunk;
             } else {
                 enemy.is_shrunk = false;
+                if enemy.state == EnemyAiState::Shrunk {
+                    enemy.state = EnemyAiState::Seeking;
+                }
                 trans.scale = Vec3::splat(1.0);
             }
         }
 
-        if enemy.is_frozen {
+        if enemy.is_frozen || enemy.state == EnemyAiState::Frozen {
             enemy.freeze_timer -= dt;
             if enemy.freeze_timer <= 0.0 {
                 enemy.is_frozen = false;
@@ -328,10 +364,25 @@ pub fn apply_damage_events(
                 continue;
             }
 
-            if enemy.state == EnemyAiState::Frozen {
+            if enemy.state == EnemyAiState::Frozen || enemy.is_frozen {
+                enemy.is_frozen = false;
                 enemy.health = -50;
                 enemy.state = EnemyAiState::Gibbed;
                 sound_events.send(crate::audio::PlaySoundEvent { sound_id: 19 }); // GLASS_BREAKING
+                gib_events.send(GibEvent {
+                    origin: enemy_trans.translation,
+                    gib_count: 8,
+                });
+                continue;
+            }
+
+            if (enemy.state == EnemyAiState::Shrunk || enemy.is_shrunk)
+                && ev.source == DamageSource::PlayerWeapon(ProjectileType::MightyBoot)
+            {
+                enemy.is_shrunk = false;
+                enemy.health = -100;
+                enemy.state = EnemyAiState::Gibbed;
+                sound_events.send(crate::audio::PlaySoundEvent { sound_id: 69 }); // SQUISHED
                 gib_events.send(GibEvent {
                     origin: enemy_trans.translation,
                     gib_count: 8,
@@ -389,13 +440,25 @@ pub fn apply_damage_events(
         }
 
         if let Ok(mut player) = players.get_mut(ev.target) {
-            player.health = player.health.saturating_sub(ev.amount);
-            if player.health == 0 {
-                sound_events.send(crate::audio::PlaySoundEvent { sound_id: 41 });
-            // DUKE_DEAD
-            } else {
-                sound_events.send(crate::audio::PlaySoundEvent { sound_id: 37 });
-                // DUKE_PAIN
+            if player.god_mode || player.health <= 0 {
+                continue;
+            }
+
+            let mut damage = ev.amount;
+            // Armor absorbs 75% of damage up to available armor value
+            if player.armor > 0 {
+                let absorbed = (damage * 3 / 4).min(player.armor);
+                player.armor -= absorbed;
+                damage -= absorbed;
+            }
+
+            let was_alive = player.health > 0;
+            player.health = player.health.saturating_sub(damage);
+            if player.health == 0 && was_alive {
+                player.death_timer = 3.0;
+                sound_events.send(crate::audio::PlaySoundEvent { sound_id: 41 }); // DUKE_DEAD
+            } else if player.health > 0 {
+                sound_events.send(crate::audio::PlaySoundEvent { sound_id: 37 }); // DUKE_PAIN
             }
             if let Some(ref mut t) = tint {
                 t.target_color = Color::srgba(0.8, 0.0, 0.0, 0.6);

@@ -2,15 +2,18 @@
 
 pub mod midi;
 pub mod rts;
+pub mod sound_defs;
 pub mod synth_stream;
 pub mod voc;
 
 pub use midi::*;
 pub use rts::*;
+pub use sound_defs::*;
 pub use synth_stream::*;
 pub use voc::*;
 
 use crate::grp::Grp;
+use crate::player::PlayerMovementMode;
 use bevy::prelude::*;
 use std::collections::HashMap;
 
@@ -22,6 +25,8 @@ impl Plugin for DukeAudioPlugin {
             .init_resource::<DukeAudioAssets>()
             .init_resource::<DynamicMusicState>()
             .init_resource::<DukeVoiceQueue>()
+            .init_resource::<DukeRtsResource>()
+            .init_resource::<AudioVoiceLimiter>()
             .add_event::<PlaySoundEvent>()
             .add_event::<PlaySpatialSoundEvent>()
             .add_event::<PlayNamedSoundEvent>()
@@ -36,10 +41,21 @@ impl Plugin for DukeAudioPlugin {
                     handle_play_named_sound_events,
                     handle_play_duke_voice_events,
                     handle_play_music_track_events,
+                    update_underwater_audio_state,
                     update_dynamic_audio_state,
                     sync_music_volume_system,
+                    update_ambient_sound_emitters,
                 ),
             );
+    }
+}
+
+pub fn update_underwater_audio_state(
+    player_query: Query<&crate::player::PlayerController>,
+    mut music_state: ResMut<DynamicMusicState>,
+) {
+    if let Ok(player) = player_query.get_single() {
+        music_state.is_underwater = player.movement_mode == PlayerMovementMode::Diving;
     }
 }
 
@@ -92,6 +108,7 @@ pub struct DynamicMusicState {
     pub base_volume: f32,
     pub ducking_timer: f32,
     pub is_underwater: bool,
+    pub underwater_mult: f32,
     pub current_volume: f32,
 }
 
@@ -103,6 +120,7 @@ impl Default for DynamicMusicState {
             base_volume: 0.8,
             ducking_timer: 0.0,
             is_underwater: false,
+            underwater_mult: 1.0,
             current_volume: 0.8,
         }
     }
@@ -115,7 +133,7 @@ impl DynamicMusicState {
             vol *= 0.6; // Duck by 40% during voice lines
         }
         if self.is_underwater {
-            vol *= 0.7; // Muffle underwater
+            vol *= 0.4; // Muffle underwater (attenuate by 60%)
         }
         vol
     }
@@ -124,6 +142,8 @@ impl DynamicMusicState {
         if self.ducking_timer > 0.0 {
             self.ducking_timer = (self.ducking_timer - dt).max(0.0);
         }
+        let target_mult = if self.is_underwater { 0.4 } else { 1.0 };
+        self.underwater_mult += (target_mult - self.underwater_mult) * (dt * 5.0).min(1.0);
     }
 }
 
@@ -139,6 +159,95 @@ pub fn sync_music_volume_system(
 
     for sink in &sink_query {
         sink.set_volume(music_state.current_volume);
+    }
+}
+
+/// Represents an ambient environment sound emitter in the map (e.g. MUSICANDSFX sprites).
+#[derive(Component, Debug, Clone)]
+pub struct AmbientSoundEmitter {
+    pub sound_id: i32,
+    pub range: f32,
+    pub repeat_delay: f32,
+    pub timer: f32,
+}
+
+pub fn update_ambient_sound_emitters(
+    time: Res<Time>,
+    mut emitters: Query<(&Transform, &mut AmbientSoundEmitter)>,
+    player_query: Query<&Transform, With<crate::player::PlayerController>>,
+    music_state: Option<Res<DynamicMusicState>>,
+    mut sound_events: EventWriter<PlaySpatialSoundEvent>,
+) {
+    let dt = time.delta_seconds();
+    let Ok(player_trans) = player_query.get_single() else {
+        return;
+    };
+    let p_pos = player_trans.translation;
+    let underwater_mult = if let Some(ref state) = music_state {
+        state.underwater_mult
+    } else {
+        1.0
+    };
+
+    for (trans, mut emitter) in emitters.iter_mut() {
+        emitter.timer -= dt;
+        if emitter.timer <= 0.0 {
+            emitter.timer = emitter.repeat_delay;
+            let dist = trans.translation.distance(p_pos);
+            if dist <= emitter.range {
+                let base_vol = (1.0 - (dist / emitter.range).clamp(0.0, 1.0)).max(0.1);
+                let volume = base_vol * underwater_mult;
+                sound_events.send(PlaySpatialSoundEvent {
+                    sound_id: emitter.sound_id,
+                    volume,
+                    position: trans.translation,
+                });
+            }
+        }
+    }
+}
+
+#[derive(Resource, Debug, Clone, Default)]
+pub struct DukeRtsResource(pub DukeRts);
+
+pub const MAX_ACTIVE_VOICES: usize = 32;
+
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
+pub struct VoiceChannel {
+    pub sequence: u64,
+}
+
+#[derive(Resource, Debug, Clone)]
+pub struct AudioVoiceLimiter {
+    pub max_voices: usize,
+    pub next_id: u64,
+}
+
+impl Default for AudioVoiceLimiter {
+    fn default() -> Self {
+        Self {
+            max_voices: MAX_ACTIVE_VOICES,
+            next_id: 0,
+        }
+    }
+}
+
+pub fn cull_oldest_voice_if_needed(
+    current_voices: &mut Vec<(Entity, u64)>,
+    max_voices: usize,
+    commands: &mut Commands,
+) {
+    while current_voices.len() >= max_voices {
+        if let Some((idx, &(oldest_entity, _))) = current_voices
+            .iter()
+            .enumerate()
+            .min_by_key(|(_, &(_, seq))| seq)
+        {
+            commands.entity(oldest_entity).despawn_recursive();
+            current_voices.remove(idx);
+        } else {
+            break;
+        }
     }
 }
 
@@ -176,6 +285,7 @@ pub struct DukeAudioAssets {
     pub sounds_by_id: HashMap<i32, Handle<AudioSource>>,
     pub sound_id_to_file: HashMap<i32, String>,
     pub music_tracks: HashMap<LevelMidiTrack, Handle<MidiAudioStream>>,
+    pub wav_music_tracks: HashMap<LevelMidiTrack, Handle<AudioSource>>,
     pub duke_quotes: Vec<Handle<AudioSource>>,
     pub all_sounds: Vec<Handle<AudioSource>>,
 }
@@ -192,7 +302,14 @@ impl DukeAudioAssets {
     }
 
     pub fn get_sound_by_name(&self, name: &str) -> Option<Handle<AudioSource>> {
-        let upper = name.to_uppercase();
+        let mapped = match name.to_uppercase().as_str() {
+            "LOOKING_GOOD" => "LOOK01",
+            "FOUND_SECRET" => "COOL01",
+            "BONUS_SPEECH1" => "DMDG",
+            "BONUS_SPEECH2" => "GROOVY",
+            _ => name,
+        };
+        let upper = mapped.to_uppercase();
         if let Some(handle) = self.sounds_by_name.get(&upper) {
             return Some(handle.clone());
         }
@@ -200,9 +317,23 @@ impl DukeAudioAssets {
         if let Some(handle) = self.sounds_by_name.get(stripped) {
             return Some(handle.clone());
         }
-        // Prefix search fallback
+        // Prefix search fallback (e.g. LOOK01 matching LOOKIN01 or vice versa, GROOVY matching GROOVY02)
         for (key, handle) in &self.sounds_by_name {
             if key.starts_with(stripped) || stripped.starts_with(key) {
+                return Some(handle.clone());
+            }
+        }
+        // Voice fallbacks for bonus speeches and look quotes if specific stem was not present
+        if stripped == "DMDG" {
+            if let Some(handle) = self.sounds_by_name.get("LETSRK03") {
+                return Some(handle.clone());
+            }
+            if let Some(handle) = self.sounds_by_name.get("DAMN03") {
+                return Some(handle.clone());
+            }
+        }
+        if stripped == "LOOK01" {
+            if let Some(handle) = self.sounds_by_name.get("LOOKIN01") {
                 return Some(handle.clone());
             }
         }
@@ -336,6 +467,32 @@ pub fn setup_duke_audio(
         }
     }
 
+    // 3b. Read and parse DUKE.RTS lump file if present in GRP
+    if let Ok(rts_bytes) = grp.read_file("DUKE.RTS") {
+        if let Ok(duke_rts) = crate::audio::rts::DukeRts::parse(&rts_bytes) {
+            println!(
+                "DukeAudioPlugin: Loaded DUKE.RTS with {} speech lumps",
+                duke_rts.lumps.len()
+            );
+            for (lump_name, lump_data) in &duke_rts.lumps {
+                if let Ok(voc_sound) = VocSound::parse(lump_name, lump_data) {
+                    let wav_bytes = voc_sound.to_wav_bytes();
+                    let audio_source = AudioSource {
+                        bytes: wav_bytes.into(),
+                    };
+                    let handle = audio_sources.add(audio_source);
+                    audio_assets
+                        .sounds_by_name
+                        .insert(format!("RTS_{}", lump_name), handle.clone());
+                    audio_assets
+                        .sounds_by_name
+                        .insert(lump_name.clone(), handle);
+                }
+            }
+            commands.insert_resource(DukeRtsResource(duke_rts));
+        }
+    }
+
     // 4. Map Sound IDs to loaded handles
     let id_mappings = audio_assets.sound_id_to_file.clone();
     for (id, filename) in id_mappings {
@@ -345,25 +502,33 @@ pub fn setup_duke_audio(
     }
 
     // 5. Setup streaming MIDI music via SoundFont
-    let soundfont_data = std::fs::read("assets/TimGM6mb.sf2").unwrap_or_default();
-    let sf2_soundfont = if !soundfont_data.is_empty() {
-        let mut reader = std::io::Cursor::new(soundfont_data);
-        if let Ok(sf) = rustysynth::SoundFont::new(&mut reader) {
-            Some(std::sync::Arc::new(sf))
+    let sf2_path = "assets/TimGM6mb.sf2";
+    let sf2_soundfont = if std::path::Path::new(sf2_path).exists() {
+        if let Ok(soundfont_data) = std::fs::read(sf2_path) {
+            let mut reader = std::io::Cursor::new(soundfont_data);
+            if let Ok(sf) = rustysynth::SoundFont::new(&mut reader) {
+                Some(std::sync::Arc::new(sf))
+            } else {
+                println!(
+                    "DukeAudioPlugin: Warning - failed to parse SoundFont at {}! Falling back to MidiSynth.",
+                    sf2_path
+                );
+                None
+            }
         } else {
             None
         }
     } else {
-        println!("DukeAudioPlugin: Warning - assets/TimGM6mb.sf2 not found! Music will not play.");
+        println!("DukeAudioPlugin: Warning - assets/TimGM6mb.sf2 not found! Falling back to built-in MidiSynth synthesizer.");
         None
     };
 
-    if let Some(soundfont) = sf2_soundfont {
-        let tracks_to_load = [
-            (LevelMidiTrack::E1L1Stalker, "STALKER.MID"),
-            (LevelMidiTrack::TitleGrabbag, "GRABBAG.MID"),
-        ];
+    let tracks_to_load = [
+        (LevelMidiTrack::E1L1Stalker, "STALKER.MID"),
+        (LevelMidiTrack::TitleGrabbag, "GRABBAG.MID"),
+    ];
 
+    if let Some(soundfont) = sf2_soundfont {
         for (track_enum, midi_filename) in &tracks_to_load {
             if let Ok(midi_data) = grp.read_file(midi_filename) {
                 let stream = MidiAudioStream {
@@ -380,6 +545,28 @@ pub fn setup_duke_audio(
         }
     }
 
+    // Fallback: If SoundFont is missing or loading fails, do NOT leave background music silent!
+    // Fall back to the built-in pure-Rust software synthesizer:
+    if audio_assets.music_tracks.is_empty() {
+        println!("DukeAudioPlugin: Synthesizing background music with built-in pure-Rust software synthesizer (MidiSynth)...");
+        let synth = crate::audio::midi::MidiSynth::new(22050);
+        for (track_enum, midi_filename) in &tracks_to_load {
+            if let Ok(midi_data) = grp.read_file(midi_filename) {
+                if let Ok(wav_bytes) = synth.midi_to_wav(&midi_data) {
+                    let audio_source = AudioSource {
+                        bytes: wav_bytes.into(),
+                    };
+                    let handle = audio_sources.add(audio_source);
+                    audio_assets.wav_music_tracks.insert(*track_enum, handle);
+                    println!(
+                        "DukeAudioPlugin: Synthesized fallback background music (MidiSynth): {}",
+                        midi_filename
+                    );
+                }
+            }
+        }
+    }
+
     // 6. Start playing the iconic E1L1 soundtrack (STALKER.MID) in background loop
     if let Some(e1l1_music) = audio_assets.music_tracks.get(&LevelMidiTrack::E1L1Stalker) {
         commands.spawn((
@@ -390,6 +577,15 @@ pub fn setup_duke_audio(
             MusicTrackEmitter,
         ));
         println!("DukeAudioPlugin: Background music playing (STALKER.MID - Episode 1 Level 1)");
+    } else if let Some(e1l1_wav) = audio_assets.wav_music_tracks.get(&LevelMidiTrack::E1L1Stalker) {
+        commands.spawn((
+            AudioBundle {
+                source: e1l1_wav.clone(),
+                settings: PlaybackSettings::LOOP.with_volume(bevy::audio::Volume::new(0.6)),
+            },
+            MusicTrackEmitter,
+        ));
+        println!("DukeAudioPlugin: Background music playing via MidiSynth fallback (STALKER.MID - Episode 1 Level 1)");
     }
 
     println!(
@@ -397,21 +593,49 @@ pub fn setup_duke_audio(
         voc_count,
         audio_assets.sounds_by_id.len(),
         audio_assets.duke_quotes.len(),
-        audio_assets.music_tracks.len()
+        audio_assets.music_tracks.len() + audio_assets.wav_music_tracks.len()
     );
 }
 
 pub fn handle_play_sound_events(
     mut events: EventReader<PlaySoundEvent>,
     audio_assets: Res<DukeAudioAssets>,
+    mut voice_limiter: Option<ResMut<AudioVoiceLimiter>>,
+    voice_query: Query<(Entity, &VoiceChannel)>,
     mut commands: Commands,
 ) {
+    let max_voices = voice_limiter
+        .as_ref()
+        .map(|l| l.max_voices)
+        .unwrap_or(MAX_ACTIVE_VOICES);
+
+    let mut current_voices: Vec<(Entity, u64)> = voice_query
+        .iter()
+        .map(|(e, vc)| (e, vc.sequence))
+        .collect();
+
     for ev in events.read() {
         if let Some(handle) = audio_assets.get_sound_by_id(ev.sound_id) {
-            commands.spawn(AudioBundle {
-                source: handle,
-                ..default()
-            });
+            cull_oldest_voice_if_needed(&mut current_voices, max_voices, &mut commands);
+
+            let seq = if let Some(ref mut limiter) = voice_limiter {
+                let id = limiter.next_id;
+                limiter.next_id += 1;
+                id
+            } else {
+                0
+            };
+
+            let entity = commands
+                .spawn((
+                    AudioBundle {
+                        source: handle,
+                        ..default()
+                    },
+                    VoiceChannel { sequence: seq },
+                ))
+                .id();
+            current_voices.push((entity, seq));
         }
     }
 }
@@ -419,20 +643,46 @@ pub fn handle_play_sound_events(
 pub fn handle_play_spatial_sound_events(
     mut events: EventReader<PlaySpatialSoundEvent>,
     audio_assets: Res<DukeAudioAssets>,
+    mut voice_limiter: Option<ResMut<AudioVoiceLimiter>>,
+    voice_query: Query<(Entity, &VoiceChannel)>,
     mut commands: Commands,
 ) {
+    let max_voices = voice_limiter
+        .as_ref()
+        .map(|l| l.max_voices)
+        .unwrap_or(MAX_ACTIVE_VOICES);
+
+    let mut current_voices: Vec<(Entity, u64)> = voice_query
+        .iter()
+        .map(|(e, vc)| (e, vc.sequence))
+        .collect();
+
     for ev in events.read() {
         if let Some(handle) = audio_assets.get_sound_by_id(ev.sound_id) {
+            cull_oldest_voice_if_needed(&mut current_voices, max_voices, &mut commands);
+
+            let seq = if let Some(ref mut limiter) = voice_limiter {
+                let id = limiter.next_id;
+                limiter.next_id += 1;
+                id
+            } else {
+                0
+            };
+
             let settings = PlaybackSettings::default()
                 .with_volume(bevy::audio::Volume::new(ev.volume))
                 .with_spatial(true);
-            commands.spawn((
-                AudioBundle {
-                    source: handle,
-                    settings,
-                },
-                TransformBundle::from_transform(Transform::from_translation(ev.position)),
-            ));
+            let entity = commands
+                .spawn((
+                    AudioBundle {
+                        source: handle,
+                        settings,
+                    },
+                    TransformBundle::from_transform(Transform::from_translation(ev.position)),
+                    VoiceChannel { sequence: seq },
+                ))
+                .id();
+            current_voices.push((entity, seq));
         }
     }
 }
@@ -440,28 +690,59 @@ pub fn handle_play_spatial_sound_events(
 pub fn handle_play_named_sound_events(
     mut events: EventReader<PlayNamedSoundEvent>,
     audio_assets: Res<DukeAudioAssets>,
+    mut voice_limiter: Option<ResMut<AudioVoiceLimiter>>,
+    voice_query: Query<(Entity, &VoiceChannel)>,
     mut commands: Commands,
 ) {
+    let max_voices = voice_limiter
+        .as_ref()
+        .map(|l| l.max_voices)
+        .unwrap_or(MAX_ACTIVE_VOICES);
+
+    let mut current_voices: Vec<(Entity, u64)> = voice_query
+        .iter()
+        .map(|(e, vc)| (e, vc.sequence))
+        .collect();
+
     for ev in events.read() {
         if let Some(handle) = audio_assets.get_sound_by_name(&ev.name) {
+            cull_oldest_voice_if_needed(&mut current_voices, max_voices, &mut commands);
+
+            let seq = if let Some(ref mut limiter) = voice_limiter {
+                let id = limiter.next_id;
+                limiter.next_id += 1;
+                id
+            } else {
+                0
+            };
+
             let mut settings =
                 PlaybackSettings::default().with_volume(bevy::audio::Volume::new(ev.volume));
 
-            if let Some(pos) = ev.position {
+            let entity = if let Some(pos) = ev.position {
                 settings = settings.with_spatial(true);
-                commands.spawn((
-                    AudioBundle {
-                        source: handle,
-                        settings,
-                    },
-                    TransformBundle::from_transform(Transform::from_translation(pos)),
-                ));
+                commands
+                    .spawn((
+                        AudioBundle {
+                            source: handle,
+                            settings,
+                        },
+                        TransformBundle::from_transform(Transform::from_translation(pos)),
+                        VoiceChannel { sequence: seq },
+                    ))
+                    .id()
             } else {
-                commands.spawn(AudioBundle {
-                    source: handle,
-                    settings,
-                });
-            }
+                commands
+                    .spawn((
+                        AudioBundle {
+                            source: handle,
+                            settings,
+                        },
+                        VoiceChannel { sequence: seq },
+                    ))
+                    .id()
+            };
+            current_voices.push((entity, seq));
         }
     }
 }
@@ -491,6 +772,23 @@ pub fn handle_play_music_track_events(
                 },
                 MusicTrackEmitter,
             ));
+        } else if let Some(wav_handle) = audio_assets.wav_music_tracks.get(&ev.track) {
+            // Despawn old tracks
+            for entity in &old_music {
+                commands.entity(entity).despawn_recursive();
+            }
+
+            music_state.current_track = ev.track.filename().to_string();
+
+            // Spawn new track
+            commands.spawn((
+                AudioBundle {
+                    source: wav_handle.clone(),
+                    settings: PlaybackSettings::LOOP
+                        .with_volume(bevy::audio::Volume::new(music_state.current_volume)),
+                },
+                MusicTrackEmitter,
+            ));
         }
     }
 }
@@ -498,15 +796,35 @@ pub fn handle_play_music_track_events(
 pub fn handle_play_duke_voice_events(
     mut events: EventReader<PlayDukeVoiceEvent>,
     audio_assets: Res<DukeAudioAssets>,
+    rts_resource: Option<Res<DukeRtsResource>>,
+    mut audio_sources: Option<ResMut<Assets<AudioSource>>>,
     mut voice_queue: Option<ResMut<DukeVoiceQueue>>,
     mut music_state: Option<ResMut<DynamicMusicState>>,
+    mut voice_limiter: Option<ResMut<AudioVoiceLimiter>>,
+    voice_query: Query<(Entity, &VoiceChannel)>,
     mut commands: Commands,
 ) {
+    let max_voices = voice_limiter
+        .as_ref()
+        .map(|l| l.max_voices)
+        .unwrap_or(MAX_ACTIVE_VOICES);
+
+    let mut current_voices: Vec<(Entity, u64)> = voice_query
+        .iter()
+        .map(|(e, vc)| (e, vc.sequence))
+        .collect();
+
     for ev in events.read() {
-        let priority = if let Some(ref n) = ev.name {
+        let sound_name = match ev.name.as_deref() {
+            Some("LOOKING_GOOD") => Some("LOOK01"),
+            Some("FOUND_SECRET") => Some("COOL01"),
+            other => other,
+        };
+
+        let priority = if let Some(n) = sound_name {
             if n.contains("REST_IN_PIECES") || n.contains("EAT_SHIT") || n.contains("HAIL") {
                 10
-            } else if n.contains("LOOKING_GOOD") {
+            } else if n.contains("LOOK") {
                 8
             } else {
                 5
@@ -521,15 +839,89 @@ pub fn handle_play_duke_voice_events(
             true
         };
 
-        if can_play {
+        if !can_play {
+            continue;
+        }
+
+        let mut handle_to_play: Option<Handle<AudioSource>> = None;
+
+        if let Some(name) = sound_name {
+            let is_rts_random = name.eq_ignore_ascii_case("RTS")
+                || name.eq_ignore_ascii_case("TAUNT")
+                || name.eq_ignore_ascii_case("RTS_TAUNT");
+
+            if is_rts_random {
+                if let Some(ref rts) = rts_resource {
+                    if let Some((lump_name, lump_data)) = rts.0.sample_random_taunt() {
+                        if let Some(handle) = audio_assets.get_sound_by_name(lump_name) {
+                            handle_to_play = Some(handle);
+                        } else if let Some(ref mut sources) = audio_sources {
+                            let src = DukeRts::lump_to_audio_source(lump_data);
+                            handle_to_play = Some(sources.add(src));
+                        }
+                    }
+                }
+            } else if let Some(ref rts) = rts_resource {
+                let rts_key = name.strip_prefix("RTS_").unwrap_or(name);
+                if let Some(lump_data) = rts.0.get_sound(rts_key) {
+                    if let Some(handle) = audio_assets
+                        .get_sound_by_name(name)
+                        .or_else(|| audio_assets.get_sound_by_name(rts_key))
+                    {
+                        handle_to_play = Some(handle);
+                    } else if let Some(ref mut sources) = audio_sources {
+                        let src = DukeRts::lump_to_audio_source(lump_data);
+                        handle_to_play = Some(sources.add(src));
+                    }
+                } else if let Some(handle) = audio_assets.get_sound_by_name(name) {
+                    handle_to_play = Some(handle);
+                }
+            } else if let Some(handle) = audio_assets.get_sound_by_name(name) {
+                handle_to_play = Some(handle);
+            }
+        } else {
+            // Random taunt (ev.name is None)
+            if let Some(ref rts) = rts_resource {
+                if let Some((lump_name, lump_data)) = rts.0.sample_random_taunt() {
+                    if let Some(handle) = audio_assets.get_sound_by_name(lump_name) {
+                        handle_to_play = Some(handle);
+                    } else if let Some(ref mut sources) = audio_sources {
+                        let src = DukeRts::lump_to_audio_source(lump_data);
+                        handle_to_play = Some(sources.add(src));
+                    }
+                }
+            }
+            if handle_to_play.is_none() && !audio_assets.duke_quotes.is_empty() {
+                let idx = rand::random::<usize>() % audio_assets.duke_quotes.len();
+                handle_to_play = audio_assets.duke_quotes.get(idx).cloned();
+            }
+        }
+
+        if let Some(handle) = handle_to_play {
             if let Some(ref mut music) = music_state {
-                music.ducking_timer = 2.5; // Duck background music for 2.5s
+                music.ducking_timer = 2.5; // Duck background music for 2.5s only when sound exists
             }
-            if let Some(ref name) = ev.name {
-                audio_assets.play_named(&mut commands, name);
+
+            cull_oldest_voice_if_needed(&mut current_voices, max_voices, &mut commands);
+
+            let seq = if let Some(ref mut limiter) = voice_limiter {
+                let id = limiter.next_id;
+                limiter.next_id += 1;
+                id
             } else {
-                audio_assets.play_duke_quote(&mut commands);
-            }
+                0
+            };
+
+            let entity = commands
+                .spawn((
+                    AudioBundle {
+                        source: handle,
+                        ..default()
+                    },
+                    VoiceChannel { sequence: seq },
+                ))
+                .id();
+            current_voices.push((entity, seq));
         }
     }
 }
@@ -631,9 +1023,13 @@ pub fn build_default_sound_id_map() -> HashMap<i32, String> {
     map.insert(81, "TRUMBLE.VOC".into()); // EARTHQUAKE
     map.insert(82, "ALARM1A.VOC".into()); // INTRUDER_ALERT
     map.insert(83, "ENDSEQ.VOC".into()); // END_OF_LEVEL_WARN
+    map.insert(88, "SECRET.VOC".into()); // SECRET_AREA
     map.insert(109, "SHOTGUN7.VOC".into()); // SHOTGUN_FIRE
     map.insert(110, "FREEZE.VOC".into()); // SOMETHINGFROZE
     map.insert(118, "WPNSEL21.VOC".into()); // SELECT_WEAPON
+    map.insert(195, "DMDG.VOC".into()); // BONUS_SPEECH1 ("Damn, I'm good!")
+    map.insert(196, "GROOVY.VOC".into()); // BONUS_SPEECH2 ("Groovy!")
+    map.insert(252, "LOOKIN01.VOC".into()); // DUKE_LOOKINTOMIRROR
     map.insert(649, "GOGGLE12.VOC".into()); // NITEVISION_ONOFF
     map.insert(670, "COOL01.VOC".into()); // DUKE_GETWEAPON1
     map.insert(671, "GETSOM1A.VOC".into()); // DUKE_GETWEAPON2
@@ -706,10 +1102,52 @@ mod tests {
     #[test]
     fn test_default_sound_mappings() {
         let map = build_default_sound_id_map();
+        assert_eq!(map.get(&0), Some(&"KICKHIT.VOC".to_string()));
+        assert_eq!(map.get(&2), Some(&"BULITHIT.VOC".to_string()));
         assert_eq!(map.get(&3), Some(&"PISTOL.VOC".to_string()));
+        assert_eq!(map.get(&88), Some(&"SECRET.VOC".to_string()));
         assert_eq!(map.get(&109), Some(&"SHOTGUN7.VOC".to_string()));
         assert_eq!(map.get(&76), Some(&"SWITCH1.VOC".to_string()));
         assert_eq!(map.get(&69), Some(&"SQUISH1A.VOC".to_string()));
+        assert_eq!(map.get(&195), Some(&"DMDG.VOC".to_string()));
+        assert_eq!(map.get(&196), Some(&"GROOVY.VOC".to_string()));
+        assert_eq!(map.get(&252), Some(&"LOOKIN01.VOC".to_string()));
+    }
+
+    #[test]
+    fn test_voice_aliases_and_ducking() {
+        let mut assets = DukeAudioAssets::default();
+        // Insert mock source
+        let mut dummy_sources = Assets::<AudioSource>::default();
+        let handle = dummy_sources.add(AudioSource {
+            bytes: vec![0u8; 100].into(),
+        });
+        assets.sounds_by_name.insert("COOL01".to_string(), handle.clone());
+        assets.sounds_by_name.insert("LOOKIN01".to_string(), handle.clone());
+
+        // Test alias lookups
+        assert!(assets.get_sound_by_name("FOUND_SECRET").is_some());
+        assert!(assets.get_sound_by_name("LOOKING_GOOD").is_some());
+        assert!(assets.get_sound_by_name("NON_EXISTENT_VOICE").is_none());
+    }
+
+    #[test]
+    fn test_midisynth_fallback_wav_generation() {
+        if let Ok(grp) = crate::grp::Grp::open("dukenukem3d/duke3d.grp") {
+            if let Ok(midi_data) = grp.read_file("STALKER.MID") {
+                let synth = crate::audio::midi::MidiSynth::new(22050);
+                let wav_res = synth.midi_to_wav(&midi_data);
+                assert!(wav_res.is_ok());
+                let wav_bytes = wav_res.unwrap();
+                assert!(wav_bytes.starts_with(b"RIFF"));
+                let audio_source = AudioSource {
+                    bytes: wav_bytes.into(),
+                };
+                let mut dummy_sources = Assets::<AudioSource>::default();
+                let handle = dummy_sources.add(audio_source);
+                assert!(handle.id() != bevy::asset::AssetId::invalid());
+            }
+        }
     }
 
     #[test]
@@ -738,11 +1176,149 @@ mod tests {
         assert!((music.get_target_volume() - 0.48).abs() < 0.001); // 0.8 * 0.6 = 0.48
 
         music.is_underwater = true;
-        assert!((music.get_target_volume() - 0.336).abs() < 0.001); // 0.48 * 0.7 = 0.336
+        assert!((music.get_target_volume() - 0.192).abs() < 0.001); // 0.8 * 0.6 * 0.4 = 0.192
 
         let mut voice = DukeVoiceQueue::default();
         assert!(voice.should_play(5)); // Low priority plays when idle
         assert!(!voice.should_play(2)); // Lower priority rejected while on cooldown
         assert!(voice.should_play(10)); // High priority overrides active line
+    }
+
+    #[test]
+    fn test_underwater_audio_sync_and_volume_attenuation() {
+        let mut app = App::new();
+        app.init_resource::<DynamicMusicState>();
+
+        // Spawn player in Diving mode
+        let mut player = crate::player::PlayerController::default();
+        player.movement_mode = PlayerMovementMode::Diving;
+        let player_entity = app.world_mut().spawn(player).id();
+
+        // Run underwater audio state system
+        let mut schedule = Schedule::default();
+        schedule.add_systems(update_underwater_audio_state);
+        schedule.run(app.world_mut());
+
+        let music_state = app.world().resource::<DynamicMusicState>();
+        assert!(music_state.is_underwater, "Music state should be marked underwater when player is diving");
+
+        // Underwater attenuation: volume multiplier 0.4 (attenuated by 60%)
+        let underwater_vol = music_state.get_target_volume();
+        let base_vol = music_state.base_volume;
+        assert!((underwater_vol - (base_vol * 0.4)).abs() < 0.001, "Target volume should be attenuated by 60% (mult 0.4)");
+
+        // Test transition out of water and smooth lerping back towards 1.0
+        app.world_mut().entity_mut(player_entity).get_mut::<crate::player::PlayerController>().unwrap().movement_mode = PlayerMovementMode::Standing;
+
+        schedule.run(app.world_mut());
+
+        let mut music_state = app.world_mut().resource_mut::<DynamicMusicState>();
+        assert!(!music_state.is_underwater, "Music state should no longer be underwater when player is standing");
+        assert!((music_state.get_target_volume() - base_vol).abs() < 0.001);
+
+        // Simulate ticking/lerping volume back to 1.0
+        music_state.underwater_mult = 0.4;
+        music_state.tick(0.1);
+        assert!(music_state.underwater_mult > 0.4, "Underwater multiplier should smoothly lerp back towards 1.0");
+        for _ in 0..20 {
+            music_state.tick(0.1);
+        }
+        assert!((music_state.underwater_mult - 1.0).abs() < 0.01, "Underwater multiplier should reach 1.0");
+    }
+
+    #[test]
+    fn test_rts_resource_loading_and_taunt_dispatch() {
+        let mut app = App::new();
+        app.insert_resource(Assets::<AudioSource>::default())
+            .init_resource::<DukeAudioAssets>()
+            .init_resource::<DynamicMusicState>()
+            .init_resource::<AudioVoiceLimiter>()
+            .add_event::<PlayDukeVoiceEvent>();
+
+        // Build mock DUKE.RTS lump data (WAD format)
+        let mut wad_bytes = Vec::new();
+        wad_bytes.extend_from_slice(b"IWAD");
+        wad_bytes.extend_from_slice(&2i32.to_le_bytes()); // 2 lumps
+        wad_bytes.extend_from_slice(&12i32.to_le_bytes()); // infotable offset
+
+        // Lump directory: Lump 1 = "TAUNT1" at offset 44, size 4
+        wad_bytes.extend_from_slice(&44i32.to_le_bytes());
+        wad_bytes.extend_from_slice(&4i32.to_le_bytes());
+        let mut name1 = [0u8; 8];
+        name1[0..6].copy_from_slice(b"TAUNT1");
+        wad_bytes.extend_from_slice(&name1);
+
+        // Lump 2 = "TAUNT2" at offset 48, size 4
+        wad_bytes.extend_from_slice(&48i32.to_le_bytes());
+        wad_bytes.extend_from_slice(&4i32.to_le_bytes());
+        let mut name2 = [0u8; 8];
+        name2[0..6].copy_from_slice(b"TAUNT2");
+        wad_bytes.extend_from_slice(&name2);
+
+        // Lump contents
+        wad_bytes.extend_from_slice(b"WAV1");
+        wad_bytes.extend_from_slice(b"WAV2");
+
+        let rts = DukeRts::parse(&wad_bytes).expect("Failed to parse mock RTS");
+        assert_eq!(rts.lumps.len(), 2);
+        assert_eq!(rts.get_sound("TAUNT1"), Some(b"WAV1".as_slice()));
+        assert_eq!(rts.get_sound("TAUNT2"), Some(b"WAV2".as_slice()));
+
+        // Store in Bevy resource DukeRtsResource
+        app.insert_resource(DukeRtsResource(rts));
+
+        // Send random taunt event (name: None)
+        app.world_mut().send_event(PlayDukeVoiceEvent { name: None });
+
+        let mut schedule = Schedule::default();
+        schedule.add_systems(handle_play_duke_voice_events);
+        schedule.run(app.world_mut());
+
+        // Verify voice entity spawned
+        let count = app.world_mut().query::<&VoiceChannel>().iter(app.world()).count();
+        assert_eq!(count, 1, "RTS taunt event should spawn an audio voice entity");
+
+        // Verify music ducking was activated
+        let music_state = app.world().resource::<DynamicMusicState>();
+        assert!(music_state.ducking_timer > 0.0, "Voice taunt should activate music ducking timer");
+    }
+
+    #[test]
+    fn test_audio_voice_limiter_channel_culling() {
+        let mut app = App::new();
+        let mut dummy_sources = Assets::<AudioSource>::default();
+        let dummy_handle = dummy_sources.add(AudioSource {
+            bytes: vec![0u8; 100].into(),
+        });
+
+        let mut assets = DukeAudioAssets::default();
+        assets.sounds_by_id.insert(1, dummy_handle.clone());
+        app.insert_resource(assets);
+        app.insert_resource(dummy_sources);
+        app.add_event::<PlaySoundEvent>();
+
+        // Configure limiter with max 4 voices
+        app.insert_resource(AudioVoiceLimiter {
+            max_voices: 4,
+            next_id: 0,
+        });
+
+        let mut schedule = Schedule::default();
+        schedule.add_systems(handle_play_sound_events);
+
+        // Spawn 8 sounds sequentially
+        for _ in 0..8 {
+            app.world_mut().send_event(PlaySoundEvent { sound_id: 1 });
+            schedule.run(app.world_mut());
+        }
+
+        // Verify total active voice entities do NOT exceed 4
+        let remaining_channels: Vec<u64> = app.world_mut().query::<&VoiceChannel>().iter(app.world()).map(|v| v.sequence).collect();
+        assert_eq!(remaining_channels.len(), 4, "Active voices must be capped at 4");
+
+        // Oldest voices (sequence 0, 1, 2, 3) should have been culled, leaving sequence 4, 5, 6, 7
+        for seq in remaining_channels {
+            assert!(seq >= 4, "Oldest voices should be stolen/culled by voice limiter");
+        }
     }
 }

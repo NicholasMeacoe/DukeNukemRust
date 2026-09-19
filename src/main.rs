@@ -18,10 +18,12 @@ mod palette;
 pub mod player;
 pub mod save;
 mod scripting;
+pub mod sector_map;
 mod sky;
 
 pub type Player = player::PlayerController;
 
+use crate::names::*;
 use art::Art;
 use bevy::input::mouse::MouseMotion;
 use bevy::prelude::*;
@@ -104,7 +106,9 @@ fn main() {
         .add_systems(
             Update,
             (
-                (player_look, cursor_grab, emit_player_interaction).in_set(GameSet::Input),
+                cursor_grab,
+                (player_look, emit_player_interaction).in_set(GameSet::Input),
+                (sector_map::update_entity_sectors,).in_set(GameSet::Movement),
                 (play_duke_quotes, update_weapon).in_set(GameSet::Combat),
                 (
                     animation::update_engine_clock,
@@ -267,7 +271,7 @@ fn setup(
 
     let default_material = materials.add(StandardMaterial { base_color: Color::srgb(0.5, 0.5, 0.6), unlit: true, double_sided: true, ..default() });
 
-    let spark_tile = 2595;
+    let spark_tile = SHOTSPARK1;
     let spark_material = if let Some(handle) = tile_textures.get(&spark_tile) {
         materials.add(StandardMaterial {
             base_color_texture: Some(handle.clone()),
@@ -338,6 +342,7 @@ fn setup(
                 spawn_position: start_pos,
                 ..default()
             },
+            sector_map::CurrentSector(-1),
             TransformBundle::from_transform(Transform::from_translation(start_pos)),
             RigidBody::KinematicPositionBased,
             Collider::capsule_y(0.5, 0.3),
@@ -356,6 +361,9 @@ fn setup(
                 min_slope_slide_angle: 60.0f32.to_radians(),
                 ..default()
             },
+            crate::player::weapons::FirstPersonViewModel::new(
+                crate::player::WeaponType::Pistol,
+            ),
         ))
         .id();
 
@@ -386,12 +394,12 @@ fn setup(
 
     // Spawn First Person Weapon (Pistol) using UI
     // The shareware version might not have 2524, let's try 2524 (FIRSTGUN) or fallback to something else, or a colored block
-    let pistol_tile = 2524;
+    let pistol_tile = FIRSTGUN;
     let weapon_image = if let Some(handle) = tile_textures.get(&pistol_tile) {
         handle.clone()
     } else {
         // Fallback to shotgun or just something visible if pistol is missing in this GRP
-        tile_textures.get(&2613).cloned().unwrap_or_else(|| {
+        tile_textures.get(&SHOTGUN).cloned().unwrap_or_else(|| {
             images.add(Image::default()) // dummy
         })
     };
@@ -700,7 +708,7 @@ fn update_weapon(
     }
 }
 
-fn cursor_grab(
+pub fn cursor_grab(
     mut windows: Query<&mut Window, With<PrimaryWindow>>,
     btn: Res<ButtonInput<MouseButton>>,
     state: Res<State<game_flow::GamePhase>>,
@@ -710,12 +718,75 @@ fn cursor_grab(
     };
 
     if *state.get() == game_flow::GamePhase::Playing {
-        if btn.just_pressed(MouseButton::Left) {
+        if btn.just_pressed(MouseButton::Left)
+            || state.is_changed()
+            || window.cursor.grab_mode != CursorGrabMode::Locked
+        {
             window.cursor.grab_mode = CursorGrabMode::Locked;
             window.cursor.visible = false;
         }
     } else {
         window.cursor.grab_mode = CursorGrabMode::None;
         window.cursor.visible = true;
+    }
+}
+
+#[cfg(test)]
+mod main_tests {
+    use super::*;
+    use bevy::window::{CursorGrabMode, PrimaryWindow, Window};
+
+    #[test]
+    fn test_cursor_grab_releases_in_pause_and_locks_in_playing() {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins);
+        app.add_plugins(bevy::state::app::StatesPlugin);
+        app.init_state::<game_flow::GamePhase>();
+        app.init_resource::<ButtonInput<MouseButton>>();
+
+        let window_entity = app
+            .world_mut()
+            .spawn((
+                Window {
+                    ..default()
+                },
+                PrimaryWindow,
+            ))
+            .id();
+
+        app.add_systems(Update, cursor_grab);
+
+        // Initial default state is MainMenu: cursor must be released and visible
+        app.update();
+        let win = app.world().entity(window_entity).get::<Window>().unwrap();
+        assert_eq!(win.cursor.grab_mode, CursorGrabMode::None);
+        assert!(win.cursor.visible);
+
+        // Transition to Playing state: cursor must be locked and hidden
+        app.world_mut()
+            .resource_mut::<NextState<game_flow::GamePhase>>()
+            .set(game_flow::GamePhase::Playing);
+        app.update();
+        let win = app.world().entity(window_entity).get::<Window>().unwrap();
+        assert_eq!(win.cursor.grab_mode, CursorGrabMode::Locked);
+        assert!(!win.cursor.visible);
+
+        // Switch state to Paused: cursor must be released and visible
+        app.world_mut()
+            .resource_mut::<NextState<game_flow::GamePhase>>()
+            .set(game_flow::GamePhase::Paused);
+        app.update();
+        let win = app.world().entity(window_entity).get::<Window>().unwrap();
+        assert_eq!(win.cursor.grab_mode, CursorGrabMode::None);
+        assert!(win.cursor.visible);
+
+        // Switch back to Playing: cursor must be grabbed again
+        app.world_mut()
+            .resource_mut::<NextState<game_flow::GamePhase>>()
+            .set(game_flow::GamePhase::Playing);
+        app.update();
+        let win = app.world().entity(window_entity).get::<Window>().unwrap();
+        assert_eq!(win.cursor.grab_mode, CursorGrabMode::Locked);
+        assert!(!win.cursor.visible);
     }
 }

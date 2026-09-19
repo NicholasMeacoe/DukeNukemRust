@@ -21,6 +21,10 @@ pub fn get_quicksave_path() -> PathBuf {
     get_save_dir().join("quicksave.sav")
 }
 
+pub fn slot_save_exists(slot: usize) -> bool {
+    get_save_path_for_slot(slot).exists()
+}
+
 pub fn write_save_to_disk(path: &Path, snapshot: &SaveGameSnapshot) -> Result<(), std::io::Error> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;

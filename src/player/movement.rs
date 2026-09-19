@@ -13,8 +13,12 @@ pub fn update_player_movement(
         &mut PlayerController,
         &mut KinematicCharacterController,
         Option<&KinematicCharacterControllerOutput>,
+        Option<&crate::sector_map::CurrentSector>,
+        Option<&mut Collider>,
     )>,
     camera_query: Query<&Transform, (With<Camera>, Without<PlayerController>)>,
+    effectors: Query<&crate::interactivity::SectorEffectorComponent>,
+    sector_map: Option<Res<crate::sector_map::SectorMap>>,
     mut sound_events: EventWriter<PlaySoundEvent>,
     mut tint: Option<ResMut<crate::hud::ScreenTintState>>,
 ) {
@@ -23,7 +27,24 @@ pub fn update_player_movement(
     };
     let dt = time.delta_seconds();
 
-    for (mut trans, mut player, mut controller, output) in query.iter_mut() {
+    for (mut trans, mut player, mut controller, output, current_sector, mut collider) in query.iter_mut() {
+        if player.health <= 0 {
+            player.death_timer -= dt;
+            controller.translation = Some(Vec3::new(0.0, -9.81 * dt, 0.0));
+            if player.death_timer <= 0.0 {
+                // Respawn at level spawn position
+                player.health = player.max_health;
+                player.armor = 0;
+                trans.translation = player.spawn_position;
+                player.velocity_y = 0.0;
+                player.velocity_xz = Vec2::ZERO;
+                player.death_timer = 0.0;
+                player.current_weapon = WeaponType::Pistol;
+                player.pistol_mag = 12;
+            }
+            continue;
+        }
+
         if player.freeze_timer > 0.0 {
             // Cannot move while frozen
             controller.translation = Some(Vec3::new(0.0, -9.81 * dt, 0.0));
@@ -62,13 +83,81 @@ pub fn update_player_movement(
             direction += right;
         }
 
-        // Crouch toggle / hold (Key 'C')
-        if keys.pressed(KeyCode::KeyC) {
-            player.movement_mode = PlayerMovementMode::Crouching;
+        // Sector lotag water detection (lotag 1: water surface, lotag 2: underwater)
+        let in_water = match current_sector {
+            Some(sec) if sec.0 >= 0 => {
+                if let Some(ref sm) = sector_map {
+                    let lotag = sm.get_sector_lotag(sec.0 as usize);
+                    lotag == 1 || lotag == 2
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        };
+
+        let is_underwater = match current_sector {
+            Some(sec) if sec.0 >= 0 => {
+                if let Some(ref sm) = sector_map {
+                    sm.get_sector_lotag(sec.0 as usize) == 2
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        };
+
+        // Check ceiling headroom for crouch un-toggling
+        let ceiling_y = match current_sector {
+            Some(sec) if sec.0 >= 0 => {
+                if let Some(ref sm) = sector_map {
+                    sm.get_ceil_y_at(sec.0 as usize, trans.translation.x, trans.translation.z)
+                } else {
+                    f32::INFINITY
+                }
+            }
+            _ => f32::INFINITY,
+        };
+        let feet_y = trans.translation.y - 0.5;
+        let headroom = ceiling_y - feet_y;
+        let wants_crouch = keys.pressed(KeyCode::KeyC);
+        // Prevent standing up if headroom is too low (< 1.6m)
+        let force_crouch = player.movement_mode == PlayerMovementMode::Crouching && headroom < 1.6;
+
+        let prev_movement_mode = player.movement_mode;
+
+        // Determine player movement mode
+        if is_underwater || (in_water && wants_crouch) {
+            player.movement_mode = PlayerMovementMode::Diving;
+        } else if in_water {
+            player.movement_mode = PlayerMovementMode::Swimming;
         } else if player.inventory.jetpack_active {
             player.movement_mode = PlayerMovementMode::JetpackFlying;
+        } else if wants_crouch || force_crouch {
+            player.movement_mode = PlayerMovementMode::Crouching;
         } else {
             player.movement_mode = PlayerMovementMode::Standing;
+        }
+
+        // Resize Rapier collider based on crouching vs standing and adjust translation to keep feet anchored
+        if let Some(ref mut col) = collider {
+            if player.movement_mode == PlayerMovementMode::Crouching && prev_movement_mode != PlayerMovementMode::Crouching {
+                **col = Collider::capsule_y(0.2, 0.3);
+                // Lower center by 0.3 so capsule bottom (half_height 0.2 + radius 0.3 = 0.5)
+                // matches previous bottom (half_height 0.5 + radius 0.3 = 0.8)
+                trans.translation.y -= 0.3;
+            } else if player.movement_mode != PlayerMovementMode::Crouching && prev_movement_mode == PlayerMovementMode::Crouching {
+                **col = Collider::capsule_y(0.5, 0.3);
+                // Raise center by 0.3 when standing up
+                trans.translation.y += 0.3;
+            }
+        }
+
+        // Diving blue tint
+        if player.movement_mode == PlayerMovementMode::Diving {
+            if let Some(ref mut t) = tint {
+                t.target_color = Color::srgba(0.0, 0.25, 0.75, 0.45);
+            }
         }
 
         // Calculate speed multiplier based on active buffs/debuffs
@@ -80,7 +169,7 @@ pub fn update_player_movement(
             speed_multiplier *= 0.5;
         }
         if player.movement_mode == PlayerMovementMode::Crouching {
-            speed_multiplier *= 0.5;
+            speed_multiplier *= 0.6;
         }
 
         let is_swimming = matches!(
@@ -89,9 +178,6 @@ pub fn update_player_movement(
         );
         if is_swimming {
             speed_multiplier *= 0.7;
-            if let Some(ref mut t) = tint {
-                t.target_color = Color::srgba(0.0, 0.2, 0.7, 0.4);
-            }
         }
 
         let current_speed = player.speed * speed_multiplier;
@@ -114,7 +200,31 @@ pub fn update_player_movement(
             player.velocity_xz *= (1.0 - 0.75 * dt).max(0.0);
         }
 
-        let horizontal_movement = Vec3::new(player.velocity_xz.x, 0.0, player.velocity_xz.y) * dt;
+        let mut conveyor_drift = Vec3::ZERO;
+        if let Some(sec) = current_sector {
+            if sec.0 >= 0 {
+                let sec_idx = sec.0 as usize;
+                for effector in effectors.iter() {
+                    if effector.sector_idx == sec_idx {
+                        match &effector.kind {
+                            crate::interactivity::EffectorKind::ConveyorBelt { direction, speed } => {
+                                conveyor_drift += Vec3::new(direction.x, 0.0, direction.y) * (*speed * dt);
+                            }
+                            crate::interactivity::EffectorKind::UnderwaterTeleport { target_pos, .. } => {
+                                if is_swimming && trans.translation.distance_squared(*target_pos) > 9.0 {
+                                    trans.translation = *target_pos;
+                                    sound_events.send(PlaySoundEvent { sound_id: 11 }); // TELEPORTER
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            }
+        }
+
+        let horizontal_movement =
+            Vec3::new(player.velocity_xz.x, 0.0, player.velocity_xz.y) * dt + conveyor_drift;
 
         // Jetpack / Swimming / Gravity / Jumping
         let gravity = -18.0;
@@ -139,10 +249,48 @@ pub fn update_player_movement(
                 player.velocity_y = -0.3; // Gentle sinking buoyancy
             }
         } else if is_grounded {
-            if player.velocity_y < -4.0 {
+            if player.velocity_y < -10.0 {
+                let fall_speed = -player.velocity_y;
+                let fall_damage = ((fall_speed - 9.0) * 8.0) as i32;
+                if fall_damage > 0 {
+                    let mut damage = fall_damage;
+                    if player.inventory.boots_amount > 0 {
+                        let absorbed = player.inventory.boots_amount.min(damage);
+                        player.inventory.boots_amount -= absorbed;
+                        damage -= absorbed;
+                        sound_events.send(PlaySoundEvent { sound_id: 42 }); // DUKE_LAND
+                    }
+                    if damage > 0 && !player.god_mode {
+                        player.health = (player.health - damage).max(0);
+                        if player.health == 0 {
+                            player.death_timer = 3.0;
+                            sound_events.send(PlaySoundEvent { sound_id: 41 }); // DUKE_DEAD
+                        } else {
+                            sound_events.send(PlaySoundEvent { sound_id: 37 }); // DUKE_PAIN
+                        }
+                    }
+                }
+            } else if player.velocity_y < -4.0 {
                 sound_events.send(PlaySoundEvent { sound_id: 42 }); // DUKE_LAND
             }
-            if player.velocity_y < 0.0 {
+            if let Some(sec) = current_sector {
+                if sec.0 >= 0 {
+                    if let Some(ref sm) = sector_map {
+                        let floor_y = sm.get_floor_y_at(sec.0 as usize, trans.translation.x, trans.translation.z);
+                        let feet_y = trans.translation.y - if player.is_crouching() { 0.5 } else { 0.8 };
+                        let height_diff = feet_y - floor_y;
+                        if height_diff < 0.25 && height_diff > -0.25 && player.velocity_y < 0.0 {
+                            player.velocity_y = -0.5; // Smooth sloped floor adherence
+                        } else if player.velocity_y < 0.0 {
+                            player.velocity_y = -0.2;
+                        }
+                    } else if player.velocity_y < 0.0 {
+                        player.velocity_y = -0.2;
+                    }
+                } else if player.velocity_y < 0.0 {
+                    player.velocity_y = -0.2;
+                }
+            } else if player.velocity_y < 0.0 {
                 player.velocity_y = -0.2; // Gentle slope adherence
             }
             if keys.just_pressed(KeyCode::Space)

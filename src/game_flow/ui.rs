@@ -14,6 +14,9 @@ pub struct MenuItemText(pub usize);
 pub struct MenuCursorIndicator(pub usize);
 
 #[derive(Component)]
+pub struct MenuItemRow(pub usize);
+
+#[derive(Component)]
 pub struct MenuHeaderTitle;
 
 #[derive(Component)]
@@ -52,7 +55,7 @@ pub fn setup_menu_ui(mut commands: Commands) {
                 TextBundle::from_section(
                     "DUKE NUKEM 3D",
                     TextStyle {
-                        font_size: 48.0,
+                        font_size: 44.0,
                         color: DUKE_GOLD,
                         ..default()
                     },
@@ -65,46 +68,49 @@ pub fn setup_menu_ui(mut commands: Commands) {
                 TextBundle::from_section(
                     "MAIN MENU",
                     TextStyle {
-                        font_size: 26.0,
+                        font_size: 24.0,
                         color: DUKE_RED,
                         ..default()
                     },
                 )
                 .with_style(Style {
-                    margin: UiRect::new(Val::Px(0.0), Val::Px(0.0), Val::Px(10.0), Val::Px(30.0)),
+                    margin: UiRect::new(Val::Px(0.0), Val::Px(0.0), Val::Px(6.0), Val::Px(16.0)),
                     ..default()
                 }),
                 MenuSubheaderText,
             ));
 
-            // Menu items container (4 rows)
-            for i in 0..4 {
+            // Menu items container (10 rows)
+            for i in 0..10 {
                 parent
-                    .spawn(NodeBundle {
-                        style: Style {
-                            flex_direction: FlexDirection::Row,
-                            align_items: AlignItems::Center,
-                            justify_content: JustifyContent::FlexStart,
-                            width: Val::Px(450.0),
-                            height: Val::Px(42.0),
-                            margin: UiRect::vertical(Val::Px(4.0)),
+                    .spawn((
+                        NodeBundle {
+                            style: Style {
+                                flex_direction: FlexDirection::Row,
+                                align_items: AlignItems::Center,
+                                justify_content: JustifyContent::FlexStart,
+                                width: Val::Px(500.0),
+                                height: Val::Px(32.0),
+                                margin: UiRect::vertical(Val::Px(2.0)),
+                                ..default()
+                            },
                             ..default()
                         },
-                        ..default()
-                    })
+                        MenuItemRow(i),
+                    ))
                     .with_children(|row| {
                         // Cursor symbol
                         row.spawn((
                             TextBundle::from_section(
                                 "► ",
                                 TextStyle {
-                                    font_size: 28.0,
+                                    font_size: 24.0,
                                     color: DUKE_RED,
                                     ..default()
                                 },
                             )
                             .with_style(Style {
-                                width: Val::Px(40.0),
+                                width: Val::Px(36.0),
                                 ..default()
                             }),
                             MenuCursorIndicator(i),
@@ -115,7 +121,7 @@ pub fn setup_menu_ui(mut commands: Commands) {
                             TextBundle::from_section(
                                 "",
                                 TextStyle {
-                                    font_size: 26.0,
+                                    font_size: 22.0,
                                     color: DUKE_GREY,
                                     ..default()
                                 },
@@ -130,13 +136,13 @@ pub fn setup_menu_ui(mut commands: Commands) {
                 TextBundle::from_section(
                     "ARROWS / W/S TO MOVE • ENTER TO SELECT • ESC TO BACK",
                     TextStyle {
-                        font_size: 16.0,
+                        font_size: 15.0,
                         color: Color::srgb(0.5, 0.5, 0.55),
                         ..default()
                     },
                 )
                 .with_style(Style {
-                    margin: UiRect::top(Val::Px(40.0)),
+                    margin: UiRect::top(Val::Px(20.0)),
                     ..default()
                 }),
                 MenuFooterText,
@@ -150,7 +156,9 @@ pub fn update_menu_ui(
     cursor_anim: Res<CursorAnimTimer>,
     progress: Res<LevelProgress>,
     anim_state: Res<crate::game_flow::intermission::IntermissionAnimationState>,
+    save_mgr: Option<Res<crate::save::SaveManager>>,
     mut root_query: Query<(&mut Style, &mut BackgroundColor), With<MenuUiRoot>>,
+    mut row_query: Query<(&mut Style, &MenuItemRow), Without<MenuUiRoot>>,
     mut header_query: Query<
         &mut Text,
         (
@@ -214,8 +222,12 @@ pub fn update_menu_ui(
 
     root_style.display = Display::Flex;
 
-    // Semi-transparent backdrop for pause/intermission vs dark for main menu
-    if current_phase == GamePhase::Paused || current_phase == GamePhase::Intermission {
+    // Semi-transparent backdrop for pause/intermission/save/load vs dark for main menu
+    if current_phase == GamePhase::Paused
+        || current_phase == GamePhase::SaveMenu
+        || current_phase == GamePhase::LoadMenu
+        || current_phase == GamePhase::Intermission
+    {
         root_bg.0 = Color::srgba(0.02, 0.02, 0.04, 0.82);
     } else {
         root_bg.0 = Color::srgba(0.04, 0.04, 0.07, 0.95);
@@ -239,6 +251,8 @@ pub fn update_menu_ui(
             GamePhase::EpisodeSelect => "SELECT AN EPISODE".to_string(),
             GamePhase::SkillSelect => "CHOOSE SKILL LEVEL".to_string(),
             GamePhase::Paused => "OPTIONS & STATUS".to_string(),
+            GamePhase::SaveMenu => "SAVE GAME".to_string(),
+            GamePhase::LoadMenu => "LOAD GAME".to_string(),
             GamePhase::Intermission => "MISSION STATISTICS".to_string(),
             _ => "".to_string(),
         };
@@ -249,8 +263,26 @@ pub fn update_menu_ui(
             GamePhase::Intermission => "PRESS SPACE OR ENTER TO CONTINUE TO NEXT LEVEL".to_string(),
             GamePhase::Paused => "PRESS ESC TO RESUME • ENTER TO SELECT".to_string(),
             GamePhase::MainMenu => "USE ARROWS / W/S TO MOVE • ENTER TO SELECT".to_string(),
+            GamePhase::SaveMenu | GamePhase::LoadMenu => {
+                "ENTER: CONFIRM • ESC: BACK • UP/DOWN: SELECT SLOT".to_string()
+            }
             _ => "USE ARROWS / W/S TO MOVE • ENTER TO SELECT • ESC TO GO BACK".to_string(),
         };
+    }
+
+    // Toggle row container visibility depending on phase and max_items
+    let active_rows = if current_phase == GamePhase::Intermission {
+        3
+    } else {
+        cursor.max_items
+    };
+
+    for (mut row_style, row) in row_query.iter_mut() {
+        if row.0 < active_rows {
+            row_style.display = Display::Flex;
+        } else {
+            row_style.display = Display::None;
+        }
     }
 
     // Get item labels
@@ -259,25 +291,6 @@ pub fn update_menu_ui(
     let sec = (stats.time_taken_seconds % 60.0) as i32;
     let par_min = (stats.par_time_seconds / 60.0) as i32;
     let par_sec = (stats.par_time_seconds % 60.0) as i32;
-
-    let item_labels: [&str; 4] = match current_phase {
-        GamePhase::MainMenu => ["NEW GAME", "OPTIONS", "LOAD GAME", "QUIT"],
-        GamePhase::EpisodeSelect => [
-            "1: L.A. MELTDOWN",
-            "2: LUNAR APOCALYPSE",
-            "3: SHRAPNEL CITY",
-            "4: THE PLUTONIUM PAK",
-        ],
-        GamePhase::SkillSelect => [
-            "PIECE OF CAKE",
-            "LET'S ROCK",
-            "COME GET SOME",
-            "DAMN I'M GOOD",
-        ],
-        GamePhase::Paused => ["RESUME GAME", "OPTIONS", "MAIN MENU", "QUIT TO DESKTOP"],
-        GamePhase::Intermission => ["", "", "", ""],
-        _ => ["", "", "", ""],
-    };
 
     // Update item texts & colors
     for (mut text, item) in items_query.iter_mut() {
@@ -317,12 +330,66 @@ pub fn update_menu_ui(
                 _ => "".to_string(),
             };
             text.sections[0].style.color = DUKE_WHITE;
-        } else if idx < item_labels.len() {
-            text.sections[0].value = item_labels[idx].to_string();
-            if idx == cursor.selected_index {
-                text.sections[0].style.color = DUKE_GOLD;
+        } else if current_phase == GamePhase::SaveMenu || current_phase == GamePhase::LoadMenu {
+            if idx < 10 {
+                let slot_title = save_mgr
+                    .as_ref()
+                    .and_then(|sm| sm.save_slots_info[idx].clone())
+                    .or_else(|| {
+                        let path = crate::save::get_save_path_for_slot(idx);
+                        if path.exists() {
+                            crate::save::read_save_from_disk(&path).ok().map(|s| s.title)
+                        } else {
+                            None
+                        }
+                    });
+                let label = if let Some(title) = slot_title {
+                    format!("SLOT {}: {}", idx + 1, title)
+                } else {
+                    format!("SLOT {}: [EMPTY]", idx + 1)
+                };
+                text.sections[0].value = label;
+                if idx == cursor.selected_index {
+                    text.sections[0].style.color = DUKE_GOLD;
+                } else {
+                    text.sections[0].style.color = DUKE_GREY;
+                }
             } else {
-                text.sections[0].style.color = DUKE_GREY;
+                text.sections[0].value = "".to_string();
+            }
+        } else {
+            let item_labels: &[&str] = match current_phase {
+                GamePhase::MainMenu => &["NEW GAME", "OPTIONS", "LOAD GAME", "QUIT"],
+                GamePhase::EpisodeSelect => &[
+                    "1: L.A. MELTDOWN",
+                    "2: LUNAR APOCALYPSE",
+                    "3: SHRAPNEL CITY",
+                    "4: THE PLUTONIUM PAK",
+                ],
+                GamePhase::SkillSelect => &[
+                    "PIECE OF CAKE",
+                    "LET'S ROCK",
+                    "COME GET SOME",
+                    "DAMN I'M GOOD",
+                ],
+                GamePhase::Paused => &[
+                    "RESUME GAME",
+                    "SAVE GAME",
+                    "LOAD GAME",
+                    "MAIN MENU",
+                    "QUIT TO DESKTOP",
+                ],
+                _ => &[],
+            };
+            if idx < item_labels.len() && idx < cursor.max_items {
+                text.sections[0].value = item_labels[idx].to_string();
+                if idx == cursor.selected_index {
+                    text.sections[0].style.color = DUKE_GOLD;
+                } else {
+                    text.sections[0].style.color = DUKE_GREY;
+                }
+            } else {
+                text.sections[0].value = "".to_string();
             }
         }
     }
@@ -333,7 +400,10 @@ pub fn update_menu_ui(
 
     for (mut text, indicator) in cursor_indicators.iter_mut() {
         let idx = indicator.0;
-        if current_phase != GamePhase::Intermission && idx == cursor.selected_index {
+        if current_phase != GamePhase::Intermission
+            && idx == cursor.selected_index
+            && idx < active_rows
+        {
             text.sections[0].value = cur_frame.to_string();
             text.sections[0].style.color = DUKE_RED;
         } else {

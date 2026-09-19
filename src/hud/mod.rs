@@ -28,6 +28,9 @@ pub struct HudMessageText;
 #[derive(Component)]
 pub struct HudKeysText;
 
+#[derive(Component)]
+pub struct HudFaceText;
+
 #[derive(Resource, Debug, Clone, PartialEq)]
 pub struct EngineProfilerMetrics {
     pub fps: f32,
@@ -182,6 +185,19 @@ pub fn setup_hud_ui(mut commands: Commands) {
                 HudArmorText,
             ));
 
+            // Face
+            parent.spawn((
+                TextBundle::from_section(
+                    "[:) READY]",
+                    TextStyle {
+                        font_size: 22.0,
+                        color: Color::srgb(0.2, 1.0, 0.3),
+                        ..default()
+                    },
+                ),
+                HudFaceText,
+            ));
+
             // Ammo
             parent.spawn((
                 TextBundle::from_section(
@@ -289,6 +305,18 @@ pub fn update_hud_display(
             Without<HudArmorText>,
             Without<HudAmmoText>,
             Without<HudKeysText>,
+            Without<HudFaceText>,
+        ),
+    >,
+    mut face_text: Query<
+        &mut Text,
+        (
+            With<HudFaceText>,
+            Without<HudHealthText>,
+            Without<HudArmorText>,
+            Without<HudAmmoText>,
+            Without<HudKeysText>,
+            Without<HudMessageText>,
         ),
     >,
     mut hud_root: Query<&mut Style, With<HudRoot>>,
@@ -323,6 +351,22 @@ pub fn update_hud_display(
 
     if let Ok(mut txt) = armor_text.get_single_mut() {
         txt.sections[0].value = format!("ARMOR: {:>3}", player.armor.clamp(0, 999));
+    }
+
+    if let Ok(mut txt) = face_text.get_single_mut() {
+        let (face, col) = if player.health <= 0 {
+            ("[:( DEAD]", Color::srgb(0.5, 0.5, 0.5))
+        } else if player.health < 25 {
+            ("[:( CRITICAL]", Color::srgb(1.0, 0.1, 0.1))
+        } else if player.health < 50 {
+            ("[:/ HURT]", Color::srgb(1.0, 0.5, 0.2))
+        } else if player.health < 75 {
+            ("[:| OK]", Color::srgb(1.0, 0.9, 0.2))
+        } else {
+            ("[:) READY]", Color::srgb(0.2, 1.0, 0.3))
+        };
+        txt.sections[0].value = face.to_string();
+        txt.sections[0].style.color = col;
     }
 
     if let Ok(mut txt) = ammo_text.get_single_mut() {

@@ -8,7 +8,7 @@ pub struct RtsLump {
     pub data: Vec<u8>,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct DukeRts {
     pub lumps: HashMap<String, Vec<u8>>,
 }
@@ -62,5 +62,42 @@ impl DukeRts {
 
     pub fn get_sound(&self, name: &str) -> Option<&[u8]> {
         self.lumps.get(&name.to_uppercase()).map(|v| v.as_slice())
+    }
+
+    /// Sample a random speech taunt lump from parsed DUKE.RTS
+    pub fn sample_random_taunt(&self) -> Option<(&str, &[u8])> {
+        if self.lumps.is_empty() {
+            return None;
+        }
+        let mut keys: Vec<&String> = self.lumps.keys().collect();
+        keys.sort();
+        let idx = rand::random::<usize>() % keys.len();
+        let key = keys[idx];
+        self.lumps.get(key).map(|v| (key.as_str(), v.as_slice()))
+    }
+
+    /// List all lump names available in the RTS archive
+    pub fn lump_names(&self) -> Vec<String> {
+        let mut names: Vec<String> = self.lumps.keys().cloned().collect();
+        names.sort();
+        names
+    }
+
+    /// Helper to convert lump bytes (VOC or WAV) into a Bevy AudioSource
+    pub fn lump_to_audio_source(data: &[u8]) -> bevy::audio::AudioSource {
+        let wav_bytes = if data.starts_with(b"Creative Voice File\x1A") {
+            if let Ok(voc) = crate::audio::voc::VocSound::parse("rts", data) {
+                voc.to_wav_bytes()
+            } else {
+                data.to_vec()
+            }
+        } else if data.starts_with(b"RIFF") {
+            data.to_vec()
+        } else {
+            data.to_vec()
+        };
+        bevy::audio::AudioSource {
+            bytes: wav_bytes.into(),
+        }
     }
 }

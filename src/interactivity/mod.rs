@@ -4,12 +4,14 @@ pub mod effectors;
 pub mod props;
 pub mod props_extended;
 pub mod types;
+pub mod wall_damage;
 
 pub use effectors::*;
 pub use props::*;
 #[allow(unused_imports)]
 pub use props_extended::{DancerProp, ExtendedPropsPlugin, FountainProp, MoneyItem};
 pub use types::*;
+pub use wall_damage::*;
 
 use crate::map::Map;
 use bevy::prelude::*;
@@ -19,12 +21,14 @@ pub struct InteractivityPlugin;
 impl Plugin for InteractivityPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(props_extended::ExtendedPropsPlugin)
+            .init_resource::<EarthquakeCameraShake>()
             .add_event::<ActivateTagEvent>()
             .add_event::<InteractEvent>()
             .add_event::<ExplosionDamageEvent>()
             .add_event::<BarrelExplodeEvent>()
             .add_event::<PlayerHealEvent>()
             .add_event::<PlaySoundEvent>()
+            .add_event::<WallDamageEvent>()
             .add_systems(
                 Update,
                 (
@@ -33,6 +37,8 @@ impl Plugin for InteractivityPlugin {
                     handle_explosions,
                     handle_barrel_chain_explosions,
                     handle_tag_activations,
+                    handle_wall_damage,
+                    handle_master_switch_activations,
                 )
                     .in_set(crate::GameSet::Interactivity),
             )
@@ -40,8 +46,11 @@ impl Plugin for InteractivityPlugin {
                 Update,
                 (
                     update_sector_effectors,
+                    update_carrier_platform_momentum,
+                    update_earthquake_camera_shake,
                     update_surveillance_monitors,
                     update_mirror_props,
+                    update_master_switches,
                     apply_player_healing,
                 )
                     .in_set(crate::GameSet::Interactivity),
@@ -143,6 +152,68 @@ pub fn spawn_interactive_elements_from_map(commands: &mut Commands, map: &Map) {
                         moving_to_b: true,
                         pause_timer: 0.0,
                     },
+                    10 => EffectorKind::AutoCloseDoor {
+                        orig_ceil_z: sprite.z,
+                        open_ceil_z: sprite.z - (4096 * 16),
+                        current_ceil_z: sprite.z,
+                        speed: 16,
+                        auto_close_timer: None,
+                        auto_close_delay: 3.0,
+                        is_open: false,
+                    },
+                    1 => EffectorKind::PivotRotatingSector {
+                        pivot: Vec2::new(pos.x, pos.z),
+                        orig_ang: 0.0,
+                        target_ang: std::f32::consts::FRAC_PI_2,
+                        current_ang: 0.0,
+                        speed: 1.5,
+                        is_open: false,
+                    },
+                    2 | 22 => EffectorKind::Earthquake {
+                        intensity: 0.5,
+                        duration: 5.0,
+                        elapsed: 0.0,
+                        is_triggered: false,
+                    },
+                    4 | 5 => EffectorKind::RandomFlicker {
+                        base_shade: 0,
+                        min_shade: 0,
+                        max_shade: 25,
+                        timer: 0.0,
+                        is_buzz: sprite.lotag == 5,
+                    },
+                    11 => EffectorKind::ContinuousRotation {
+                        pivot: Vec2::new(pos.x, pos.z),
+                        current_ang: 0.0,
+                        angular_speed: 1.5,
+                    },
+                    20 => EffectorKind::StretchCeiling {
+                        orig_ceil_z: sprite.z,
+                        target_ceil_z: sprite.z - (4096 * 16),
+                        current_ceil_z: sprite.z,
+                        speed: 16,
+                        is_stretched: false,
+                    },
+                    24 => EffectorKind::ConveyorBelt {
+                        direction: Vec2::new(ang_rad.cos(), ang_rad.sin()),
+                        speed: if sprite.hitag != 0 {
+                            (sprite.hitag as f32) * 0.1
+                        } else {
+                            3.0
+                        },
+                    },
+                    31 | 32 => EffectorKind::CrusherSector {
+                        min_z: sprite.z - (4096 * 16),
+                        max_z: sprite.z,
+                        current_z: sprite.z,
+                        speed: 16,
+                        crushing_ceiling: sprite.lotag == 31,
+                        moving_down: true,
+                    },
+                    36 => EffectorKind::ShootingGlassPane {
+                        health: 20,
+                        is_shattered: false,
+                    },
                     _ => EffectorKind::SlidingDoor {
                         orig_pos: Vec2::new(pos.x, pos.z),
                         open_offset: Vec2::new(ang_rad.cos() * 2.0, ang_rad.sin() * 2.0),
@@ -194,6 +265,78 @@ pub fn spawn_interactive_elements_from_map(commands: &mut Commands, map: &Map) {
             }
 
             _ => {}
+        }
+    }
+
+    // Spawn sector-based interactive effectors (SECTOR.C operatesectors: lotag 20..=30)
+    for (sec_idx, sector) in map.sectors.iter().enumerate() {
+        if sector.lotag >= 20 && sector.lotag <= 30 {
+            // Find neighbor sector to determine door open height / floor drop depth
+            let start = sector.wallptr as usize;
+            let end = start + sector.wallnum as usize;
+            let mut neighbor_ceil_z = sector.ceilingz;
+            let mut neighbor_floor_z = sector.floorz;
+
+            for i in start..end {
+                if let Some(wall) = map.walls.get(i) {
+                    if wall.nextsector >= 0 {
+                        let n_sec = &map.sectors[wall.nextsector as usize];
+                        neighbor_ceil_z = n_sec.ceilingz;
+                        neighbor_floor_z = n_sec.floorz;
+                        break;
+                    }
+                }
+            }
+
+            let kind = match sector.lotag {
+                20 | 30 => EffectorKind::AutoCloseDoor {
+                    orig_ceil_z: sector.ceilingz,
+                    open_ceil_z: neighbor_ceil_z,
+                    current_ceil_z: sector.ceilingz,
+                    speed: 16,
+                    auto_close_timer: None,
+                    auto_close_delay: if sector.lotag == 30 { 4.0 } else { 2.0 },
+                    is_open: false,
+                },
+                21 | 28 => EffectorKind::DropFloor {
+                    orig_floor_z: sector.floorz,
+                    target_floor_z: neighbor_floor_z,
+                    current_floor_z: sector.floorz,
+                    speed: 16,
+                    is_dropped: false,
+                },
+                29 => EffectorKind::Elevator {
+                    orig_floor_z: sector.floorz,
+                    target_floor_z: neighbor_floor_z,
+                    current_floor_z: sector.floorz,
+                    orig_ceil_z: sector.ceilingz,
+                    target_ceil_z: neighbor_ceil_z,
+                    current_ceil_z: sector.ceilingz,
+                    speed: 16,
+                    is_at_top: false,
+                    auto_return_timer: None,
+                },
+                _ => EffectorKind::AutoCloseDoor {
+                    orig_ceil_z: sector.ceilingz,
+                    open_ceil_z: neighbor_ceil_z,
+                    current_ceil_z: sector.ceilingz,
+                    speed: 16,
+                    auto_close_timer: None,
+                    auto_close_delay: 3.0,
+                    is_open: false,
+                },
+            };
+
+            commands.spawn((
+                SectorEffectorComponent {
+                    sector_idx: sec_idx,
+                    lotag: sector.lotag,
+                    hitag: sector.hitag,
+                    kind,
+                    active: false,
+                },
+                crate::game_flow::LevelEntity,
+            ));
         }
     }
 }
@@ -525,6 +668,7 @@ mod tests {
             velocity: Vec3::new(0.0, 2.5, 0.0), // Elevator ascending at 2.5 m/s
             sector_bounds_min: Vec2::new(-5.0, -5.0),
             sector_bounds_max: Vec2::new(5.0, 5.0),
+            sector_idx: None,
         };
 
         let mut passenger_pos = Vec3::new(0.0, 10.0, 0.0);

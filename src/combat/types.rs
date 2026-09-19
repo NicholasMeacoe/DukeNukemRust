@@ -49,6 +49,9 @@ pub struct LaserTripbomb {
     pub damage_radius: f32,
 }
 
+#[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct LaserTripwireBeam;
+
 #[derive(Component, Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct FlyingActor {
     pub current_z_vel: f32,
@@ -101,6 +104,7 @@ pub enum EnemyAiState {
     Seeking,
     Attacking,
     Flinching,
+    Shrunk,
     Frozen,
     Expanding,
     Dying,

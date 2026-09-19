@@ -81,6 +81,8 @@ impl Default for InventoryState {
     }
 }
 
+pub type Inventory = InventoryState;
+
 #[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct HoloDukeDecoy {
     pub lifetime: f32,
@@ -124,6 +126,7 @@ pub struct PlayerController {
     pub has_yellow_key: bool,
     pub spawn_position: Vec3,
     pub velocity_xz: Vec2,
+    pub death_timer: f32,
     pub god_mode: bool,
     pub no_clip: bool,
 }
@@ -168,7 +171,7 @@ impl Default for PlayerController {
                 weapon_type: WeaponType::Chaingun,
                 name: String::from("Chaingun Cannon"),
                 ammo: 50,
-                max_ammo: 200,
+                max_ammo: 400,
                 base_tile: 2548,
                 fire_delay: 0.1,
                 fire_timer: 0.0,
@@ -288,8 +291,16 @@ impl Default for PlayerController {
             has_yellow_key: false,
             spawn_position: Vec3::ZERO,
             velocity_xz: Vec2::ZERO,
+            death_timer: 0.0,
             god_mode: false,
             no_clip: false,
         }
+    }
+}
+
+impl PlayerController {
+    #[inline]
+    pub fn is_crouching(&self) -> bool {
+        self.movement_mode == PlayerMovementMode::Crouching
     }
 }

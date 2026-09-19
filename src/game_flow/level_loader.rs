@@ -5,6 +5,7 @@ use crate::game_flow::state::*;
 use crate::grp::Grp;
 use crate::map::Map;
 use crate::player::PlayerController;
+use crate::names::*;
 use bevy::prelude::*;
 
 pub fn handle_load_level_events(
@@ -16,6 +17,7 @@ pub fn handle_load_level_events(
     mut materials: ResMut<Assets<StandardMaterial>>,
     assets: Option<Res<crate::GameAssets>>,
     mut progress: ResMut<LevelProgress>,
+    mut found_secrets: Option<ResMut<FoundSecretSectors>>,
     mut sound_events: EventWriter<crate::audio::PlayMusicTrackEvent>,
 ) {
     let Some(ref game_assets) = assets else {
@@ -78,14 +80,14 @@ pub fn handle_load_level_events(
                     let monster_count = map
                         .sprites
                         .iter()
-                        .filter(|s| matches!(s.picnum, 2000 | 1680 | 1820 | 2120))
+                        .filter(|s| s.picnum == PIGCOP || s.picnum == LIZTROOP || s.picnum == OCTABRAIN || s.picnum == ENFORCER)
                         .count() as i32;
                     let secret_count = map.sectors.iter().filter(|s| s.lotag == 32767).count()
                         as i32
                         + map
                             .sprites
                             .iter()
-                            .filter(|s| s.lotag != 0 && matches!(s.picnum, 142..=145))
+                            .filter(|s| s.lotag != 0 && (NUKEBUTTON..=NUKEBUTTON+3).contains(&s.picnum))
                             .count() as i32;
 
                     progress.current_episode = event.episode;
@@ -94,6 +96,9 @@ pub fn handle_load_level_events(
                     progress.total_secrets = secret_count.max(1);
                     progress.kills_count = 0;
                     progress.secrets_found = 0;
+                    if let Some(ref mut fs) = found_secrets {
+                        fs.0.clear();
+                    }
                     progress.level_time_seconds = 0.0;
                     progress.is_level_completed = false;
 
@@ -122,16 +127,20 @@ pub fn handle_load_level_events(
                         progress.skill as u8,
                     );
 
-                    // 7. Spawn interactive effectors, props, and enemies
+                    // 7. Build runtime SectorMap for sector-aware gameplay queries
+                    let sector_map = crate::sector_map::SectorMap::from_map(&map);
+                    commands.insert_resource(sector_map);
+
+                    // 8. Spawn interactive effectors, props, and enemies
                     crate::interactivity::spawn_interactive_elements_from_map(&mut commands, &map);
 
                     // 8. Spawn parallax skybox if needed
                     let has_sky = map.sectors.iter().any(|s| s.is_ceiling_parallax());
                     if has_sky {
                         let sky_tile = match event.episode {
-                            1 => 89, // LA_SKY (L.A. Meltdown)
-                            2 => 80, // MOONSKY1 (Lunar Apocalypse)
-                            _ => 89, // DEFAULT
+                            1 => 89,  // LA_SKY (L.A. Meltdown)
+                            2 => 80,  // MOONSKY1 (Lunar Apocalypse)
+                            _ => 89,  // LA_SKY (Default)
                         };
                         crate::sky::spawn_skybox(
                             &mut commands,

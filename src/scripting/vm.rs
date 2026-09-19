@@ -3,6 +3,8 @@
 use crate::scripting::types::*;
 use rand_chacha::rand_core::Rng;
 
+pub use crate::combat::ai::map_tile_to_projectile;
+
 pub const MAX_CALL_DEPTH: usize = 64;
 
 pub struct ConVm {
@@ -90,6 +92,8 @@ pub struct VmActorContext<'a> {
     pub can_shoot_target: bool,
     pub bullet_near: bool,
     pub not_moving: bool,
+    pub away_from_wall: bool,
+    pub has_active_sound: bool,
 
     // --- Output: directional shoot events (separate from spawned_sprites) ---
     /// (tile, x, y, z, ang) — the consuming ECS system uses ang to fire projectiles
@@ -503,21 +507,23 @@ impl ConVm {
                 }
 
                 Opcode::IfAwayFromWall => {
-                    // TODO: Requires updatesector() wall proximity check
                     let fail_target = self.get_word(ip + 1).unwrap_or(0) as usize;
-                    self.handle_if_else(true, &mut ip, 2, fail_target);
+                    let cond = ctx.away_from_wall;
+                    self.handle_if_else(cond, &mut ip, 2, fail_target);
                 }
 
                 Opcode::IfNoSounds => {
-                    // TODO: Requires tracking sound ownership per-sprite
                     let fail_target = self.get_word(ip + 1).unwrap_or(0) as usize;
-                    self.handle_if_else(true, &mut ip, 2, fail_target);
+                    let cond = !ctx.has_active_sound;
+                    self.handle_if_else(cond, &mut ip, 2, fail_target);
                 }
 
                 Opcode::IfSquished => {
-                    // TODO: Requires floor/ceiling crush detection
+                    // Original GAMEDEF.C case 27: (sector[g_sp->sectnum].floorz - sector[g_sp->sectnum].ceilingz) <= (32<<8)
                     let fail_target = self.get_word(ip + 1).unwrap_or(0) as usize;
-                    self.handle_if_else(false, &mut ip, 2, fail_target);
+                    let gap = ctx.registers.floor_z - ctx.registers.ceiling_z;
+                    let cond = gap <= (32 << 8);
+                    self.handle_if_else(cond, &mut ip, 2, fail_target);
                 }
 
                 Opcode::IfInSpace | Opcode::IfInOuterSpace | Opcode::IfRespawn => {
@@ -901,6 +907,8 @@ mod tests {
             can_shoot_target: false,
             bullet_near: false,
             not_moving: false,
+            away_from_wall: true,
+            has_active_sound: false,
             shoot_events: Vec::new(),
         }
     }
@@ -2056,5 +2064,86 @@ mod tests {
         vm.execute(&mut ctx);
         assert_eq!(ctx.sound_events.len(), 1);
         assert_eq!(ctx.sound_events[0].0, 65536);
+    }
+
+    #[test]
+    fn test_vm_ifawayfromwall_ifnosounds_ifsquished() {
+        let script = r#"
+            define TROOP 1680
+            actor TROOP 100
+                ifsquished
+                    sound 999
+                ifawayfromwall
+                    sound 888
+                ifnosounds
+                    sound 777
+            enda
+        "#;
+
+        let mut compiler = Compiler::new();
+        let compiled = compiler.compile(script).unwrap();
+        let vm = ConVm::new(
+            compiled.bytecode,
+            compiled.actor_script_ptrs,
+            compiled.actor_types,
+        );
+
+        let mut reg = ActorRegisters::default();
+        let mut x = 0;
+        let mut y = 0;
+        let mut z = 0;
+        let mut ang = 0;
+        let mut xvel = 0;
+        let mut zvel = 0;
+        let mut extra = 100;
+        let mut picnum = 1680;
+        let mut sectnum = 0;
+        let mut cstat = 0;
+        let mut pal = 0;
+        let mut xrepeat = 64;
+        let mut yrepeat = 64;
+        let mut clipdist = 32;
+        let mut lotag = 0;
+        let mut hitag = 0;
+
+        let mut ctx = create_test_context(
+            &mut reg,
+            &mut x,
+            &mut y,
+            &mut z,
+            &mut ang,
+            &mut xvel,
+            &mut zvel,
+            &mut extra,
+            &mut picnum,
+            &mut sectnum,
+            &mut cstat,
+            &mut pal,
+            &mut xrepeat,
+            &mut yrepeat,
+            &mut clipdist,
+            &mut lotag,
+            &mut hitag,
+        );
+
+        // Standard: floor_z=0, ceiling_z=-100000 -> not squished; away_from_wall=true; has_active_sound=false
+        ctx.registers.floor_z = 0;
+        ctx.registers.ceiling_z = -100_000;
+        ctx.away_from_wall = true;
+        ctx.has_active_sound = false;
+        vm.execute(&mut ctx);
+
+        let sounds: Vec<i32> = ctx.sound_events.iter().map(|s| s.0).collect();
+        assert!(!sounds.contains(&999), "Should not be squished");
+        assert!(sounds.contains(&888), "Should be away from wall");
+        assert!(sounds.contains(&777), "Should have no sounds");
+
+        // Now test squished
+        ctx.sound_events.clear();
+        ctx.registers.floor_z = 1000;
+        ctx.registers.ceiling_z = 990; // gap is 10 <= (32 << 8)
+        vm.execute(&mut ctx);
+        let sounds_squished: Vec<i32> = ctx.sound_events.iter().map(|s| s.0).collect();
+        assert!(sounds_squished.contains(&999), "Should be squished");
     }
 }

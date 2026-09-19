@@ -3,6 +3,7 @@
 use crate::combat::types::*;
 use crate::player::types::PlayerController;
 use crate::scripting::{getincangle, move_flags, ConActor, ConScriptEngine, VmActorContext};
+use crate::names::*;
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
 
@@ -45,6 +46,7 @@ pub fn update_con_actors(
     mut explosion_events: EventWriter<crate::interactivity::ExplosionDamageEvent>,
     mut gib_events: EventWriter<GibEvent>,
     mut rng: ResMut<crate::net::DeterministicRng>,
+    sector_map: Option<Res<crate::sector_map::SectorMap>>,
 ) {
     let Some(engine) = script_engine else {
         return;
@@ -68,17 +70,22 @@ pub fn update_con_actors(
     ) in actors.iter_mut()
     {
         if let Some(ref mut enemy) = enemy_opt {
-            if enemy.is_frozen {
+            if enemy.is_frozen || enemy.state == EnemyAiState::Frozen {
                 enemy.freeze_timer -= dt;
                 if enemy.freeze_timer <= 0.0 {
                     enemy.is_frozen = false;
+                    enemy.state = EnemyAiState::Seeking;
+                    enemy.health = 1;
                 }
                 continue;
             }
-            if enemy.is_shrunk {
+            if enemy.is_shrunk || enemy.state == EnemyAiState::Shrunk {
                 enemy.shrink_timer -= dt;
                 if enemy.shrink_timer <= 0.0 {
                     enemy.is_shrunk = false;
+                    if enemy.state == EnemyAiState::Shrunk {
+                        enemy.state = EnemyAiState::Seeking;
+                    }
                 }
             }
         }
@@ -150,6 +157,32 @@ pub fn update_con_actors(
             ((-dir_to_player.z.atan2(dir_to_player.x) / std::f32::consts::TAU) * 2048.0) as i16;
 
         let player_facing_actor = getincangle(player_build_ang, actor_to_player_angle).abs() < 128;
+
+        // Shrunk enemy boot-stomp / touch squish check
+        if let Some(ref mut enemy) = enemy_opt {
+            if (enemy.is_shrunk || enemy.state == EnemyAiState::Shrunk)
+                && enemy.state != EnemyAiState::Gibbed
+                && enemy.state != EnemyAiState::Dying
+            {
+                let is_touching = dist_to_player < 0.9;
+                let is_kicking = (player_ctrl.quick_kick_timer > 0.0
+                    || player_ctrl.current_weapon == crate::player::types::WeaponType::Knee)
+                    && dist_to_player < 2.0
+                    && player_facing_actor;
+
+                if is_touching || is_kicking {
+                    enemy.is_shrunk = false;
+                    enemy.state = EnemyAiState::Gibbed;
+                    enemy.health = -100;
+                    sound_events.send(crate::audio::PlaySoundEvent { sound_id: 69 }); // SQUISHED
+                    gib_events.send(GibEvent {
+                        origin: trans.translation,
+                        gib_count: 8,
+                    });
+                    continue;
+                }
+            }
+        }
 
         let ConActor {
             ref mut registers,
@@ -254,8 +287,14 @@ pub fn update_con_actors(
             player_firstaid_amount: player_ctrl.inventory.medkit_amount,
             player_boot_amount: player_ctrl.inventory.boots_amount,
             player_got_access: 0,
-            sector_lotag: 0,
-            sector_ceilingstat: 0,
+            sector_lotag: sector_map.as_ref()
+                .and_then(|sm| sm.find_sector_world(trans.translation.x, trans.translation.z, None))
+                .map(|si| sector_map.as_ref().unwrap().get_sector_lotag(si) as i32)
+                .unwrap_or(0),
+            sector_ceilingstat: sector_map.as_ref()
+                .and_then(|sm| sm.find_sector_world(trans.translation.x, trans.translation.z, None))
+                .map(|si| sector_map.as_ref().unwrap().get_sector_ceilingstat(si) as i32)
+                .unwrap_or(0),
             is_multiplayer: false,
             hit_space_pressed: false,
             spawned_by_picnum,
@@ -263,6 +302,8 @@ pub fn update_con_actors(
             can_shoot_target,
             bullet_near,
             not_moving,
+            away_from_wall: true,
+            has_active_sound: false,
             shoot_events: Vec::new(),
             end_of_game: None,
         };
@@ -307,6 +348,50 @@ pub fn update_con_actors(
                         EnemyActor::new_pigcop(),
                         ConActor::new(2000, *sectnum, *ang, 100),
                         TransformBundle::from_transform(Transform::from_translation(eject_pos)),
+                        crate::game_flow::LevelEntity,
+                    ));
+                }
+
+                // Authentic Duke 3D Enemy Death Drops
+                let drop_kind = match enemy.kind {
+                    EnemyKind::Pigcop => {
+                        if rng.next_f32() < 0.6 {
+                            Some(crate::interactivity::PickupKind::ShotgunBox)
+                        } else {
+                            Some(crate::interactivity::PickupKind::ArmorVest)
+                        }
+                    }
+                    EnemyKind::Liztroop | EnemyKind::AssaultCaptain => {
+                        if rng.next_f32() < 0.5 {
+                            Some(crate::interactivity::PickupKind::PistolClip)
+                        } else {
+                            Some(crate::interactivity::PickupKind::SmallMedkit)
+                        }
+                    }
+                    EnemyKind::Enforcer => {
+                        Some(crate::interactivity::PickupKind::ChaingunBox)
+                    }
+                    EnemyKind::Octabrain | EnemyKind::AssaultCommander => {
+                        Some(crate::interactivity::PickupKind::RpgRocket)
+                    }
+                    EnemyKind::Boss1Battlelord
+                    | EnemyKind::Boss1Mini
+                    | EnemyKind::Boss2Overlord
+                    | EnemyKind::Boss3Cycloid
+                    | EnemyKind::Boss4Queen => {
+                        Some(crate::interactivity::PickupKind::AtomicHealth)
+                    }
+                    _ => None,
+                };
+
+                if let Some(kind) = drop_kind {
+                    let drop_pos = trans.translation + Vec3::Y * 0.2;
+                    commands.spawn((
+                        crate::interactivity::ItemPickup {
+                            kind,
+                            respawn_timer: None,
+                        },
+                        TransformBundle::from_transform(Transform::from_translation(drop_pos)),
                         crate::game_flow::LevelEntity,
                     ));
                 }
@@ -478,15 +563,49 @@ pub fn update_con_actors(
 
 pub fn map_tile_to_projectile(tile: i16) -> (ProjectileType, f32, i32) {
     match tile {
-        1625 => (ProjectileType::AlienBlaster, 50.0, 7), // FIRELASER
-        1636 => (ProjectileType::Spit, 35.0, 8),         // SPIT (Enforcer venom)
+        1625 | 1600 => (ProjectileType::AlienBlaster, 50.0, 7), // FIRELASER
+        1636 | 1605 => (ProjectileType::Spit, 35.0, 8),         // SPIT (Enforcer venom / Octabrain spit)
         1641 => (ProjectileType::FreezeShard, 45.0, 20), // FREEZEBLAST
         1646 | 2556 => (ProjectileType::ShrinkRay, 40.0, 0), // SHRINKSPARK / SHRINKER
         1650 => (ProjectileType::Mortar, 30.0, 50),      // MORTER (Battlelord / Tank artillery)
-        2595 => (ProjectileType::HitscanBullet, 150.0, 9), // SHOTSPARK1 (Chaingun / Enforcer / Battlelord)
-        2605 => (ProjectileType::Rocket, 45.0, 140),       // RPG (Commander / Overlord / Cycloid)
-        2613 => (ProjectileType::ShotgunPellet, 80.0, 10), // SHOTGUN (Pigcop)
+        SHOTSPARK1 => (ProjectileType::HitscanBullet, 150.0, 9), // SHOTSPARK1 (Chaingun / Enforcer / Battlelord)
+        RPG => (ProjectileType::Rocket, 45.0, 140),       // RPG (Commander / Overlord / Cycloid)
+        SHOTGUN => (ProjectileType::ShotgunPellet, 80.0, 10), // SHOTGUN (Pigcop)
         1360 => (ProjectileType::PsiBlast, 30.0, 38),      // COOLEXPLOSION1 (Octabrain)
         _ => (ProjectileType::HitscanBullet, 100.0, 10),
     }
+}
+
+/// Trigger squash/stomp kill on a shrunk enemy.
+pub fn execute_shrunk_enemy_stomp(
+    enemy: &mut EnemyActor,
+    origin: Vec3,
+    sound_events: &mut EventWriter<crate::audio::PlaySoundEvent>,
+    gib_events: &mut EventWriter<GibEvent>,
+) {
+    enemy.is_shrunk = false;
+    enemy.state = EnemyAiState::Gibbed;
+    enemy.health = -100;
+    sound_events.send(crate::audio::PlaySoundEvent { sound_id: 69 }); // SQUISHED
+    gib_events.send(GibEvent {
+        origin,
+        gib_count: 8,
+    });
+}
+
+/// Shatter a frozen enemy upon receiving damage.
+pub fn execute_frozen_enemy_shatter(
+    enemy: &mut EnemyActor,
+    origin: Vec3,
+    sound_events: &mut EventWriter<crate::audio::PlaySoundEvent>,
+    gib_events: &mut EventWriter<GibEvent>,
+) {
+    enemy.is_frozen = false;
+    enemy.state = EnemyAiState::Gibbed;
+    enemy.health = -50;
+    sound_events.send(crate::audio::PlaySoundEvent { sound_id: 19 }); // GLASS_BREAKING
+    gib_events.send(GibEvent {
+        origin,
+        gib_count: 8,
+    });
 }

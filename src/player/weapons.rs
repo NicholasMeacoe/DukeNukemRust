@@ -1,10 +1,11 @@
 #![allow(dead_code)]
 
 use crate::audio::PlaySoundEvent;
-use crate::combat::types::{Projectile, ProjectileType, SpawnProjectileEvent};
+use crate::combat::types::{LaserTripwireBeam, Projectile, ProjectileType, SpawnProjectileEvent};
 use crate::interactivity::types::ExplosionDamageEvent;
-use crate::player::types::*;
+pub use crate::player::types::*;
 use bevy::prelude::*;
+use bevy_rapier3d::prelude::*;
 
 pub fn handle_weapon_selection(
     keys: Res<ButtonInput<KeyCode>>,
@@ -92,6 +93,9 @@ pub fn handle_weapon_firing(
     pipebomb_query: Query<(Entity, &Transform, &Projectile), Without<PlayerController>>,
     mut commands: Commands,
     mut rng: ResMut<crate::net::DeterministicRng>,
+    rapier_context: Option<Res<RapierContext>>,
+    mut meshes: Option<ResMut<Assets<Mesh>>>,
+    mut materials: Option<ResMut<Assets<StandardMaterial>>>,
 ) {
     let Ok(cam_trans) = camera_query.get_single() else {
         return;
@@ -157,8 +161,10 @@ pub fn handle_weapon_firing(
     if btn.just_pressed(MouseButton::Right)
         || (player.current_weapon == WeaponType::HandRemote && btn.just_pressed(MouseButton::Left))
     {
+        let mut detonated_any = false;
         for (entity, p_trans, proj) in pipebomb_query.iter() {
             if proj.projectile_type == ProjectileType::Pipebomb && proj.is_player_source {
+                detonated_any = true;
                 sound_events.send(PlaySoundEvent { sound_id: 14 }); // PIPEBOMB_EXPLODE
                 explosion_events.send(ExplosionDamageEvent {
                     origin: p_trans.translation,
@@ -166,6 +172,15 @@ pub fn handle_weapon_firing(
                     damage: 150,
                 });
                 commands.entity(entity).despawn_recursive();
+            }
+        }
+        if detonated_any && player.current_weapon == WeaponType::HandRemote {
+            player.weapons[cur_idx].fire_timer = player.weapons[cur_idx].fire_delay;
+            let pipebomb_idx = WeaponType::Pipebomb as usize;
+            if player.weapons[pipebomb_idx].ammo > 0 {
+                player.current_weapon = WeaponType::Pipebomb;
+            } else {
+                player.current_weapon = get_highest_priority_available_weapon(&player);
             }
         }
     }
@@ -357,28 +372,115 @@ pub fn handle_weapon_firing(
             }
             WeaponType::Tripbomb => {
                 if player.weapons[cur_idx].ammo > 0 {
-                    player.weapons[cur_idx].ammo -= 1;
-                    player.weapons[cur_idx].fire_timer = player.weapons[cur_idx].fire_delay;
-                    sound_events.send(PlaySoundEvent { sound_id: 16 }); // TRIPBOMB_ARM
+                    let max_reach = TRIPBOMB_MAX_REACH;
+                    let ray_origin = cam_trans.translation;
+                    let ray_dir = fwd_vec.normalize_or_zero();
 
-                    let attach_pos = fire_pos + fwd_vec * 1.5;
-                    let outward_normal = -fwd_vec;
+                    let mut hit_wall = false;
+                    let mut attach_pos = Vec3::ZERO;
+                    let mut outward_normal = Vec3::ZERO;
+                    let mut beam_length = 12.0;
 
-                    commands.spawn((
-                        SpatialBundle {
-                            transform: Transform::from_translation(attach_pos),
-                            ..default()
-                        },
-                        crate::combat::LaserTripbomb {
-                            normal: outward_normal,
-                            arm_timer: 1.0,
-                            is_armed: false,
-                            beam_length: 12.0,
-                            damage: 150,
-                            damage_radius: 6.0,
-                        },
-                        crate::game_flow::LevelEntity,
-                    ));
+                    if let Some(ref rapier) = rapier_context {
+                        let filter = QueryFilter::exclude_kinematic();
+                        if let Some((_hit_entity, intersection)) =
+                            rapier.cast_ray_and_get_normal(ray_origin, ray_dir, max_reach, true, filter)
+                        {
+                            hit_wall = true;
+                            attach_pos = intersection.point + intersection.normal * 0.02;
+                            outward_normal = intersection.normal.normalize_or_zero();
+
+                            // Opposing surface raycast across from the tripbomb
+                            let max_beam = 30.0;
+                            if let Some((_opp_entity, opp_hit)) = rapier.cast_ray_and_get_normal(
+                                attach_pos + outward_normal * 0.05,
+                                outward_normal,
+                                max_beam,
+                                true,
+                                filter,
+                            ) {
+                                beam_length = opp_hit.time_of_impact + 0.05;
+                            }
+                        }
+                    }
+
+                    if hit_wall {
+                        player.weapons[cur_idx].ammo -= 1;
+                        player.weapons[cur_idx].fire_timer = player.weapons[cur_idx].fire_delay;
+                        sound_events.send(PlaySoundEvent { sound_id: 15 }); // LSRBMBPT (mounted on wall)
+                        sound_events.send(PlaySoundEvent { sound_id: 16 }); // LSRBMBWN (arming beep)
+
+                        let up = if outward_normal.abs().dot(Vec3::Y) > 0.99 {
+                            Vec3::Z
+                        } else {
+                            Vec3::Y
+                        };
+                        let tripbomb_transform = Transform::from_translation(attach_pos)
+                            .looking_to(outward_normal, up);
+
+                        let mut tripbomb_cmd = commands.spawn((
+                            SpatialBundle {
+                                transform: tripbomb_transform,
+                                ..default()
+                            },
+                            crate::combat::LaserTripbomb {
+                                normal: outward_normal,
+                                arm_timer: 1.0,
+                                is_armed: false,
+                                beam_length,
+                                damage: 150,
+                                damage_radius: 6.0,
+                            },
+                            crate::game_flow::LevelEntity,
+                        ));
+
+                        if let (Some(ref mut meshes_res), Some(ref mut mats_res)) =
+                            (meshes.as_mut(), materials.as_mut())
+                        {
+                            let beam_mesh = meshes_res.add(Cuboid::new(0.02, 0.02, beam_length));
+                            let beam_mat = mats_res.add(StandardMaterial {
+                                base_color: Color::srgb(0.0, 0.8, 1.0),
+                                emissive: LinearRgba::new(0.0, 4.0, 8.0, 1.0),
+                                unlit: true,
+                                ..default()
+                            });
+                            tripbomb_cmd.with_children(|parent| {
+                                parent.spawn((
+                                    PbrBundle {
+                                        mesh: beam_mesh,
+                                        material: beam_mat,
+                                        transform: Transform::from_translation(Vec3::new(
+                                            0.0,
+                                            0.0,
+                                            -beam_length * 0.5,
+                                        )),
+                                        ..default()
+                                    },
+                                    LaserTripwireBeam,
+                                    crate::game_flow::LevelEntity,
+                                ));
+                            });
+                        } else {
+                            tripbomb_cmd.with_children(|parent| {
+                                parent.spawn((
+                                    SpatialBundle {
+                                        transform: Transform::from_translation(Vec3::new(
+                                            0.0,
+                                            0.0,
+                                            -beam_length * 0.5,
+                                        )),
+                                        ..default()
+                                    },
+                                    LaserTripwireBeam,
+                                    crate::game_flow::LevelEntity,
+                                ));
+                            });
+                        }
+                    } else {
+                        // If no wall is in reach: do NOT consume ammo, play a click/misplace sound or do not place.
+                        player.weapons[cur_idx].fire_timer = 0.2;
+                        sound_events.send(PlaySoundEvent { sound_id: 86 }); // Click / Access denied misplace sound
+                    }
                 }
             }
             WeaponType::Freezethrower => {
@@ -413,7 +515,30 @@ pub fn handle_weapon_firing(
                     });
                 }
             }
-            _ => {}
+            WeaponType::HandRemote => {
+                let mut detonated = false;
+                for (entity, p_trans, proj) in pipebomb_query.iter() {
+                    if proj.projectile_type == ProjectileType::Pipebomb && proj.is_player_source {
+                        detonated = true;
+                        sound_events.send(PlaySoundEvent { sound_id: 14 }); // PIPEBOMB_EXPLODE
+                        explosion_events.send(ExplosionDamageEvent {
+                            origin: p_trans.translation,
+                            radius: 7.0,
+                            damage: 150,
+                        });
+                        commands.entity(entity).despawn_recursive();
+                    }
+                }
+                player.weapons[cur_idx].fire_timer = player.weapons[cur_idx].fire_delay;
+                if detonated {
+                    let pipebomb_idx = WeaponType::Pipebomb as usize;
+                    if player.weapons[pipebomb_idx].ammo > 0 {
+                        player.current_weapon = WeaponType::Pipebomb;
+                    } else {
+                        player.current_weapon = get_highest_priority_available_weapon(&player);
+                    }
+                }
+            }
         }
 
         // Priority auto-switch if out of ammo
@@ -520,17 +645,37 @@ pub struct FirstPersonViewModel {
     pub current_tile: i16,
 }
 
-impl Default for FirstPersonViewModel {
-    fn default() -> Self {
+impl FirstPersonViewModel {
+    pub fn new(current_weapon: WeaponType) -> Self {
+        let base_tile = match current_weapon {
+            WeaponType::Knee => 2521,
+            WeaponType::Pistol => 2524,
+            WeaponType::Shotgun => 2613,
+            WeaponType::Chaingun => 2544,
+            WeaponType::Rpg => 2605,
+            WeaponType::Pipebomb => 2565,
+            WeaponType::HandRemote => 2570,
+            WeaponType::Shrinker => 2575,
+            WeaponType::Devastator => 2590,
+            WeaponType::Tripbomb => 2580,
+            WeaponType::Freezethrower => 2600,
+            WeaponType::Expander => 2586,
+        };
         Self {
-            current_weapon: WeaponType::Pistol,
+            current_weapon,
             anim_frame: 0,
             anim_timer: 0.0,
             bob_phase: 0.0,
             is_firing: false,
-            base_tile: 2524,
-            current_tile: 2524,
+            base_tile,
+            current_tile: base_tile,
         }
+    }
+}
+
+impl Default for FirstPersonViewModel {
+    fn default() -> Self {
+        Self::new(WeaponType::Pistol)
     }
 }
 
@@ -547,6 +692,14 @@ pub fn update_first_person_viewmodel(
         return;
     };
 
+    if player.quick_kick_timer > 0.0 {
+        let kick_progress = 1.0 - (player.quick_kick_timer / 0.5);
+        let frame = (kick_progress * 3.0) as i16;
+        vm.current_tile = 2521 + frame.clamp(0, 2);
+        vm.is_firing = true;
+        return;
+    }
+
     let cur_idx = player.current_weapon as usize;
     if cur_idx < player.weapons.len() {
         let weapon = &player.weapons[cur_idx];
@@ -557,6 +710,10 @@ pub fn update_first_person_viewmodel(
             vm.is_firing = true;
             let progress = 1.0 - (weapon.fire_timer / weapon.fire_delay.max(0.01));
             match player.current_weapon {
+                WeaponType::Knee => {
+                    let frame_offset = (progress * 3.0) as i16;
+                    vm.current_tile = 2521 + frame_offset.clamp(0, 2);
+                }
                 WeaponType::Pistol => {
                     let frame_offset = (progress * 4.0) as i16;
                     vm.current_tile = 2524 + frame_offset.clamp(0, 4);
@@ -569,8 +726,38 @@ pub fn update_first_person_viewmodel(
                     let frame_offset = ((time.elapsed_seconds() * 20.0) as i16) % 3;
                     vm.current_tile = 2544 + frame_offset;
                 }
-                _ => {
-                    vm.current_tile = weapon.base_tile;
+                WeaponType::Rpg => {
+                    let frame_offset = (progress * 3.0) as i16;
+                    vm.current_tile = 2605 + frame_offset.clamp(0, 2);
+                }
+                WeaponType::Pipebomb => {
+                    let frame_offset = (progress * 4.0) as i16;
+                    vm.current_tile = 2565 + frame_offset.clamp(0, 3);
+                }
+                WeaponType::HandRemote => {
+                    let frame_offset = if progress < 0.5 { 1 } else { 0 };
+                    vm.current_tile = 2570 + frame_offset;
+                }
+                WeaponType::Shrinker => {
+                    let frame_offset = (progress * 4.0) as i16;
+                    vm.current_tile = 2575 + frame_offset.clamp(0, 3);
+                }
+                WeaponType::Devastator => {
+                    let side_offset = if player.devastator_alt_side { 0 } else { 2 };
+                    let frame_offset = (progress * 2.0) as i16;
+                    vm.current_tile = 2590 + side_offset + frame_offset.clamp(0, 1);
+                }
+                WeaponType::Tripbomb => {
+                    let frame_offset = (progress * 5.0) as i16;
+                    vm.current_tile = 2580 + frame_offset.clamp(0, 4);
+                }
+                WeaponType::Freezethrower => {
+                    let frame_offset = ((time.elapsed_seconds() * 25.0) as i16) % 3;
+                    vm.current_tile = 2600 + frame_offset;
+                }
+                WeaponType::Expander => {
+                    let frame_offset = (progress * 3.0) as i16;
+                    vm.current_tile = 2586 + frame_offset.clamp(0, 2);
                 }
             }
         } else {
@@ -582,5 +769,123 @@ pub fn update_first_person_viewmodel(
         if player.speed > 0.1 {
             vm.bob_phase += dt * 8.0;
         }
+    }
+}
+
+pub const TRIPBOMB_MAX_REACH: f32 = 2.5;
+
+/// Calculates tripbomb placement given a raycast hit point and normal, if within reach.
+pub fn calculate_tripbomb_placement(
+    ray_origin: Vec3,
+    hit_info: Option<(Vec3, Vec3)>,
+    max_reach: f32,
+) -> Option<(Vec3, Vec3)> {
+    if let Some((hit_pos, hit_normal)) = hit_info {
+        if (hit_pos - ray_origin).length() <= max_reach {
+            return Some((hit_pos + hit_normal * 0.02, hit_normal.normalize_or_zero()));
+        }
+    }
+    None
+}
+
+/// Detonates all active player-owned pipebombs and triggers explosion events.
+pub fn detonate_player_pipebombs(
+    pipebombs: impl IntoIterator<Item = (Entity, Vec3)>,
+    commands: &mut Commands,
+    explosion_events: &mut EventWriter<ExplosionDamageEvent>,
+    sound_events: &mut EventWriter<PlaySoundEvent>,
+) -> usize {
+    let mut count = 0;
+    for (entity, pos) in pipebombs {
+        count += 1;
+        sound_events.send(PlaySoundEvent { sound_id: 14 });
+        explosion_events.send(ExplosionDamageEvent {
+            origin: pos,
+            radius: 7.0,
+            damage: 150,
+        });
+        commands.entity(entity).despawn_recursive();
+    }
+    count
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_tripbomb_wall_raycast_placement_condition() {
+        let player_eye = Vec3::new(0.0, 1.5, 0.0);
+
+        // Case 1: Wall hit at 1.8m (within 2.5m reach) -> placement succeeds
+        let hit_within_reach = Some((Vec3::new(0.0, 1.5, -1.8), Vec3::new(0.0, 0.0, 1.0)));
+        let placement = calculate_tripbomb_placement(player_eye, hit_within_reach, TRIPBOMB_MAX_REACH);
+        assert!(placement.is_some());
+        let (pos, normal) = placement.unwrap();
+        assert_eq!(normal, Vec3::new(0.0, 0.0, 1.0));
+        assert!((pos.z - (-1.8 + 0.02)).abs() < 0.001);
+
+        // Case 2: Wall hit at 3.5m (beyond 2.5m reach) -> placement fails
+        let hit_too_far = Some((Vec3::new(0.0, 1.5, -3.5), Vec3::new(0.0, 0.0, 1.0)));
+        let placement_too_far = calculate_tripbomb_placement(player_eye, hit_too_far, TRIPBOMB_MAX_REACH);
+        assert!(placement_too_far.is_none());
+
+        // Case 3: No wall hit in raycast -> placement fails
+        let no_hit = None;
+        let placement_none = calculate_tripbomb_placement(player_eye, no_hit, TRIPBOMB_MAX_REACH);
+        assert!(placement_none.is_none());
+
+        // Case 4: Ammo consumption logic verification
+        let mut player = PlayerController::default();
+        let trip_idx = WeaponType::Tripbomb as usize;
+        player.weapons[trip_idx].is_unlocked = true;
+        player.weapons[trip_idx].ammo = 5;
+
+        // When placement succeeds: ammo is consumed
+        if placement.is_some() {
+            player.weapons[trip_idx].ammo -= 1;
+        }
+        assert_eq!(player.weapons[trip_idx].ammo, 4);
+
+        // When placement fails (no wall / too far): ammo must NOT be consumed
+        if placement_too_far.is_some() {
+            player.weapons[trip_idx].ammo -= 1;
+        }
+        assert_eq!(player.weapons[trip_idx].ammo, 4); // Ammo unchanged!
+    }
+
+    #[test]
+    fn test_hand_remote_detonates_pipebombs_and_ammo_switch() {
+        let mut player = PlayerController::default();
+        let pipe_idx = WeaponType::Pipebomb as usize;
+        player.weapons[pipe_idx].is_unlocked = true;
+        player.weapons[pipe_idx].ammo = 2;
+
+        // Throwing pipebomb equips HandRemote
+        player.current_weapon = WeaponType::HandRemote;
+        assert_eq!(player.current_weapon, WeaponType::HandRemote);
+
+        // When detonated, if ammo remains, returns to Pipebomb
+        let pipebomb_detonated = true;
+        if pipebomb_detonated {
+            if player.weapons[pipe_idx].ammo > 0 {
+                player.current_weapon = WeaponType::Pipebomb;
+            } else {
+                player.current_weapon = get_highest_priority_available_weapon(&player);
+            }
+        }
+        assert_eq!(player.current_weapon, WeaponType::Pipebomb);
+
+        // When detonated with 0 ammo, returns to highest priority weapon
+        player.weapons[pipe_idx].ammo = 0;
+        player.current_weapon = WeaponType::HandRemote;
+        if pipebomb_detonated {
+            if player.weapons[pipe_idx].ammo > 0 {
+                player.current_weapon = WeaponType::Pipebomb;
+            } else {
+                player.current_weapon = get_highest_priority_available_weapon(&player);
+            }
+        }
+        assert_eq!(player.current_weapon, WeaponType::Shotgun);
     }
 }

@@ -49,6 +49,7 @@ impl Plugin for CombatPlugin {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::names::*;
 
     #[test]
     fn test_enemy_actor_initialization() {
@@ -149,12 +150,12 @@ mod tests {
         assert_eq!(vel_spit, 35.0);
         assert_eq!(dmg_spit, 8);
 
-        let (p_shot, vel_shot, dmg_shot) = map_tile_to_projectile(2613);
+        let (p_shot, vel_shot, dmg_shot) = map_tile_to_projectile(SHOTGUN);
         assert_eq!(p_shot, ProjectileType::ShotgunPellet);
         assert_eq!(vel_shot, 80.0);
         assert_eq!(dmg_shot, 10);
 
-        let (p_chain, vel_chain, dmg_chain) = map_tile_to_projectile(2595);
+        let (p_chain, vel_chain, dmg_chain) = map_tile_to_projectile(SHOTSPARK1);
         assert_eq!(p_chain, ProjectileType::HitscanBullet);
         assert_eq!(vel_chain, 150.0);
         assert_eq!(dmg_chain, 9);
@@ -162,8 +163,8 @@ mod tests {
 
     #[test]
     fn test_con_actor_ecs_initialization() {
-        let actor = crate::scripting::ConActor::new(2000, 12, 512, 100);
-        assert_eq!(actor.picnum, 2000);
+        let actor = crate::scripting::ConActor::new(PIGCOP, 12, 512, 100);
+        assert_eq!(actor.picnum, PIGCOP);
         assert_eq!(actor.sectnum, 12);
         assert_eq!(actor.ang, 512);
         assert_eq!(actor.extra, 100);
@@ -494,7 +495,7 @@ mod tests {
         assert_eq!(turret.attack_cooldown, 0.5);
 
         // Scampering rat actor
-        let mut rat = EnemyActor::new_rat();
+        let rat = EnemyActor::new_rat();
         assert_eq!(rat.kind, EnemyKind::ScamperingRat);
         assert_eq!(rat.speed, 10.0);
         let dist_to_player = 3.0;
@@ -513,5 +514,173 @@ mod tests {
         // Camera prop
         let cam = EnemyActor::new_camera_prop();
         assert_eq!(cam.kind, EnemyKind::SecurityCameraProp);
+    }
+
+    #[test]
+    fn test_pipebomb_persistence_without_auto_despawn() {
+        let mut app = App::new();
+        app.add_event::<SpawnProjectileEvent>()
+            .add_event::<EntityDamageEvent>()
+            .add_event::<crate::interactivity::ExplosionDamageEvent>()
+            .add_event::<crate::audio::PlaySoundEvent>()
+            .add_event::<crate::combat::decals::SpawnDecalEvent>()
+            .add_event::<crate::interactivity::WallDamageEvent>()
+            .add_event::<GibEvent>()
+            .insert_resource(Time::<()>::default())
+            .add_systems(Update, (spawn_projectiles, update_projectiles));
+
+        // Spawn a pipebomb projectile event
+        app.world_mut().send_event(SpawnProjectileEvent {
+            projectile_type: ProjectileType::Pipebomb,
+            origin: Vec3::new(0.0, 1.0, 0.0),
+            direction: Vec3::new(0.0, 0.0, 1.0),
+            velocity: 15.0,
+            damage: 150,
+            is_player_source: true,
+        });
+
+        // Run schedule to process spawn
+        app.update();
+
+        // Verify pipebomb has infinite lifetime (no 8.0s auto-despawn timer)
+        let mut pipebomb_query = app.world_mut().query::<&Projectile>();
+        let pipebomb = pipebomb_query.iter(app.world()).next().expect("Pipebomb entity should exist");
+        assert_eq!(pipebomb.projectile_type, ProjectileType::Pipebomb);
+        assert_eq!(pipebomb.lifetime, f32::INFINITY);
+
+        // Advance time past the former 8.0s auto-despawn threshold (e.g. 10.0 seconds)
+        {
+            let mut time = app.world_mut().resource_mut::<Time>();
+            time.advance_by(std::time::Duration::from_secs(10));
+        }
+        app.update();
+
+        // Verify pipebomb STILL exists and was NOT auto-despawned
+        let mut pipebomb_query = app.world_mut().query::<(Entity, &Projectile)>();
+        let pipebomb_count = pipebomb_query.iter(app.world()).count();
+        assert_eq!(pipebomb_count, 1, "Pipebomb must persist indefinitely without auto-despawning");
+    }
+
+    #[test]
+    fn test_shrunk_enemy_stomp_damage_execution() {
+        let mut app = App::new();
+        app.add_event::<EntityDamageEvent>()
+            .add_event::<GibEvent>()
+            .add_event::<crate::audio::PlaySoundEvent>()
+            .add_event::<crate::audio::PlayDukeVoiceEvent>()
+            .insert_resource(crate::net::DeterministicRng::new(42))
+            .add_systems(Update, apply_damage_events);
+
+        // Spawn shrunk enemy
+        let mut enemy = EnemyActor::new_pigcop();
+        enemy.is_shrunk = true;
+        enemy.shrink_timer = 9.0;
+        enemy.state = EnemyAiState::Shrunk;
+
+        let enemy_entity = app.world_mut().spawn((
+            enemy,
+            TransformBundle::from_transform(Transform::from_xyz(2.0, 0.0, 2.0)),
+        )).id();
+
+        // Player delivers Mighty Boot kick
+        app.world_mut().send_event(EntityDamageEvent {
+            target: enemy_entity,
+            amount: 15, // Normal boot kick damage
+            source: DamageSource::PlayerWeapon(ProjectileType::MightyBoot),
+            hit_origin: Vec3::new(2.0, 0.0, 2.0),
+        });
+
+        app.update();
+
+        // Verify immediate squash/stomp kill
+        let enemy = app.world().get::<EnemyActor>(enemy_entity).unwrap();
+        assert_eq!(enemy.state, EnemyAiState::Gibbed);
+        assert_eq!(enemy.health, -100);
+        assert!(!enemy.is_shrunk);
+
+        // Verify squish sound and gib events emitted
+        let sound_events = app.world().resource::<Events<crate::audio::PlaySoundEvent>>();
+        let mut sound_reader = sound_events.get_reader();
+        let sounds: Vec<_> = sound_reader.read(sound_events).collect();
+        assert!(sounds.iter().any(|s| s.sound_id == 69), "Squish sound (69) must be played on stomp");
+
+        let gib_events = app.world().resource::<Events<GibEvent>>();
+        let mut gib_reader = gib_events.get_reader();
+        let gibs: Vec<_> = gib_reader.read(gib_events).collect();
+        assert!(!gibs.is_empty(), "Gib particles must be spawned on stomp");
+    }
+
+    #[test]
+    fn test_frozen_enemy_shatter_upon_damage() {
+        let mut app = App::new();
+        app.add_event::<EntityDamageEvent>()
+            .add_event::<GibEvent>()
+            .add_event::<crate::audio::PlaySoundEvent>()
+            .add_event::<crate::audio::PlayDukeVoiceEvent>()
+            .insert_resource(crate::net::DeterministicRng::new(42))
+            .add_systems(Update, apply_damage_events);
+
+        // Spawn frozen enemy
+        let mut enemy = EnemyActor::new_pigcop();
+        enemy.health = 1;
+        enemy.is_frozen = true;
+        enemy.freeze_timer = 4.6;
+        enemy.state = EnemyAiState::Frozen;
+
+        let enemy_entity = app.world_mut().spawn((
+            enemy,
+            TransformBundle::from_transform(Transform::from_xyz(1.0, 0.0, 1.0)),
+        )).id();
+
+        // Hit frozen enemy with minimal bullet damage (e.g. 1 point of hitscan damage)
+        app.world_mut().send_event(EntityDamageEvent {
+            target: enemy_entity,
+            amount: 1,
+            source: DamageSource::PlayerWeapon(ProjectileType::HitscanBullet),
+            hit_origin: Vec3::new(1.0, 0.0, 1.0),
+        });
+
+        app.update();
+
+        // Verify immediate shatter into ice shards
+        let enemy = app.world().get::<EnemyActor>(enemy_entity).unwrap();
+        assert_eq!(enemy.state, EnemyAiState::Gibbed);
+        assert_eq!(enemy.health, -50);
+        assert!(!enemy.is_frozen);
+
+        // Verify glass shatter sound (19) and gibs
+        let sound_events = app.world().resource::<Events<crate::audio::PlaySoundEvent>>();
+        let mut sound_reader = sound_events.get_reader();
+        let sounds: Vec<_> = sound_reader.read(sound_events).collect();
+        assert!(sounds.iter().any(|s| s.sound_id == 19), "Glass/ice shatter sound (19) must be played");
+
+        let gib_events = app.world().resource::<Events<GibEvent>>();
+        let mut gib_reader = gib_events.get_reader();
+        let gibs: Vec<_> = gib_reader.read(gib_events).collect();
+        assert!(!gibs.is_empty(), "Ice shard gibs must be spawned on shatter");
+    }
+
+    #[test]
+    fn test_tripbomb_placement_raycast_condition() {
+        let origin = Vec3::new(0.0, 1.5, 0.0);
+        let max_reach = 2.5;
+
+        // Within reach (<= 2.5m)
+        let hit_near = Some((Vec3::new(0.0, 1.5, 2.0), Vec3::new(0.0, 0.0, -1.0)));
+        let near_res = crate::player::weapons::calculate_tripbomb_placement(origin, hit_near, max_reach);
+        assert!(near_res.is_some());
+        let (pos, norm) = near_res.unwrap();
+        assert_eq!(norm, Vec3::new(0.0, 0.0, -1.0));
+        assert!((pos.z - (2.0 - 0.02)).abs() < 0.001);
+
+        // Beyond reach (> 2.5m)
+        let hit_far = Some((Vec3::new(0.0, 1.5, 4.0), Vec3::new(0.0, 0.0, -1.0)));
+        let far_res = crate::player::weapons::calculate_tripbomb_placement(origin, hit_far, max_reach);
+        assert!(far_res.is_none());
+
+        // No hit
+        let no_hit = None;
+        let none_res = crate::player::weapons::calculate_tripbomb_placement(origin, no_hit, max_reach);
+        assert!(none_res.is_none());
     }
 }
