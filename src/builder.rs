@@ -11,13 +11,29 @@ use crate::map::{Map, Wall};
 use crate::names::*;
 use crate::palette::Palette;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum MaterialAlphaMode {
+    Opaque,
+    Mask,
+    Blend(u8), // Percentage opacity: e.g. 66 for water surface or glass, 33 for faint forcefields
+}
+
+pub fn is_water_sector(lotag: i16) -> bool {
+    lotag == 1 || lotag == 2
+}
+
+pub fn is_water_surface(lotag: i16, part: crate::interactivity::SectorMeshPart) -> bool {
+    (lotag == 1 && part == crate::interactivity::SectorMeshPart::Floor)
+        || (lotag == 2 && part == crate::interactivity::SectorMeshPart::Ceiling)
+}
+
 pub struct MapMeshBuilder<'a> {
     pub map: &'a Map,
     pub tile_textures: &'a HashMap<i16, Handle<Image>>,
     pub tile_sizes: &'a HashMap<i16, (u32, u32)>,
     pub picanm_map: &'a HashMap<i16, PicAnm>,
     pub default_material: Handle<StandardMaterial>,
-    material_cache: std::cell::RefCell<HashMap<(i16, bool), Handle<StandardMaterial>>>,
+    material_cache: std::cell::RefCell<HashMap<(i16, MaterialAlphaMode), Handle<StandardMaterial>>>,
 }
 
 impl<'a> MapMeshBuilder<'a> {
@@ -38,25 +54,30 @@ impl<'a> MapMeshBuilder<'a> {
         }
     }
 
-    fn get_material(
+    pub fn get_material(
         &self,
         picnum: i16,
-        is_transparent: bool,
+        alpha_mode: MaterialAlphaMode,
         materials: &mut Assets<StandardMaterial>,
     ) -> Handle<StandardMaterial> {
-        let key = (picnum, is_transparent);
+        let key = (picnum, alpha_mode);
         if let Some(handle) = self.material_cache.borrow().get(&key) {
             return handle.clone();
         }
 
         let handle = if let Some(tex_handle) = self.tile_textures.get(&picnum) {
+            let (bevy_alpha, base_color) = match alpha_mode {
+                MaterialAlphaMode::Opaque => (AlphaMode::Opaque, Color::WHITE),
+                MaterialAlphaMode::Mask => (AlphaMode::Mask(0.5), Color::WHITE),
+                MaterialAlphaMode::Blend(opacity_pct) => {
+                    let alpha = (opacity_pct as f32) / 100.0;
+                    (AlphaMode::Blend, Color::srgba(1.0, 1.0, 1.0, alpha))
+                }
+            };
             materials.add(StandardMaterial {
                 base_color_texture: Some(tex_handle.clone()),
-                alpha_mode: if is_transparent {
-                    AlphaMode::Mask(0.5)
-                } else {
-                    AlphaMode::Opaque
-                },
+                base_color,
+                alpha_mode: bevy_alpha,
                 unlit: true,
                 double_sided: true,
                 perceptual_roughness: 1.0,
@@ -229,11 +250,23 @@ impl<'a> MapMeshBuilder<'a> {
                     })
                     .collect();
 
-                let floor_tint = Palette::authentic_shade_to_tint(sector.floorshade);
+                let is_water = is_water_surface(sector.lotag, crate::interactivity::SectorMeshPart::Floor);
+                let floor_alpha = if is_water {
+                    MaterialAlphaMode::Blend(66)
+                } else {
+                    MaterialAlphaMode::Opaque
+                };
+                let mut floor_tint = Palette::authentic_shade_to_tint(sector.floorshade);
+                if is_water {
+                    floor_tint[0] *= 0.8;
+                    floor_tint[1] *= 0.95;
+                    floor_tint[2] *= 1.1;
+                    floor_tint[3] = 0.66;
+                }
                 let floor_colors: Vec<[f32; 4]> = vec![floor_tint; floor_vertices.len()];
 
                 let floor_indices = buffers.indices.clone();
-                let floor_mat = self.get_material(sector.floorpicnum, false, materials);
+                let floor_mat = self.get_material(sector.floorpicnum, floor_alpha, materials);
 
                 let mut floor_mesh = Mesh::new(
                     bevy::render::mesh::PrimitiveTopology::TriangleList,
@@ -262,14 +295,20 @@ impl<'a> MapMeshBuilder<'a> {
                             material: floor_mat.clone(),
                             ..default()
                         },
-                        RigidBody::Fixed,
-                        Collider::trimesh(floor_collider_vertices, floor_collider_indices),
                         crate::interactivity::DynamicSectorMesh {
                             sector_idx: sec_idx,
                             part: crate::interactivity::SectorMeshPart::Floor,
                         },
                         crate::game_flow::LevelEntity,
                     ));
+
+                    if is_water {
+                        entity_cmds.insert(Collider::trimesh(floor_collider_vertices, floor_collider_indices));
+                        entity_cmds.insert(Sensor);
+                    } else {
+                        entity_cmds.insert(RigidBody::Fixed);
+                        entity_cmds.insert(Collider::trimesh(floor_collider_vertices, floor_collider_indices));
+                    }
 
                     // Check for tile animation on floor
                     if let Some(&picanm) = self.picanm_map.get(&sector.floorpicnum) {
@@ -329,7 +368,19 @@ impl<'a> MapMeshBuilder<'a> {
                     })
                     .collect();
 
-                let ceil_tint = Palette::authentic_shade_to_tint(sector.ceilingshade);
+                let is_water = is_water_surface(sector.lotag, crate::interactivity::SectorMeshPart::Ceiling);
+                let ceil_alpha = if is_water {
+                    MaterialAlphaMode::Blend(66)
+                } else {
+                    MaterialAlphaMode::Opaque
+                };
+                let mut ceil_tint = Palette::authentic_shade_to_tint(sector.ceilingshade);
+                if is_water {
+                    ceil_tint[0] *= 0.8;
+                    ceil_tint[1] *= 0.95;
+                    ceil_tint[2] *= 1.1;
+                    ceil_tint[3] = 0.66;
+                }
                 let ceil_colors: Vec<[f32; 4]> = vec![ceil_tint; ceil_vertices.len()];
 
                 // Reverse ceiling winding order so normals face downwards
@@ -339,7 +390,7 @@ impl<'a> MapMeshBuilder<'a> {
                     .flat_map(|c| [c[0], c[2], c[1]])
                     .collect();
 
-                let ceil_mat = self.get_material(sector.ceilingpicnum, false, materials);
+                let ceil_mat = self.get_material(sector.ceilingpicnum, ceil_alpha, materials);
 
                 let mut ceil_mesh = Mesh::new(
                     bevy::render::mesh::PrimitiveTopology::TriangleList,
@@ -369,14 +420,20 @@ impl<'a> MapMeshBuilder<'a> {
                             material: ceil_mat.clone(),
                             ..default()
                         },
-                        RigidBody::Fixed,
-                        Collider::trimesh(ceil_collider_vertices, ceil_collider_indices),
                         crate::interactivity::DynamicSectorMesh {
                             sector_idx: sec_idx,
                             part: crate::interactivity::SectorMeshPart::Ceiling,
                         },
                         crate::game_flow::LevelEntity,
                     ));
+
+                    if is_water {
+                        entity_cmds.insert(Collider::trimesh(ceil_collider_vertices, ceil_collider_indices));
+                        entity_cmds.insert(Sensor);
+                    } else {
+                        entity_cmds.insert(RigidBody::Fixed);
+                        entity_cmds.insert(Collider::trimesh(ceil_collider_vertices, ceil_collider_indices));
+                    }
 
                     // Check for tile animation on ceiling
                     if let Some(&picanm) = self.picanm_map.get(&sector.ceilingpicnum) {
@@ -630,7 +687,19 @@ impl<'a> MapMeshBuilder<'a> {
         let colors = vec![tint; 4];
         let indices = vec![0u32, 1, 2, 0, 2, 3];
 
-        let mat = self.get_material(picnum, is_masked, materials);
+        let wall_alpha = if is_masked {
+            if (wall.cstat & 512) != 0 {
+                MaterialAlphaMode::Blend(66)
+            } else if (wall.cstat & 128) != 0 {
+                MaterialAlphaMode::Blend(33)
+            } else {
+                MaterialAlphaMode::Mask
+            }
+        } else {
+            MaterialAlphaMode::Opaque
+        };
+
+        let mat = self.get_material(picnum, wall_alpha, materials);
 
         let mut wall_mesh = Mesh::new(
             bevy::render::mesh::PrimitiveTopology::TriangleList,
@@ -784,9 +853,16 @@ impl<'a> MapMeshBuilder<'a> {
 
 
 
-                let is_enemy = sprite.picnum == PIGCOP; // PIGCOP
+                let is_enemy = sprite.picnum == PIGCOP;
 
-                let sprite_mat = self.get_material(sprite.picnum, true, materials);
+                let sprite_alpha = if (sprite.cstat & 512) != 0 {
+                    MaterialAlphaMode::Blend(66)
+                } else if (sprite.cstat & 2) != 0 || sprite.picnum == GLASS || sprite.picnum == GLASS2 {
+                    MaterialAlphaMode::Blend(40)
+                } else {
+                    MaterialAlphaMode::Mask
+                };
+                let sprite_mat = self.get_material(sprite.picnum, sprite_alpha, materials);
 
                 // In Build Engine, Z is the bottom of the sprite unless cstat & 128 is set (Centered)
                 let is_centered = (sprite.cstat & 128) != 0;
@@ -1679,5 +1755,52 @@ mod tests {
                 "Sprite {picnum} must be in editor utility range 1..=8"
             );
         }
+    }
+
+    #[test]
+    fn test_water_sector_detection_and_surface_classification() {
+        assert!(is_water_sector(1), "Lotag 1 must be water sector");
+        assert!(is_water_sector(2), "Lotag 2 must be water sector");
+        assert!(!is_water_sector(0), "Lotag 0 is not water sector");
+        assert!(!is_water_sector(15), "Lotag 15 is not water sector");
+
+        // Surface plane tests
+        assert!(
+            is_water_surface(1, crate::interactivity::SectorMeshPart::Floor),
+            "Lotag 1 Floor must be a water surface"
+        );
+        assert!(
+            !is_water_surface(1, crate::interactivity::SectorMeshPart::Ceiling),
+            "Lotag 1 Ceiling is the sky/ceiling, not water surface"
+        );
+        assert!(
+            is_water_surface(2, crate::interactivity::SectorMeshPart::Ceiling),
+            "Lotag 2 Ceiling must be underwater surface looking up"
+        );
+        assert!(
+            !is_water_surface(2, crate::interactivity::SectorMeshPart::Floor),
+            "Lotag 2 Floor is the pool floor/bed, not water surface"
+        );
+    }
+
+    #[test]
+    fn test_material_alpha_mode_and_translucency_flags() {
+        assert_eq!(MaterialAlphaMode::Opaque, MaterialAlphaMode::Opaque);
+        assert_ne!(MaterialAlphaMode::Opaque, MaterialAlphaMode::Mask);
+        assert_eq!(MaterialAlphaMode::Blend(66), MaterialAlphaMode::Blend(66));
+
+        let eval_wall_alpha = |cstat: i16| -> MaterialAlphaMode {
+            if (cstat & 512) != 0 {
+                MaterialAlphaMode::Blend(66)
+            } else if (cstat & 128) != 0 {
+                MaterialAlphaMode::Blend(33)
+            } else {
+                MaterialAlphaMode::Mask
+            }
+        };
+
+        assert_eq!(eval_wall_alpha(0), MaterialAlphaMode::Mask);
+        assert_eq!(eval_wall_alpha(128), MaterialAlphaMode::Blend(33));
+        assert_eq!(eval_wall_alpha(512), MaterialAlphaMode::Blend(66));
     }
 }

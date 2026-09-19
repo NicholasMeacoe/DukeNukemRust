@@ -4,6 +4,16 @@ use std::collections::HashMap;
 #[derive(Component)]
 pub struct SkyboxDome;
 
+/// Calculate authentic Build engine 360-degree cylindrical panorama repeat count.
+/// Duke 3D skies wrap across 1024 Build units (e.g. 256px texture -> 4 wraps).
+pub fn calculate_sky_tile_repeats(tile_width: u32) -> f32 {
+    if tile_width == 0 {
+        4.0
+    } else {
+        (1024.0 / tile_width as f32).clamp(1.0, 16.0)
+    }
+}
+
 pub fn spawn_skybox(
     commands: &mut Commands,
     meshes: &mut Assets<Mesh>,
@@ -21,28 +31,20 @@ pub fn spawn_skybox(
         ..default()
     });
 
-    // Spawn a large inverted cylinder / dome for panoramic sky
+    // Spawn a large inverted cylinder for authentic panoramic sky
     let mut cylinder_mesh = Mesh::from(Cylinder {
         radius: 500.0,
         half_height: 250.0,
     });
-    
-    // Scale UVs so the sky texture tiles correctly around the panorama
-    if let Some(bevy::render::mesh::VertexAttributeValues::Float32x2(uvs)) = cylinder_mesh.attribute_mut(Mesh::ATTRIBUTE_UV_0) {
-        println!("Modifying sky UVs!");
-        for uv in uvs.iter_mut() {
-            uv[0] *= 16.0; // Tile 16 times around the cylinder
-        }
-    } else {
-        println!("WARNING: NO SKY UVS FOUND!");
-    }
 
-    // Invert U coordinate so textures are not mirrored when viewed from the inside
+    let repeats = calculate_sky_tile_repeats(256);
+
+    // Scale UVs so the sky texture tiles correctly around the panorama and invert U for inner visibility
     if let Some(bevy::render::mesh::VertexAttributeValues::Float32x2(uvs)) =
         cylinder_mesh.attribute_mut(Mesh::ATTRIBUTE_UV_0)
     {
         for uv in uvs.iter_mut() {
-            uv[0] = 1.0 - uv[0];
+            uv[0] = (1.0 - uv[0]) * repeats;
         }
     }
 
@@ -70,9 +72,56 @@ pub fn update_skybox(
             sky_trans.translation.x = cam_trans.translation.x;
             sky_trans.translation.z = cam_trans.translation.z;
             let (yaw, pitch, _) = cam_trans.rotation.to_euler(EulerRot::YXZ);
-            let clamped_pitch = pitch.clamp(-0.75, 0.75);
-            sky_trans.translation.y = 50.0 + clamped_pitch * 20.0;
+            let clamped_pitch = pitch.clamp(-0.85, 0.85);
+            sky_trans.translation.y = cam_trans.translation.y + clamped_pitch * 25.0;
             sky_trans.rotation = Quat::from_rotation_y(yaw * 0.5);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sky_tile_repeats_calculation() {
+        assert_eq!(calculate_sky_tile_repeats(256), 4.0);
+        assert_eq!(calculate_sky_tile_repeats(128), 8.0);
+        assert_eq!(calculate_sky_tile_repeats(512), 2.0);
+        assert_eq!(calculate_sky_tile_repeats(1024), 1.0);
+        assert_eq!(calculate_sky_tile_repeats(0), 4.0);
+    }
+
+    #[test]
+    fn test_skybox_camera_alignment_and_pitch() {
+        let mut app = App::new();
+        app.add_systems(Update, update_skybox);
+
+        let cam_pos = Vec3::new(15.0, 2.5, -30.0);
+        let _cam_entity = app
+            .world_mut()
+            .spawn(Camera3dBundle {
+                transform: Transform::from_translation(cam_pos)
+                    .with_rotation(Quat::from_rotation_y(std::f32::consts::FRAC_PI_2)),
+                ..default()
+            })
+            .id();
+
+        let sky_entity = app
+            .world_mut()
+            .spawn((
+                SpatialBundle::from_transform(Transform::from_xyz(0.0, 0.0, 0.0)),
+                SkyboxDome,
+            ))
+            .id();
+
+        app.update();
+
+        let sky_trans = app.world().entity(sky_entity).get::<Transform>().unwrap();
+        assert_eq!(sky_trans.translation.x, cam_pos.x);
+        assert_eq!(sky_trans.translation.z, cam_pos.z);
+        // Half-speed yaw rotation: PI/4
+        let (yaw, _, _) = sky_trans.rotation.to_euler(EulerRot::YXZ);
+        assert!((yaw - std::f32::consts::FRAC_PI_4).abs() < 1e-4);
     }
 }
