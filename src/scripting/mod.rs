@@ -121,6 +121,14 @@ define FIRELASER 1625
 define SPIT 1636
 define SHOTGUN 2605
 define CHAINGUN 2548
+define RECON 1960
+define GREENSLIME 2370
+define SLIMER 2370
+define EGG 675
+define SHARK 1550
+define ROTATEGUN 2360
+define BOSS2 2710
+define BOSS3 2760
 
 // PIGCOP Actions & Moves
 action APIGSTAND 0 1 5 1 1
@@ -203,6 +211,67 @@ move BOSS1WALKVEL 20 0
 move BOSS1STOP 0 0
 ai AIBOSS1WALK ABOSS1WALK BOSS1WALKVEL seekplayer face_player
 ai AIBOSS1ATTACK ABOSS1ATTACK BOSS1STOP face_player
+
+// RECON Actions & Moves
+action ARECONSTAND 0 1 5 1 1
+action ARECONFLY 0 4 5 1 10
+action ARECONATTACK 20 2 5 1 12
+action ARECONDIE 30 4 1 1 8
+move RECONVEL 56 0
+move RECONSTOP 0 0
+ai AIRECONFLY ARECONFLY RECONVEL seekplayer face_player
+ai AIRECONATTACK ARECONATTACK RECONSTOP face_player
+
+// GREENSLIME (Slimer) Actions & Moves
+action ASLIMESTAND 0 1 5 1 1
+action ASLIMEWALK 0 4 5 1 8
+action ASLIMEATTACK 20 2 5 1 10
+action ASLIMEDIE 30 3 1 1 8
+move SLIMEVEL 48 0
+move SLIMESTOP 0 0
+ai AISLIMEWALK ASLIMEWALK SLIMEVEL seekplayer face_player
+ai AISLIMEATTACK ASLIMEATTACK SLIMESTOP face_player
+
+// EGG Actions & Moves
+action AEGGSTAND 0 1 1 1 1
+action AEGGHATCH 1 3 1 1 16
+action AEGGDEAD 4 1 1 1 1
+move EGGSTOP 0 0
+
+// SHARK Actions & Moves
+action ASHARKSTAND 0 1 5 1 1
+action ASHARKSWIM 0 4 5 1 10
+action ASHARKATTACK 20 2 5 1 8
+action ASHARKDIE 30 4 1 1 12
+move SHARKVEL 40 0
+move SHARKSTOP 0 0
+ai AISHARKSWIM ASHARKSWIM SHARKVEL seekplayer face_player
+ai AISHARKATTACK ASHARKATTACK SHARKSTOP face_player
+
+// ROTATEGUN Actions & Moves
+action ATURRETSTAND 0 1 1 1 1
+action ATURRETDIE 4 1 1 1 1
+move TURRETSTOP 0 0
+
+// BOSS2 (Overlord) Actions & Moves
+action ABOSS2STAND 0 1 5 1 1
+action ABOSS2WALK 0 4 5 1 16
+action ABOSS2ATTACK 20 2 5 1 10
+action ABOSS2DIE 30 6 1 1 14
+move BOSS2WALKVEL 24 0
+move BOSS2STOP 0 0
+ai AIBOSS2WALK ABOSS2WALK BOSS2WALKVEL seekplayer face_player
+ai AIBOSS2ATTACK ABOSS2ATTACK BOSS2STOP face_player
+
+// BOSS3 (Cycloid Emperor) Actions & Moves
+action ABOSS3STAND 0 1 5 1 1
+action ABOSS3WALK 0 4 5 1 16
+action ABOSS3ATTACK 20 2 5 1 10
+action ABOSS3DIE 30 6 1 1 14
+move BOSS3WALKVEL 20 0
+move BOSS3STOP 0 0
+ai AIBOSS3WALK ABOSS3WALK BOSS3WALKVEL seekplayer face_player
+ai AIBOSS3ATTACK ABOSS3ATTACK BOSS3STOP face_player
 
 // ---------------- ACTORS ----------------
 
@@ -392,6 +461,164 @@ actor BOSS1 1000 ABOSS1STAND BOSS1STOP
         }
     }
 enda
+
+actor RECON 50 ARECONSTAND RECONSTOP
+    ifdead {
+        action ARECONDIE
+        sound 14
+        ifactioncount 4 {
+            debris 1000 4
+            killit
+        }
+    } else {
+        ifcansee {
+            ifpdistl 4096 {
+                ai AIRECONATTACK
+                ifactioncount 2 {
+                    resetactioncount
+                    sound 6
+                    shoot FIRELASER
+                }
+            } else {
+                ai AIRECONFLY
+            }
+        } else {
+            action ARECONSTAND
+            move RECONSTOP
+        }
+    }
+enda
+
+actor GREENSLIME 1 ASLIMESTAND SLIMESTOP
+    ifdead {
+        action ASLIMEDIE
+        sound 572
+        ifactioncount 3 {
+            killit
+        }
+    } else {
+        ifcansee {
+            ifpdistl 1024 {
+                ai AISLIMEATTACK
+            } else {
+                ai AISLIMEWALK
+            }
+        } else {
+            action ASLIMESTAND
+            move SLIMESTOP
+        }
+    }
+enda
+
+actor EGG 20 AEGGSTAND EGGSTOP
+    ifdead {
+        action AEGGDEAD
+        sound 572
+        killit
+    } else {
+        ifpdistl 1536 {
+            action AEGGHATCH
+            ifactioncount 3 {
+                sound 570
+                killit
+            }
+        }
+    }
+enda
+
+actor SHARK 35 ASHARKSTAND SHARKSTOP
+    ifdead {
+        action ASHARKDIE
+        sound 572
+        ifactioncount 4 {
+            debris 1000 3
+            killit
+        }
+    } else {
+        ifcansee {
+            ifpdistl 2048 {
+                ai AISHARKATTACK
+            } else {
+                ai AISHARKSWIM
+            }
+        } else {
+            action ASHARKSTAND
+            move SHARKSTOP
+        }
+    }
+enda
+
+actor ROTATEGUN 40 ATURRETSTAND TURRETSTOP
+    ifdead {
+        action ATURRETDIE
+        sound 14
+        debris 1000 4
+        killit
+    } else {
+        ifcansee {
+            ifpdistl 4096 {
+                sound 6
+                shoot FIRELASER
+            }
+        }
+    }
+enda
+
+actor BOSS2 4500 ABOSS2STAND BOSS2STOP
+    ifdead {
+        action ABOSS2DIE
+        sound 538
+        ifactioncount 6 {
+            debris 1000 12
+            endofgame 52
+            killit
+        }
+    } else {
+        ifcansee {
+            ifpdistl 5120 {
+                ai AIBOSS2ATTACK
+                ifactioncount 1 {
+                    resetactioncount
+                    sound 7
+                    shoot RPG
+                }
+            } else {
+                ai AIBOSS2WALK
+            }
+        } else {
+            action ABOSS2STAND
+            move BOSS2STOP
+        }
+    }
+enda
+
+actor BOSS3 4500 ABOSS3STAND BOSS3STOP
+    ifdead {
+        action ABOSS3DIE
+        sound 538
+        ifactioncount 6 {
+            debris 1000 15
+            endofgame 52
+            killit
+        }
+    } else {
+        ifcansee {
+            ifpdistl 5120 {
+                ai AIBOSS3ATTACK
+                ifactioncount 1 {
+                    resetactioncount
+                    sound 7
+                    shoot RPG
+                }
+            } else {
+                ai AIBOSS3WALK
+            }
+        } else {
+            action ABOSS3STAND
+            move BOSS3STOP
+        }
+    }
+enda
 "#;
 
 #[cfg(test)]
@@ -537,4 +764,60 @@ mod tests {
         assert_eq!(spit_vel, 35.0);
         assert_eq!(spit_dmg, 8);
     }
+
+    #[test]
+    fn test_expanded_core_con_script_actors() {
+        let engine = ConScriptEngine::from_source(DEFAULT_CORE_CON_SCRIPT).unwrap();
+        // Verify all 14 core enemy actors are compiled
+        let expected_actors = [
+            2000, // PIGCOP
+            1680, // LIZTROOP
+            1820, // OCTABRAIN
+            2120, // ENFORCER
+            1880, // DRONE
+            1920, // COMMANDER
+            1960, // RECON
+            2370, // GREENSLIME / SLIMER
+            675,  // EGG
+            1550, // SHARK
+            2360, // ROTATEGUN
+            2630, // BOSS1
+            2710, // BOSS2
+            2760, // BOSS3
+        ];
+        for picnum in expected_actors {
+            assert!(
+                engine.compiled.actor_script_ptrs[picnum].is_some(),
+                "Actor picnum {} must be compiled in DEFAULT_CORE_CON_SCRIPT",
+                picnum
+            );
+        }
+    }
+
+    #[test]
+    fn test_real_grp_con_script_compilation() {
+        if let Ok(grp) = crate::grp::Grp::open("dukenukem3d/duke3d.grp") {
+            let res = ConScriptEngine::from_grp_files(&grp);
+            assert!(
+                res.is_ok(),
+                "Real GAME.CON must compile cleanly from duke3d.grp: {:?}",
+                res.err()
+            );
+            let engine = res.unwrap();
+            let actor_count = engine
+                .compiled
+                .actor_script_ptrs
+                .iter()
+                .filter(|p| p.is_some())
+                .count();
+            assert!(
+                actor_count >= 20,
+                "Expected at least 20 actors compiled from real GAME.CON, found {}",
+                actor_count
+            );
+            assert!(engine.vm.bytecode.len() > 1000);
+            assert!(engine.compiled.symbols.len() > 100);
+        }
+    }
 }
+

@@ -1,12 +1,12 @@
 # Implementation Plan: Authentic CON Scripting & Full Enemy Roster Expansion
 
 ## Phase 1: Real GAME.CON Parsing & Pipeline Integration
-- [ ] Task: Audit & Enhance Real `GAME.CON` Compilation
-  - [ ] Test compiling `GAME.CON` directly from `duke3d.grp` with `#include` resolution for `DEFS.CON` and `USER.CON`
-  - [ ] Resolve any tokenization or grammar edge cases in `Lexer` and `Compiler` (case insensitivity, comment variations, multi-line string quotes)
-  - [ ] Expand `DEFAULT_CORE_CON_SCRIPT` with comprehensive declarations for all standard actors and actions
-- [ ] Task: Phase 1 Verification & Checkpoint
-  - [ ] Verify `ConScriptEngine::from_grp` compiles the full script with >20 actors and registers all symbols
+- [x] Task: Audit & Enhance Real `GAME.CON` Compilation
+  - [x] Test compiling `GAME.CON` directly from `duke3d.grp` with `#include` resolution for `DEFS.CON` and `USER.CON`
+  - [x] Resolve any tokenization or grammar edge cases in `Lexer` and `Compiler` (case insensitivity, comment variations, multi-line string quotes)
+  - [x] Expand `DEFAULT_CORE_CON_SCRIPT` with comprehensive declarations for all standard actors and actions
+- [x] Task: Phase 1 Verification & Checkpoint
+  - [x] Verify `ConScriptEngine::from_grp` compiles the full script with >20 actors and registers all symbols
 
 ## Phase 2: Full 20+ Enemy Roster Definition & Spawning
 - [ ] Task: Map All Enemy Picnums & State Machines

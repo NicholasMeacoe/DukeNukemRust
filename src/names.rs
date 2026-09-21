@@ -352,6 +352,7 @@ pub const SMALLSMOKEMAKER: i16 = 2330;
 pub const FLOORFLAME: i16 = 2333;
 pub const ROTATEGUN: i16 = 2360;
 pub const GREENSLIME: i16 = 2370;
+pub const SLIMER: i16 = GREENSLIME;
 pub const WATERDRIPSPLASH: i16 = 2380;
 pub const SCRAP6: i16 = 2390;
 pub const SCRAP1: i16 = 2400;

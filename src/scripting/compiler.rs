@@ -130,8 +130,11 @@ impl Compiler {
                             if let Some(loader) = include_loader {
                                 if let Some(included_content) = loader(&filename) {
                                     let mut inc_lexer = Lexer::new(&included_content);
-                                    let inc_tokens = inc_lexer.tokenize()?;
-                                    self.compile_tokens_internal(&inc_tokens, Some(loader))?;
+                                    let inc_tokens = inc_lexer
+                                        .tokenize()
+                                        .map_err(|e| format!("Tokenizing {}: {}", filename, e))?;
+                                    self.compile_tokens_internal(&inc_tokens, Some(loader))
+                                        .map_err(|e| format!("Compiling {}: {}", filename, e))?;
                                 }
                             }
                         }
@@ -144,11 +147,15 @@ impl Compiler {
                         "action" => {
                             pos += 1;
                             let name = self.expect_ident(tokens, &mut pos)?;
-                            let start = self.expect_num_or_symbol(tokens, &mut pos)?;
-                            let num = self.expect_num_or_symbol(tokens, &mut pos)?;
-                            let view = self.expect_num_or_symbol(tokens, &mut pos)?;
-                            let inc = self.expect_num_or_symbol(tokens, &mut pos)?;
-                            let delay = self.expect_num_or_symbol(tokens, &mut pos)?;
+                            let mut params = [0i32; 5];
+                            for param in &mut params {
+                                if pos < tokens.len() && self.is_value(&tokens[pos]) {
+                                    *param = self.expect_num_or_symbol(tokens, &mut pos)?;
+                                } else {
+                                    break;
+                                }
+                            }
+                            let [start, num, view, inc, delay] = params;
 
                             let action_addr = self.bytecode.len();
                             self.bytecode
@@ -168,7 +175,11 @@ impl Compiler {
                         "move" => {
                             pos += 1;
                             let name = self.expect_ident(&tokens, &mut pos)?;
-                            let hvel = self.expect_num_or_symbol(&tokens, &mut pos)?;
+                            let hvel = if pos < tokens.len() && self.is_value(&tokens[pos]) {
+                                self.expect_num_or_symbol(&tokens, &mut pos)?
+                            } else {
+                                0
+                            };
                             let vvel = if pos < tokens.len() && self.is_value(&tokens[pos]) {
                                 self.expect_num_or_symbol(&tokens, &mut pos)?
                             } else {
@@ -638,13 +649,18 @@ impl Compiler {
                     "sizeto" => self.compile_2args(Opcode::SizeTo, tokens, pos)?,
                     "sizeat" => self.compile_2args(Opcode::SizeAt, tokens, pos)?,
 
-                    // 4-argument Commands
+                    // 4-argument Commands (with optional trailing parameters)
                     "palfrom" => {
                         *pos += 1;
-                        let a1 = self.expect_num_or_symbol(tokens, pos)?;
-                        let a2 = self.expect_num_or_symbol(tokens, pos)?;
-                        let a3 = self.expect_num_or_symbol(tokens, pos)?;
-                        let a4 = self.expect_num_or_symbol(tokens, pos)?;
+                        let mut params = [0i32; 4];
+                        for param in &mut params {
+                            if *pos < tokens.len() && self.is_value(&tokens[*pos]) {
+                                *param = self.expect_num_or_symbol(tokens, pos)?;
+                            } else {
+                                break;
+                            }
+                        }
+                        let [a1, a2, a3, a4] = params;
                         self.bytecode
                             .extend_from_slice(&[Opcode::PalFrom as i32, a1, a2, a3, a4]);
                     }
@@ -875,7 +891,12 @@ impl Compiler {
                 _ => {}
             }
         }
-        Err(format!("Expected number or symbol at pos {}", *pos))
+        let token_desc = if *pos < tokens.len() {
+            format!("{:?}", tokens[*pos])
+        } else {
+            "EOF".to_string()
+        };
+        Err(format!("Expected number or symbol at pos {}, found {}", *pos, token_desc))
     }
 
     fn is_value(&self, token: &Token) -> bool {
