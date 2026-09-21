@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use crate::hud::font::{DukeFont, DukeFontRenderer, GlyphDrawCall};
 use crate::player::types::PlayerController;
 use bevy::prelude::*;

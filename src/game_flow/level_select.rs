@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use crate::campaign::episodes::{CampaignMapInfo, ALL_CAMPAIGN_MAPS};
 use crate::game_flow::LoadLevelEvent;
 use bevy::prelude::*;

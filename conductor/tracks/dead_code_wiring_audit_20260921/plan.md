@@ -38,16 +38,16 @@
 - [x] Task: Phase 4 Verification & Checkpoint (Refer to workflow.md)
 
 ## Phase 5: Audio, Save, Game Flow, HUD & CON Scripting Audit
-- [ ] Task: Audit & Clean Audio Subsystem
-  - [ ] Remove `#![allow(dead_code)]` from `src/audio/mod.rs`, `src/audio/sound_defs.rs`
-  - [ ] Verify voice limiter, spatial audio, ambient emitters, and RTS voice triggers are active in `AudioPlugin`
-- [ ] Task: Audit & Clean Save/Load Subsystem
-  - [ ] Remove `#![allow(dead_code)]` from `src/save/mod.rs`, `src/save/format.rs`, `src/save/snapshot.rs`
-  - [ ] Verify 10-slot disk serialization, hotkeys (F2/F3/F6/F9), and sector height restoration
-- [ ] Task: Audit & Clean Game Flow, Campaign & HUD Subsystem
-  - [ ] Remove `#![allow(dead_code)]` from `src/game_flow/*`, `src/campaign/*`, `src/hud/*`
-  - [ ] Verify all UI states (MainMenu, EpisodeSelect, SkillSelect, Playing, Paused, SaveMenu, LoadMenu, Intermission) and HUD elements are connected
-- [ ] Task: Audit & Clean CON Scripting Engine
-  - [ ] Remove `#![allow(dead_code)]` from `src/scripting/types.rs`, `src/scripting/physics.rs`, `src/scripting/mod.rs`, `src/scripting/vm.rs`, `src/scripting/compiler.rs`, `src/scripting/lexer.rs`
-  - [ ] Verify all VM opcode handlers, AST structures, and script physics systems are wired and warning-free
-- [ ] Task: Phase 5 Verification & Checkpoint (Refer to workflow.md)
+- [x] Task: Audit & Clean Audio Subsystem
+  - [x] Remove `#![allow(dead_code)]` from `src/audio/mod.rs`, `src/audio/sound_defs.rs`
+  - [x] Verify voice limiter, spatial audio, ambient emitters, and RTS voice triggers are active in `AudioPlugin`
+- [x] Task: Audit & Clean Save/Load Subsystem
+  - [x] Remove `#![allow(dead_code)]` from `src/save/mod.rs`, `src/save/format.rs`, `src/save/snapshot.rs`
+  - [x] Verify 10-slot disk serialization, hotkeys (F2/F3/F6/F9), and sector height restoration
+- [x] Task: Audit & Clean Game Flow, Campaign & HUD Subsystem
+  - [x] Remove `#![allow(dead_code)]` from `src/game_flow/*`, `src/campaign/*`, `src/hud/*`
+  - [x] Verify all UI states (MainMenu, EpisodeSelect, SkillSelect, Playing, Paused, SaveMenu, LoadMenu, Intermission) and HUD elements are connected
+- [x] Task: Audit & Clean CON Scripting Engine
+  - [x] Remove `#![allow(dead_code)]` from `src/scripting/types.rs`, `src/scripting/physics.rs`, `src/scripting/mod.rs`, `src/scripting/vm.rs`, `src/scripting/compiler.rs`, `src/scripting/lexer.rs`
+  - [x] Verify all VM opcode handlers, AST structures, and script physics systems are wired and warning-free
+- [x] Task: Phase 5 Verification & Checkpoint (Refer to workflow.md)

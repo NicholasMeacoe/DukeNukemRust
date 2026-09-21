@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Token {
     Ident(String),
@@ -9,16 +7,14 @@ pub enum Token {
     RightBrace,
 }
 
-pub struct Lexer<'a> {
-    input: &'a str,
+pub struct Lexer {
     chars: Vec<char>,
     pos: usize,
 }
 
-impl<'a> Lexer<'a> {
-    pub fn new(input: &'a str) -> Self {
+impl Lexer {
+    pub fn new(input: &str) -> Self {
         Self {
-            input,
             chars: input.chars().collect(),
             pos: 0,
         }

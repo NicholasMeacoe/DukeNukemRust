@@ -66,6 +66,7 @@ impl LevelMidiTrack {
 struct TimedNote {
     start_sample: usize,
     end_sample: usize,
+    #[allow(dead_code)]
     channel: u8,
     key: u8,
     velocity: u8,

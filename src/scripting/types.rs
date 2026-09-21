@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 pub const NUM_KEYWORDS: usize = 112;
 pub const MAX_TILES: usize = 6144;
 pub const TICSPERFRAME: i32 = 3;
@@ -343,3 +341,24 @@ pub struct DynamicSoundDef {
     pub sound_type: i32,
     pub volume: i32,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_scripting_constants() {
+        assert_eq!(NUM_KEYWORDS, 112);
+        assert_eq!(NULL_PTR, 0);
+        assert_eq!(MAX_TILES, 6144);
+        assert_eq!(TICSPERFRAME, 3);
+    }
+
+    #[test]
+    fn test_getincangle() {
+        assert_eq!(getincangle(512, 512), 0);
+        assert_eq!(getincangle(50, 100), 50);
+        assert_eq!(getincangle(2040, 0), 8);
+    }
+}
+

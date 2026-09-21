@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum NetMode {
     #[default]

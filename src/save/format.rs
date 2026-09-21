@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use crate::combat::types::{EnemyActor, Projectile};
 use crate::interactivity::props_extended::{DancerProp, SecurityCameraMonitor};
 use crate::interactivity::types::{

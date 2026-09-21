@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use crate::scripting::types::*;
 
 pub struct PhysicsContext<'a> {

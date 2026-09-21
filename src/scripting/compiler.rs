@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use crate::scripting::lexer::{Lexer, Token};
 use crate::scripting::types::*;
 use std::collections::HashMap;

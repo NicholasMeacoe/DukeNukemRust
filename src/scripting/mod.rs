@@ -1,5 +1,3 @@
-#![allow(dead_code, unused_imports)]
-
 pub mod compiler;
 pub mod lexer;
 pub mod physics;

@@ -1,9 +1,5 @@
-#![allow(dead_code)]
-
 use crate::scripting::types::*;
 use rand_chacha::rand_core::Rng;
-
-pub use crate::combat::ai::map_tile_to_projectile;
 
 pub const MAX_CALL_DEPTH: usize = 64;
 
@@ -817,7 +813,6 @@ impl ConVm {
 mod tests {
     use super::*;
     use crate::scripting::compiler::Compiler;
-    use crate::scripting::types::*;
 
     fn create_test_context<'a>(
         reg: &'a mut ActorRegisters,

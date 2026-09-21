@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 pub mod intermission;
 pub mod level_loader;
 pub mod level_select;

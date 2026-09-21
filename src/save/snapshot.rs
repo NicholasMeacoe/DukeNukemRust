@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use crate::save::format::*;
 use std::fs::{self, File};
 use std::io::{Read, Write};

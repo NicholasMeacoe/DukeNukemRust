@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use crate::game_flow::state::*;
 use bevy::prelude::*;
 

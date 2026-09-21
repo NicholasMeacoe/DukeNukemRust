@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CampaignMapInfo {
     pub episode: usize,

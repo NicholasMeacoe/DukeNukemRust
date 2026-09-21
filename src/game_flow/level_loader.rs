@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use crate::builder::MapMeshBuilder;
 use crate::game_flow::state::*;
 use crate::grp::Grp;

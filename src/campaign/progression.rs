@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use crate::campaign::episodes::*;
 use crate::game_flow::state::SkillLevel;
 use bevy::prelude::*;

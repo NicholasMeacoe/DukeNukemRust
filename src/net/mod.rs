@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 pub mod protocol;
 pub mod rng;
 pub mod scoreboard;

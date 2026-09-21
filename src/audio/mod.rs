@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 pub mod midi;
 pub mod rts;
 pub mod sound_defs;

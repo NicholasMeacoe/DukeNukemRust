@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 pub const STARTALPHANUM: i16 = 2822;
 pub const ENDALPHANUM: i16 = 2915;
 pub const BIGALPHANUM: i16 = 2940;

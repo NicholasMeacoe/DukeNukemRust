@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use crate::net::protocol::NetMode;
 use bevy::prelude::*;
 
