@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use crate::combat::types::*;
 use crate::player::types::PlayerController;
 use crate::scripting::{getincangle, move_flags, ConActor, ConScriptEngine, VmActorContext};

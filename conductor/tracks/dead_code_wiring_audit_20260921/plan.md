@@ -29,13 +29,13 @@
 - [x] Task: Phase 3 Verification & Checkpoint (Refer to workflow.md)
 
 ## Phase 4: Combat, Projectiles & AI Audit
-- [ ] Task: Audit & Clean Combat Types & Projectiles
-  - [ ] Remove `#![allow(dead_code)]` from `src/combat/types.rs`, `src/combat/projectiles.rs`, `src/combat/mod.rs`
-  - [ ] Verify all projectile types (rocket, pipebomb, shrinker ray, freezer blast, bullet tracer, spit) have active spawn/update/collision loops
-- [ ] Task: Audit & Clean AI, Gore & Decals
-  - [ ] Remove `#![allow(dead_code)]` from `src/combat/ai.rs`, `src/combat/gore.rs`, `src/combat/decals.rs`
-  - [ ] Wire all enemy AI state machines (patrol, seek, attack, dodge, pain, die, gib) and decal spawning into Bevy `CombatPlugin`
-- [ ] Task: Phase 4 Verification & Checkpoint (Refer to workflow.md)
+- [x] Task: Audit & Clean Combat Types & Projectiles
+  - [x] Remove `#![allow(dead_code)]` from `src/combat/types.rs`, `src/combat/projectiles.rs`, `src/combat/mod.rs`
+  - [x] Verify all projectile types (rocket, pipebomb, shrinker ray, freezer blast, bullet tracer, spit) have active spawn/update/collision loops
+- [x] Task: Audit & Clean AI, Gore & Decals
+  - [x] Remove `#![allow(dead_code)]` from `src/combat/ai.rs`, `src/combat/gore.rs`, `src/combat/decals.rs`
+  - [x] Wire all enemy AI state machines (patrol, seek, attack, dodge, pain, die, gib) and decal spawning into Bevy `CombatPlugin`
+- [x] Task: Phase 4 Verification & Checkpoint (Refer to workflow.md)
 
 ## Phase 5: Audio, Save, Game Flow, HUD & CON Scripting Audit
 - [ ] Task: Audit & Clean Audio Subsystem

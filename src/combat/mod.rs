@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 pub mod ai;
 pub mod decals;
 pub mod gore;

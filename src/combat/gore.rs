@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use crate::combat::types::GibEvent;
 use bevy::prelude::*;
 

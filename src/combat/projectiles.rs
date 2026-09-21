@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use crate::combat::types::*;
 use crate::interactivity::types::ExplosionDamageEvent;
 use crate::player::types::PlayerController;
