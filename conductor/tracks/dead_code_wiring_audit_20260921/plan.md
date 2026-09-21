@@ -1,14 +1,14 @@
 # Implementation Plan: Codebase Dead Code & System Wiring Audit
 
 ## Phase 1: Parsers, Formats & Assets Audit
-- [ ] Task: Audit & Clean Asset Modules
-  - [ ] Remove `#![allow(dead_code)]` from `src/art.rs`, `src/palette.rs`, `src/animation.rs`, `src/kwv.rs`, `src/config.rs`, `src/names.rs`
-  - [ ] Remove `#![allow(dead_code)]` from `src/audio/voc.rs`, `src/audio/rts.rs`, `src/audio/midi.rs`
-  - [ ] Wire or test any uncalled parsing utilities; add targeted `#[allow(dead_code)]` only to authentic Build binary struct fields
-- [ ] Task: Audit & Clean Map & Demo Formats
-  - [ ] Remove `#![allow(dead_code)]` from `src/map.rs`, `src/demo/format.rs`, `src/demo/mod.rs`, `src/demo/player.rs`, `src/demo/recorder.rs`, `src/demo/attract.rs`
-  - [ ] Verify demo player/recorder integration paths
-- [ ] Task: Phase 1 Verification & Checkpoint (Refer to workflow.md)
+- [x] Task: Audit & Clean Asset Modules
+  - [x] Remove `#![allow(dead_code)]` from `src/art.rs`, `src/palette.rs`, `src/animation.rs`, `src/kwv.rs`, `src/config.rs`, `src/names.rs`
+  - [x] Remove `#![allow(dead_code)]` from `src/audio/voc.rs`, `src/audio/rts.rs`, `src/audio/midi.rs`
+  - [x] Wire or test any uncalled parsing utilities; add targeted `#[allow(dead_code)]` only to authentic Build binary struct fields
+- [x] Task: Audit & Clean Map & Demo Formats
+  - [x] Remove `#![allow(dead_code)]` from `src/map.rs`, `src/demo/format.rs`, `src/demo/mod.rs`, `src/demo/player.rs`, `src/demo/recorder.rs`, `src/demo/attract.rs`
+  - [x] Verify demo player/recorder integration paths
+- [x] Task: Phase 1 Verification & Checkpoint (Refer to workflow.md)
 
 ## Phase 2: Player Controller, Movement & Weapons Audit
 - [ ] Task: Audit & Clean Player Core & Movement

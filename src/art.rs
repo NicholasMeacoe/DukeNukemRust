@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use crate::palette::Palette;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -278,5 +277,27 @@ mod tests {
         bad_range.extend_from_slice(&100u32.to_le_bytes()); // start = 100
         bad_range.extend_from_slice(&50u32.to_le_bytes()); // end = 50
         assert!(Art::from_bytes(&bad_range).is_err());
+    }
+
+    #[test]
+    fn test_get_tile_rgba_with_pal() {
+        let palette = Palette::from_bytes(&vec![32u8; 768]).unwrap();
+        let art = Art {
+            local_tile_start: 10,
+            local_tile_end: 10,
+            tiles: vec![Some(Tile {
+                width: 2,
+                height: 2,
+                data: vec![0, 1, 2, 3],
+                picanm: PicAnm::default(),
+            })],
+        };
+
+        let result = art.get_tile_rgba_with_pal(10, &palette, 0);
+        assert!(result.is_some());
+        let (w, h, rgba) = result.unwrap();
+        assert_eq!(w, 2);
+        assert_eq!(h, 2);
+        assert_eq!(rgba.len(), 16);
     }
 }

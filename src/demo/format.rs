@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 pub const DEMO_BYTEVERSION: u8 = 116;
 
 pub mod demo_bits {

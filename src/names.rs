@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 //-------------------------------------------------------------------------
 // Build Engine & Duke Nukem 3D Tile / Sprite / Actor Symbolic Constants
 // Directly ported from 1996 3D Realms NAMES.H

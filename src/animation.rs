@@ -1,7 +1,5 @@
-#![allow(dead_code)]
 use crate::art::PicAnm;
 use bevy::prelude::*;
-use std::collections::HashMap;
 
 #[derive(Resource)]
 pub struct EngineClock {
@@ -24,11 +22,6 @@ pub struct AnimatedTileMaterial {
     pub picanm: PicAnm,
     pub current_offset: i32,
     pub material_handle: Handle<StandardMaterial>,
-}
-
-#[derive(Resource, Default)]
-pub struct TileAnmRegistry {
-    pub picanm_map: HashMap<i16, PicAnm>,
 }
 
 pub fn update_engine_clock(time: Res<Time>, mut clock: ResMut<EngineClock>) {

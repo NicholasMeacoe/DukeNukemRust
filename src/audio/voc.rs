@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use hound::{SampleFormat, WavSpec, WavWriter};
 use std::io::Cursor;
 

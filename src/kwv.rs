@@ -1,9 +1,9 @@
-#![allow(dead_code)]
 use hound::{SampleFormat, WavSpec, WavWriter};
 use std::io::{Cursor, Read};
 
 #[derive(Debug)]
 pub struct KvvWave {
+    #[allow(dead_code)]
     pub name: String,
     pub data: Vec<u8>,
     pub sample_rate: u32,

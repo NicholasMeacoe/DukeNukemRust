@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use bevy::prelude::*;
 use std::collections::HashMap;
 
@@ -135,9 +134,7 @@ impl Palette {
 
     /// Compute distance-based depth shade matching Build engine visibility decay
     pub fn compute_depth_shade(base_shade: i8, distance: f32, visibility: f32) -> i8 {
-        let decay = (distance * visibility * 0.25) as i32;
-        let final_shade = (base_shade as i32 + decay).clamp(0, 31);
-        final_shade as i8
+        Self::calculate_build_distance_shade(base_shade, distance, visibility)
     }
 
     /// Convert Build engine signed shade (-128..127) into a RGBA tint factor [0.0..1.0] for Bevy vertex color modulation.
@@ -339,6 +336,26 @@ mod tests {
         config.scanline_intensity = 0.5;
         assert!(config.enabled);
         assert_eq!(config.scanline_intensity, 0.5);
+    }
+
+    #[test]
+    fn test_palette_flash_state_tint_and_tick() {
+        let mut flash = PaletteFlashState::default();
+        assert_eq!(flash.compute_screen_tint(), [1.0, 1.0, 1.0, 0.0]);
+
+        flash.red_flash = 1.0;
+        let tint = flash.compute_screen_tint();
+        assert!(tint[0] > 1.5, "Red channel must brighten with red flash");
+        assert!(tint[3] > 0.5, "Alpha must increase with flash");
+
+        flash.tick(0.5);
+        assert!(flash.red_flash < 1.0, "Flash must decay with tick");
+    }
+
+    #[test]
+    fn test_palette_compute_depth_shade() {
+        let shade = Palette::compute_depth_shade(0, 10.0, 1.0);
+        assert!(shade > 0);
     }
 }
 

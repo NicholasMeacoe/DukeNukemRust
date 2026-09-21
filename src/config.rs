@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use bevy::prelude::*;
 use std::fs::File;
 use std::io::{Read, Write};

@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use hound::{SampleFormat, WavSpec, WavWriter};
 use midly::{MetaMessage, MidiMessage, Smf, Timing, TrackEventKind};
 use std::collections::HashMap;

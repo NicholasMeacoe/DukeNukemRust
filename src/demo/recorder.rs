@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use crate::demo::format::*;
 use std::fs::File;
 use std::io::Write;

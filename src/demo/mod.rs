@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 pub mod attract;
 pub mod format;
 pub mod player;
