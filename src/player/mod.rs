@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 pub mod cheats;
 pub mod console;
 pub mod inventory;

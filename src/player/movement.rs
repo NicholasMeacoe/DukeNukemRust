@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use crate::audio::PlaySoundEvent;
 use crate::player::types::*;
 use bevy::prelude::*;

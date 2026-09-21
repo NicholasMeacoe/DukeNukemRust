@@ -11,13 +11,13 @@
 - [x] Task: Phase 1 Verification & Checkpoint (Refer to workflow.md)
 
 ## Phase 2: Player Controller, Movement & Weapons Audit
-- [ ] Task: Audit & Clean Player Core & Movement
-  - [ ] Remove `#![allow(dead_code)]` from `src/player/mod.rs`, `src/player/types.rs`, `src/player/movement.rs`
-  - [ ] Verify player crouch, swim, jump, and slope adherence systems are registered in `PlayerPlugin`
-- [ ] Task: Audit & Clean Weapons, Inventory & Console
-  - [ ] Remove `#![allow(dead_code)]` from `src/player/inventory.rs`, `src/player/weapons.rs`, `src/player/console.rs`
-  - [ ] Wire all 10 weapon fire/tick handlers and inventory consumption routines; eliminate orphaned helpers
-- [ ] Task: Phase 2 Verification & Checkpoint (Refer to workflow.md)
+- [x] Task: Audit & Clean Player Core & Movement
+  - [x] Remove `#![allow(dead_code)]` from `src/player/mod.rs`, `src/player/types.rs`, `src/player/movement.rs`
+  - [x] Verify player crouch, swim, jump, and slope adherence systems are registered in `PlayerPlugin`
+- [x] Task: Audit & Clean Weapons, Inventory & Console
+  - [x] Remove `#![allow(dead_code)]` from `src/player/inventory.rs`, `src/player/weapons.rs`, `src/player/console.rs`
+  - [x] Wire all 10 weapon fire/tick handlers and inventory consumption routines; eliminate orphaned helpers
+- [x] Task: Phase 2 Verification & Checkpoint (Refer to workflow.md)
 
 ## Phase 3: Interactivity, Effectors, Props & Wall Damage Audit
 - [ ] Task: Audit & Clean Interactivity Core & Types

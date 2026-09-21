@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use crate::audio::PlaySoundEvent;
 use crate::combat::types::{LaserTripwireBeam, Projectile, ProjectileType, SpawnProjectileEvent};
 use crate::interactivity::types::ExplosionDamageEvent;
