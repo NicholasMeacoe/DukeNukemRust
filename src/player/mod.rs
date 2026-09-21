@@ -29,6 +29,7 @@ impl Plugin for PlayerPlugin {
                         handle_weapon_firing,
                         update_laser_tripbombs,
                         update_player_pickups,
+                        update_hazard_sectors,
                     )
                         .in_set(crate::GameSet::Combat),
                     (update_inventory_timers, update_first_person_viewmodel)
@@ -634,6 +635,61 @@ mod tests {
             }
         }
         assert_eq!(god_player.health, 100);
+    }
+
+    #[test]
+    fn test_hazard_sectors_damage_and_boot_protection() {
+        let mut app = App::new();
+        app.add_event::<crate::audio::PlaySoundEvent>()
+            .init_resource::<Time>()
+            .init_resource::<crate::hud::ScreenTintState>()
+            .add_systems(Update, movement::update_hazard_sectors);
+
+        // 1. Player without boots in hazard sector takes damage
+        let mut player = PlayerController::default();
+        player.health = 100;
+        player.inventory.boots_amount = 0;
+
+        let player_entity = app.world_mut().spawn((
+            player,
+            TransformBundle::from_transform(Transform::from_xyz(0.0, 0.0, 0.0)),
+        )).id();
+
+        // Spawn hazard sector (slime or fire)
+        app.world_mut().spawn((
+            HazardSector { damage_per_sec: 20.0 },
+            TransformBundle::from_transform(Transform::from_xyz(0.0, 0.0, 0.5)),
+        ));
+
+        // Advance time by 0.5s
+        {
+            let mut time = app.world_mut().resource_mut::<Time>();
+            time.advance_by(std::time::Duration::from_millis(500));
+        }
+        app.update();
+
+        let updated_player = app.world().get::<PlayerController>(player_entity).unwrap();
+        assert!(
+            updated_player.health < 100,
+            "Player without boots standing on hazard sector must take damage"
+        );
+
+        // 2. Player WITH boots has hazard damage absorbed by boots
+        {
+            let mut p = app.world_mut().get_mut::<PlayerController>(player_entity).unwrap();
+            p.health = 100;
+            p.inventory.boots_amount = 100;
+            let mut time = app.world_mut().resource_mut::<Time>();
+            time.advance_by(std::time::Duration::from_millis(500));
+        }
+        app.update();
+
+        let protected_player = app.world().get::<PlayerController>(player_entity).unwrap();
+        assert_eq!(
+            protected_player.health, 100,
+            "Boots must protect player from hazard sector damage"
+        );
+        assert_eq!(protected_player.inventory.boots_amount, 99);
     }
 }
 

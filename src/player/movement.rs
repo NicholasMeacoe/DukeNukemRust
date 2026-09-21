@@ -306,3 +306,44 @@ pub fn update_player_movement(
         controller.translation = Some(horizontal_movement + vertical_movement);
     }
 }
+
+pub fn update_hazard_sectors(
+    time: Res<Time>,
+    hazards: Query<(&Transform, &HazardSector)>,
+    mut player_query: Query<(&Transform, &mut PlayerController)>,
+    mut sound_events: EventWriter<PlaySoundEvent>,
+    mut tint: Option<ResMut<crate::hud::ScreenTintState>>,
+    mut last_hurt_sound: Local<f32>,
+) {
+    let Ok((p_trans, mut player)) = player_query.get_single_mut() else {
+        return;
+    };
+    if player.god_mode || player.health <= 0 {
+        return;
+    }
+
+    *last_hurt_sound += time.delta_seconds();
+    let dt = time.delta_seconds();
+    let p_pos = p_trans.translation;
+
+    for (h_trans, hazard) in hazards.iter() {
+        let dist_xz = Vec2::new(h_trans.translation.x - p_pos.x, h_trans.translation.z - p_pos.z).length();
+        let dist_y = (h_trans.translation.y - p_pos.y).abs();
+        if dist_xz <= 1.5 && dist_y <= 1.2 {
+            // Boots protect from toxic floor slime / acid / flame until depleted
+            if player.inventory.boots_amount > 0 {
+                player.inventory.boots_amount = player.inventory.boots_amount.saturating_sub(1);
+            } else {
+                let dmg = (hazard.damage_per_sec * dt).max(1.0) as i32;
+                player.health = player.health.saturating_sub(dmg);
+                if *last_hurt_sound >= 0.8 {
+                    *last_hurt_sound = 0.0;
+                    sound_events.send(PlaySoundEvent { sound_id: 37 }); // DUKE_PAIN
+                    if let Some(ref mut t) = tint {
+                        t.target_color = Color::srgba(0.8, 0.4, 0.0, 0.4);
+                    }
+                }
+            }
+        }
+    }
+}

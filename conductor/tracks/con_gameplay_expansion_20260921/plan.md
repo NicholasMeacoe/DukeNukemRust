@@ -25,11 +25,11 @@
   - [x] Unit tests verifying Battlelord combat behavior, mortar fire, and boss death triggering level victory
 
 ## Phase 4: Environmental Actors & Polish
-- [ ] Task: Ambient Actors & Explosions
-  - [ ] Add non-AI ambient actor loops (rats, debris, fire hazards, radioactive barrels)
-  - [ ] Connect `palfrom` screen tinting to major explosions
-- [ ] Task: Phase 4 Verification & Checkpoint
-  - [ ] Verify ambient actors and explosion effects tick without errors
+- [x] Task: Ambient Actors & Explosions
+  - [x] Add non-AI ambient actor loops (rats, debris, fire hazards, radioactive barrels)
+  - [x] Connect `palfrom` screen tinting to major explosions
+- [x] Task: Phase 4 Verification & Checkpoint
+  - [x] Verify ambient actors and explosion effects tick without errors
 
 ## Phase 5: Verification, Integration & Review
 - [ ] Task: Comprehensive Test Suite & Warning Audit

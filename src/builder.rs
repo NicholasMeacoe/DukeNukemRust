@@ -1208,8 +1208,8 @@ impl<'a> MapMeshBuilder<'a> {
                             base_yaw: sprite.ang as f32,
                         });
                     }
-                    // EXPLODING BARREL
-                    EXPLODINGBARREL | EXPLODINGBARREL2 | FIREBARREL => {
+                    // EXPLODING BARREL & RADIOACTIVE BARRELS
+                    EXPLODINGBARREL | EXPLODINGBARREL2 | FIREBARREL | NUKEBARREL | NUKEBARRELDENTED | NUKEBARRELLEAKED => {
                         entity_cmds.insert(crate::interactivity::ExplodingBarrel {
                             health: 20,
                             damage_radius: 6.0,
@@ -1433,12 +1433,17 @@ impl<'a> MapMeshBuilder<'a> {
                             crate::scripting::ConActor::new(RAT, sprite.sectnum, sprite.ang, 5),
                         ));
                     }
-                    // 14. Toxic Slime Hazard (OOZ, OOZ2)
-                    OOZ | OOZ2 => {
+                    // 14. Toxic Slime Hazard (OOZ, OOZ2) & Fire Hazards
+                    OOZ | OOZ2 | BURNING | FIRE | BURNING2 | FIRE2 | FLOORFLAME => {
+                        let dmg_rate = if matches!(sprite.picnum, BURNING | FIRE | BURNING2 | FIRE2 | FLOORFLAME) {
+                            30.0
+                        } else {
+                            20.0
+                        };
                         entity_cmds.insert((
                             crate::combat::EnemyActor::new_slime_hazard(),
                             crate::player::types::HazardSector {
-                                damage_per_sec: 20.0,
+                                damage_per_sec: dmg_rate,
                             },
                         ));
                     }

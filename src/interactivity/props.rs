@@ -308,6 +308,11 @@ pub fn handle_explosions(
     for exp in explosion_events.read() {
         let origin = exp.origin;
 
+        // Screen tint flash on major explosion
+        if let Some(ref mut t) = tint {
+            t.target_color = Color::srgba(1.0, 0.65, 0.15, 0.65);
+        }
+
         // 1. Damage Player with 4-tier hitradius falloff and armor mitigation
         for (p_trans, mut player) in players.iter_mut() {
             let dist = p_trans.translation.distance(origin);
@@ -500,5 +505,57 @@ mod tests {
         // Outside radius -> 0 damage
         assert_eq!(calculate_hitradius_damage(10.1, radius, max_dmg), 0);
         assert_eq!(calculate_hitradius_damage(15.0, radius, max_dmg), 0);
+    }
+
+    #[test]
+    fn test_explosion_screen_tint_and_radioactive_barrels() {
+        let mut app = App::new();
+        app.add_event::<ExplosionDamageEvent>()
+            .add_event::<BarrelExplodeEvent>()
+            .add_event::<ActivateTagEvent>()
+            .add_event::<PlaySoundEvent>()
+            .add_event::<crate::combat::GibEvent>()
+            .init_resource::<crate::hud::ScreenTintState>()
+            .add_systems(Update, handle_explosions);
+
+        // Spawn a radioactive barrel entity
+        let barrel_entity = app.world_mut().spawn((
+            ExplodingBarrel {
+                health: 20,
+                damage_radius: 6.0,
+                damage: 100,
+                is_exploded: false,
+            },
+            TransformBundle::from_transform(Transform::from_xyz(0.0, 0.0, 2.0)),
+        )).id();
+
+        // Trigger an explosion near the barrel
+        app.world_mut().send_event(ExplosionDamageEvent {
+            origin: Vec3::new(0.0, 0.0, 0.0),
+            radius: 5.0,
+            damage: 50,
+        });
+
+        app.update();
+
+        // 1. Verify screen tint triggered
+        let tint = app.world().resource::<crate::hud::ScreenTintState>();
+        assert!(
+            tint.target_color.alpha() > 0.0,
+            "Explosion must trigger screen tint flash"
+        );
+
+        // 2. Verify radioactive barrel detonated
+        let barrel_events = app.world().resource::<Events<BarrelExplodeEvent>>();
+        let mut barrel_reader = barrel_events.get_reader();
+        let explodes: Vec<_> = barrel_reader.read(barrel_events).cloned().collect();
+        assert_eq!(
+            explodes.len(),
+            1,
+            "Explosion must detonate nearby radioactive barrel"
+        );
+
+        // 3. Verify barrel entity despawned
+        assert!(app.world().get_entity(barrel_entity).is_none());
     }
 }

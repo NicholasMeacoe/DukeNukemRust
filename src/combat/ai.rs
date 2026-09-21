@@ -38,15 +38,24 @@ pub fn update_con_actors(
         ),
     >,
     rapier_context: Option<Res<RapierContext>>,
-    mut projectile_events: EventWriter<SpawnProjectileEvent>,
-    mut sound_events: EventWriter<crate::audio::PlaySoundEvent>,
-    mut duke_voice_events: EventWriter<crate::audio::PlayDukeVoiceEvent>,
-    mut explosion_events: EventWriter<crate::interactivity::ExplosionDamageEvent>,
-    mut gib_events: EventWriter<GibEvent>,
+    (
+        mut projectile_events,
+        mut sound_events,
+        mut duke_voice_events,
+        mut explosion_events,
+        mut gib_events,
+    ): (
+        EventWriter<SpawnProjectileEvent>,
+        EventWriter<crate::audio::PlaySoundEvent>,
+        EventWriter<crate::audio::PlayDukeVoiceEvent>,
+        EventWriter<crate::interactivity::ExplosionDamageEvent>,
+        EventWriter<GibEvent>,
+    ),
     mut rng: ResMut<crate::net::DeterministicRng>,
     sector_map: Option<Res<crate::sector_map::SectorMap>>,
     mut camera_shake: Option<ResMut<crate::interactivity::EarthquakeCameraShake>>,
     level_progress: Option<Res<crate::game_flow::LevelProgress>>,
+    mut screen_tint: Option<ResMut<crate::hud::ScreenTintState>>,
 ) {
     let Some(engine) = script_engine else {
         return;
@@ -319,6 +328,7 @@ pub fn update_con_actors(
         let sound_events_out = std::mem::take(&mut ctx.sound_events);
         let debris_events = std::mem::take(&mut ctx.debris_events);
         let hitradius_events = std::mem::take(&mut ctx.hitradius_events);
+        let pal_flashes = std::mem::take(&mut ctx.pal_flashes);
         let end_of_game = ctx.end_of_game;
         drop(ctx);
 
@@ -462,10 +472,20 @@ pub fn update_con_actors(
                 }
             }
 
-            // Rat scampering behavior (flees away from player within 5.0m)
-            if enemy.kind == EnemyKind::ScamperingRat && dist_to_player <= 5.0 {
-                let flee_dir = -dir_to_player.with_y(0.0).normalize_or_zero();
-                trans.translation += flee_dir * (enemy.speed * dt);
+            // Rat scampering behavior (flees away from player within 5.0m, or ambient scurrying)
+            if enemy.kind == EnemyKind::ScamperingRat {
+                if dist_to_player <= 5.0 {
+                    let flee_dir = -dir_to_player.with_y(0.0).normalize_or_zero();
+                    trans.translation += flee_dir * (enemy.speed * dt);
+                } else {
+                    enemy.attack_timer += dt;
+                    if enemy.attack_timer >= 1.5 {
+                        enemy.attack_timer = 0.0;
+                        let angle = rng.next_f32() * std::f32::consts::TAU;
+                        enemy.velocity = Vec3::new(angle.cos(), 0.0, angle.sin()) * 2.0;
+                    }
+                    trans.translation += enemy.velocity * dt;
+                }
             }
 
             // Turret tracking and continuous firing
@@ -588,6 +608,16 @@ pub fn update_con_actors(
                 radius: radius as f32 / 1024.0,
                 damage: dmg,
             });
+        }
+
+        // Handle Palette Flash / Screen Tint Events from CON Script
+        for (_duration, r, g, b) in pal_flashes {
+            if let Some(ref mut tint) = screen_tint {
+                let rf = (r as f32 / 64.0).clamp(0.0, 1.0);
+                let gf = (g as f32 / 64.0).clamp(0.0, 1.0);
+                let bf = (b as f32 / 64.0).clamp(0.0, 1.0);
+                tint.target_color = Color::srgba(rf, gf, bf, 0.75);
+            }
         }
 
         let mut final_movement = Vec3::new(0.0, vertical_movement, 0.0);
