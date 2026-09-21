@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 pub mod effectors;
 pub mod props;
 pub mod props_extended;
@@ -27,7 +25,6 @@ impl Plugin for InteractivityPlugin {
             .add_event::<ExplosionDamageEvent>()
             .add_event::<BarrelExplodeEvent>()
             .add_event::<PlayerHealEvent>()
-            .add_event::<PlaySoundEvent>()
             .add_event::<WallDamageEvent>()
             .add_systems(
                 Update,

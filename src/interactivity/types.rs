@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use bevy::prelude::*;
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -411,10 +409,7 @@ pub struct PlayerHealEvent {
     pub amount: i32,
 }
 
-#[derive(Event, Debug, Clone)]
-pub struct PlaySoundEvent {
-    pub sound_id: i32,
-}
+pub use crate::audio::PlaySoundEvent;
 
 #[derive(Event, Debug, Clone)]
 pub struct BarrelExplodeEvent {
@@ -487,5 +482,28 @@ impl EarthquakeCameraShake {
             intensity: 0.0,
             offset: Vec3::ZERO,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_carrier_platform_constructors() {
+        let p1 = CarrierPlatform::new(Vec3::new(1.0, 2.0, 3.0));
+        assert_eq!(p1.velocity, Vec3::new(1.0, 2.0, 3.0));
+        assert_eq!(p1.sector_idx, None);
+
+        let p2 = CarrierPlatform::with_sector(Vec3::Y, 5);
+        assert_eq!(p2.velocity, Vec3::Y);
+        assert_eq!(p2.sector_idx, Some(5));
+    }
+
+    #[test]
+    fn test_earthquake_camera_shake_new() {
+        let shake = EarthquakeCameraShake::new();
+        assert_eq!(shake.intensity, 0.0);
+        assert_eq!(shake.offset, Vec3::ZERO);
     }
 }

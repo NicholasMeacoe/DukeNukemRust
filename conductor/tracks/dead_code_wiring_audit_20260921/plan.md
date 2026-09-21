@@ -20,13 +20,13 @@
 - [x] Task: Phase 2 Verification & Checkpoint (Refer to workflow.md)
 
 ## Phase 3: Interactivity, Effectors, Props & Wall Damage Audit
-- [ ] Task: Audit & Clean Interactivity Core & Types
-  - [ ] Remove `#![allow(dead_code)]` from `src/interactivity/mod.rs`, `src/interactivity/types.rs`, `src/sector_map.rs`
-  - [ ] Ensure all switch, activator, and touchplate handlers are registered in `InteractivityPlugin`
-- [ ] Task: Audit & Clean Props, Effectors & Wall Damage
-  - [ ] Remove `#![allow(dead_code)]` from `src/interactivity/props.rs`, `src/interactivity/effectors.rs`, `src/interactivity/wall_damage.rs`
-  - [ ] Verify all 30+ sector effector kinds (doors, lifts, subways, rotators, water, earthquakes) are dispatched without unhandled dead variants
-- [ ] Task: Phase 3 Verification & Checkpoint (Refer to workflow.md)
+- [x] Task: Audit & Clean Interactivity Core & Types
+  - [x] Remove `#![allow(dead_code)]` from `src/interactivity/mod.rs`, `src/interactivity/types.rs`, `src/sector_map.rs`
+  - [x] Ensure all switch, activator, and touchplate handlers are registered in `InteractivityPlugin`
+- [x] Task: Audit & Clean Props, Effectors & Wall Damage
+  - [x] Remove `#![allow(dead_code)]` from `src/interactivity/props.rs`, `src/interactivity/effectors.rs`, `src/interactivity/wall_damage.rs`
+  - [x] Verify all 30+ sector effector kinds (doors, lifts, subways, rotators, water, earthquakes) are dispatched without unhandled dead variants
+- [x] Task: Phase 3 Verification & Checkpoint (Refer to workflow.md)
 
 ## Phase 4: Combat, Projectiles & AI Audit
 - [ ] Task: Audit & Clean Combat Types & Projectiles

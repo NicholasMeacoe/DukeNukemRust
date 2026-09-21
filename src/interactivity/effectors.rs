@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use crate::interactivity::types::*;
 use bevy::prelude::*;
 use std::collections::HashMap;
