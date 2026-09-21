@@ -119,8 +119,10 @@ define OCTABRAIN 1820
 define ENFORCER 2120
 define FIRELASER 1625
 define SPIT 1636
-define SHOTGUN 2605
-define CHAINGUN 2548
+define CHAINGUN 2536
+define FREEZE 2548
+define RPG 2605
+define SHOTGUN 2613
 define RECON 1960
 define GREENSLIME 2370
 define SLIMER 2370
@@ -202,7 +204,6 @@ ai AICOMMATTACK ACOMMATTACK COMMSTOP face_player
 
 // BOSS1 (Battlelord) Actions & Moves
 define BOSS1 2630
-define RPG 2605
 action ABOSS1STAND 0 1 5 1 1
 action ABOSS1WALK 0 4 5 1 16
 action ABOSS1ATTACK 20 2 5 1 10

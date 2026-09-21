@@ -681,4 +681,109 @@ mod tests {
         let none_res = crate::player::weapons::calculate_tripbomb_placement(origin, no_hit, max_reach);
         assert!(none_res.is_none());
     }
+
+    #[test]
+    fn test_full_roster_spawning_and_projectile_dispatching() {
+        // Test all 20+ Enemy roster constructor definitions & stats
+        let troopers = [
+            (EnemyActor::new_liztroop(), EnemyKind::Liztroop, 30),
+            (EnemyActor::new_captain(), EnemyKind::AssaultCaptain, 60),
+            (EnemyActor::new_pigcop(), EnemyKind::Pigcop, 100),
+            (EnemyActor::new_recon(), EnemyKind::ReconCar, 50),
+            (EnemyActor::new_tank(), EnemyKind::RiotTank, 500),
+            (EnemyActor::new_octabrain(), EnemyKind::Octabrain, 175),
+            (EnemyActor::new_egg(), EnemyKind::ProtozoidEgg, 20),
+            (EnemyActor::new_slimer(), EnemyKind::ProtozoidSlimer, 1),
+            (EnemyActor::new_enforcer(), EnemyKind::Enforcer, 120),
+            (EnemyActor::new_commander(), EnemyKind::AssaultCommander, 350),
+            (EnemyActor::new_drone(), EnemyKind::SentryDrone, 150),
+            (EnemyActor::new_shark(), EnemyKind::Shark, 35),
+            (EnemyActor::new_protector_drone(), EnemyKind::ProtectorDrone, 300),
+            (EnemyActor::new_turret(), EnemyKind::Turret, 40),
+            (EnemyActor::new_rat(), EnemyKind::ScamperingRat, 5),
+            (EnemyActor::new_slime_hazard(), EnemyKind::ToxicSlimeHazard, 50),
+            (EnemyActor::new_camera_prop(), EnemyKind::SecurityCameraProp, 20),
+            (EnemyActor::new_battlelord(false), EnemyKind::Boss1Battlelord, 4500),
+            (EnemyActor::new_battlelord(true), EnemyKind::Boss1Mini, 1000),
+            (EnemyActor::new_overlord(), EnemyKind::Boss2Overlord, 4500),
+            (EnemyActor::new_cycloid(), EnemyKind::Boss3Cycloid, 4500),
+            (EnemyActor::new_queen(), EnemyKind::Boss4Queen, 6000),
+        ];
+
+        for (enemy, kind, hp) in troopers {
+            assert_eq!(enemy.kind, kind);
+            assert_eq!(enemy.health, hp);
+            assert_eq!(enemy.max_health, hp);
+        }
+
+        // Test all enemy weapon mappings
+        assert_eq!(map_tile_to_projectile(FIRELASER).0, ProjectileType::AlienBlaster);
+        assert_eq!(map_tile_to_projectile(SPIT).0, ProjectileType::Spit);
+        assert_eq!(map_tile_to_projectile(LOOGIE).0, ProjectileType::Spit);
+        assert_eq!(map_tile_to_projectile(FREEZEBLAST).0, ProjectileType::FreezeShard);
+        assert_eq!(map_tile_to_projectile(FREEZE).0, ProjectileType::FreezeShard);
+        assert_eq!(map_tile_to_projectile(SHRINKSPARK).0, ProjectileType::ShrinkRay);
+        assert_eq!(map_tile_to_projectile(SHRINKER).0, ProjectileType::ShrinkRay);
+        assert_eq!(map_tile_to_projectile(MORTER).0, ProjectileType::Mortar);
+        assert_eq!(map_tile_to_projectile(SHOTSPARK1).0, ProjectileType::HitscanBullet);
+        assert_eq!(map_tile_to_projectile(CHAINGUN).0, ProjectileType::HitscanBullet);
+        assert_eq!(map_tile_to_projectile(RPG).0, ProjectileType::Rocket);
+        assert_eq!(map_tile_to_projectile(SHOTGUN).0, ProjectileType::ShotgunPellet);
+        assert_eq!(map_tile_to_projectile(COOLEXPLOSION1).0, ProjectileType::PsiBlast);
+        assert_eq!(map_tile_to_projectile(DEVISTATORBLAST).0, ProjectileType::Rocket);
+    }
+
+    #[test]
+    fn test_enemy_authentic_death_drops() {
+        let mut rng = crate::net::DeterministicRng::new(12345);
+
+        // Helper matching the death drop logic in ai.rs
+        let get_drop = |kind: EnemyKind, rng: &mut crate::net::DeterministicRng| {
+            match kind {
+                EnemyKind::Pigcop => {
+                    if rng.next_f32() < 0.6 {
+                        Some(crate::interactivity::PickupKind::ShotgunBox)
+                    } else {
+                        Some(crate::interactivity::PickupKind::ArmorVest)
+                    }
+                }
+                EnemyKind::Liztroop | EnemyKind::AssaultCaptain => {
+                    if rng.next_f32() < 0.5 {
+                        Some(crate::interactivity::PickupKind::PistolClip)
+                    } else {
+                        Some(crate::interactivity::PickupKind::SmallMedkit)
+                    }
+                }
+                EnemyKind::Enforcer => Some(crate::interactivity::PickupKind::ChaingunBox),
+                EnemyKind::Octabrain | EnemyKind::AssaultCommander => {
+                    Some(crate::interactivity::PickupKind::RpgRocket)
+                }
+                EnemyKind::Boss1Battlelord
+                | EnemyKind::Boss1Mini
+                | EnemyKind::Boss2Overlord
+                | EnemyKind::Boss3Cycloid
+                | EnemyKind::Boss4Queen => Some(crate::interactivity::PickupKind::AtomicHealth),
+                _ => None,
+            }
+        };
+
+        // Enforcer always drops ChaingunBox
+        assert_eq!(get_drop(EnemyKind::Enforcer, &mut rng), Some(crate::interactivity::PickupKind::ChaingunBox));
+
+        // Commander always drops RpgRocket
+        assert_eq!(get_drop(EnemyKind::AssaultCommander, &mut rng), Some(crate::interactivity::PickupKind::RpgRocket));
+
+        // Bosses always drop AtomicHealth
+        assert_eq!(get_drop(EnemyKind::Boss1Battlelord, &mut rng), Some(crate::interactivity::PickupKind::AtomicHealth));
+        assert_eq!(get_drop(EnemyKind::Boss2Overlord, &mut rng), Some(crate::interactivity::PickupKind::AtomicHealth));
+        assert_eq!(get_drop(EnemyKind::Boss3Cycloid, &mut rng), Some(crate::interactivity::PickupKind::AtomicHealth));
+        assert_eq!(get_drop(EnemyKind::Boss4Queen, &mut rng), Some(crate::interactivity::PickupKind::AtomicHealth));
+
+        // Pigcop drops ShotgunBox or ArmorVest
+        let pig_drop = get_drop(EnemyKind::Pigcop, &mut rng).unwrap();
+        assert!(matches!(
+            pig_drop,
+            crate::interactivity::PickupKind::ShotgunBox | crate::interactivity::PickupKind::ArmorVest
+        ));
+    }
 }

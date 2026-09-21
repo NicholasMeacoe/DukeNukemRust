@@ -561,15 +561,16 @@ pub fn update_con_actors(
 
 pub fn map_tile_to_projectile(tile: i16) -> (ProjectileType, f32, i32) {
     match tile {
-        1625 | 1600 => (ProjectileType::AlienBlaster, 50.0, 7), // FIRELASER
-        1636 | 1605 => (ProjectileType::Spit, 35.0, 8),         // SPIT (Enforcer venom / Octabrain spit)
-        1641 => (ProjectileType::FreezeShard, 45.0, 20), // FREEZEBLAST
-        1646 | 2556 => (ProjectileType::ShrinkRay, 40.0, 0), // SHRINKSPARK / SHRINKER
-        1650 => (ProjectileType::Mortar, 30.0, 50),      // MORTER (Battlelord / Tank artillery)
-        SHOTSPARK1 => (ProjectileType::HitscanBullet, 150.0, 9), // SHOTSPARK1 (Chaingun / Enforcer / Battlelord)
-        RPG => (ProjectileType::Rocket, 45.0, 140),       // RPG (Commander / Overlord / Cycloid)
-        SHOTGUN => (ProjectileType::ShotgunPellet, 80.0, 10), // SHOTGUN (Pigcop)
-        1360 => (ProjectileType::PsiBlast, 30.0, 38),      // COOLEXPLOSION1 (Octabrain)
+        FIRELASER | 1600 => (ProjectileType::AlienBlaster, 50.0, 7), // FIRELASER (Trooper / Captain / Turret / Recon)
+        SPIT | LOOGIE | 1605 => (ProjectileType::Spit, 35.0, 8),     // SPIT (Enforcer venom / Octabrain spit)
+        FREEZEBLAST | FREEZE => (ProjectileType::FreezeShard, 45.0, 20), // FREEZEBLAST
+        SHRINKSPARK | SHRINKER => (ProjectileType::ShrinkRay, 40.0, 0), // SHRINKSPARK / SHRINKER
+        MORTER => (ProjectileType::Mortar, 30.0, 50),                // MORTER (Battlelord / Tank artillery)
+        SHOTSPARK1 | CHAINGUN => (ProjectileType::HitscanBullet, 150.0, 9), // SHOTSPARK1 / CHAINGUN (Enforcer / Battlelord minigun)
+        RPG => (ProjectileType::Rocket, 45.0, 140),                 // RPG (Commander / Overlord / Cycloid)
+        SHOTGUN => (ProjectileType::ShotgunPellet, 80.0, 10),       // SHOTGUN (Pigcop)
+        COOLEXPLOSION1 => (ProjectileType::PsiBlast, 30.0, 38),     // COOLEXPLOSION1 (Octabrain)
+        DEVISTATORBLAST => (ProjectileType::Rocket, 60.0, 40),      // DEVISTATORBLAST
         _ => (ProjectileType::HitscanBullet, 100.0, 10),
     }
 }

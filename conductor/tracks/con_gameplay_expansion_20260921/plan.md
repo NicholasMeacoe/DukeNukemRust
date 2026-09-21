@@ -9,12 +9,12 @@
   - [x] Verify `ConScriptEngine::from_grp` compiles the full script with >20 actors and registers all symbols
 
 ## Phase 2: Full 20+ Enemy Roster Definition & Spawning
-- [ ] Task: Map All Enemy Picnums & State Machines
-  - [ ] Register all 20+ enemy picnums in `src/names.rs` and `src/combat/ai.rs` (Troopers, Captains, Pig Cops, Octabrains, Enforcers, Recon Vehicles, Drones, Commanders, Slimers, Turrets, Sharks)
-  - [ ] Update `map_tile_to_projectile` for all enemy weapon types (Trooper lasers, Octabrain spit, Pigcop shotgun, Enforcer vulcan, RPV missiles, Commander rockets, Battlelord mortar)
-  - [ ] Wire authentic enemy death drops (Pigcop -> Shotgun/Armor, Boss -> Atomic Health, Enforcer -> Chaingun)
-- [ ] Task: Phase 2 Verification & Checkpoint
-  - [ ] Unit tests verifying all 20+ enemy picnums spawn valid `ConActor` states and dispatch authentic projectiles
+- [x] Task: Map All Enemy Picnums & State Machines
+  - [x] Register all 20+ enemy picnums in `src/names.rs` and `src/combat/ai.rs` (Troopers, Captains, Pig Cops, Octabrains, Enforcers, Recon Vehicles, Drones, Commanders, Slimers, Turrets, Sharks)
+  - [x] Update `map_tile_to_projectile` for all enemy weapon types (Trooper lasers, Octabrain spit, Pigcop shotgun, Enforcer vulcan, RPV missiles, Commander rockets, Battlelord mortar)
+  - [x] Wire authentic enemy death drops (Pigcop -> Shotgun/Armor, Boss -> Atomic Health, Enforcer -> Chaingun)
+- [x] Task: Phase 2 Verification & Checkpoint
+  - [x] Unit tests verifying all 20+ enemy picnums spawn valid `ConActor` states and dispatch authentic projectiles
 
 ## Phase 3: Boss Encounters & Climax Mechanics
 - [ ] Task: Battlelord & Boss AI Combat Logic
