@@ -17,12 +17,12 @@
   - [x] Unit tests verifying all 20+ enemy picnums spawn valid `ConActor` states and dispatch authentic projectiles
 
 ## Phase 3: Boss Encounters & Climax Mechanics
-- [ ] Task: Battlelord & Boss AI Combat Logic
-  - [ ] Implement Battlelord (`BOSS1`) minigun barrage and lobbed mortar artillery in `src/combat/ai.rs`
-  - [ ] Add footstep screen shake for massive boss steps using `EarthquakeCameraShake`
-  - [ ] Wire boss defeat to emit `LevelCompletedEvent` / `endofgame` in boss levels (`E1L7` / `E1L8`)
-- [ ] Task: Phase 3 Verification & Checkpoint
-  - [ ] Unit tests verifying Battlelord combat behavior, mortar fire, and boss death triggering level victory
+- [x] Task: Battlelord & Boss AI Combat Logic
+  - [x] Implement Battlelord (`BOSS1`) minigun barrage and lobbed mortar artillery in `src/combat/ai.rs`
+  - [x] Add footstep screen shake for massive boss steps using `EarthquakeCameraShake`
+  - [x] Wire boss defeat to emit `LevelCompletedEvent` / `endofgame` in boss levels (`E1L7` / `E1L8`)
+- [x] Task: Phase 3 Verification & Checkpoint
+  - [x] Unit tests verifying Battlelord combat behavior, mortar fire, and boss death triggering level victory
 
 ## Phase 4: Environmental Actors & Polish
 - [ ] Task: Ambient Actors & Explosions

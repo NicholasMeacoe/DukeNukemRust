@@ -45,6 +45,8 @@ pub fn update_con_actors(
     mut gib_events: EventWriter<GibEvent>,
     mut rng: ResMut<crate::net::DeterministicRng>,
     sector_map: Option<Res<crate::sector_map::SectorMap>>,
+    mut camera_shake: Option<ResMut<crate::interactivity::EarthquakeCameraShake>>,
+    level_progress: Option<Res<crate::game_flow::LevelProgress>>,
 ) {
     let Some(engine) = script_engine else {
         return;
@@ -393,6 +395,31 @@ pub fn update_con_actors(
                         crate::game_flow::LevelEntity,
                     ));
                 }
+
+                // Climax victory trigger on Boss defeat in boss levels or episodes
+                if matches!(
+                    enemy.kind,
+                    EnemyKind::Boss1Battlelord
+                        | EnemyKind::Boss2Overlord
+                        | EnemyKind::Boss3Cycloid
+                        | EnemyKind::Boss4Queen
+                ) {
+                    let is_boss_level = match &level_progress {
+                        Some(lp) => {
+                            (lp.current_episode == 1 && lp.current_level >= 7)
+                                || (lp.current_episode == 2 && lp.current_level >= 10)
+                                || (lp.current_episode == 3 && lp.current_level >= 10)
+                                || (lp.current_episode == 4 && lp.current_level >= 10)
+                        }
+                        None => true,
+                    };
+                    if is_boss_level {
+                        duke_voice_events.send(crate::audio::PlayDukeVoiceEvent { name: None });
+                        commands.add(|world: &mut World| {
+                            world.send_event(crate::game_flow::LevelCompletedEvent);
+                        });
+                    }
+                }
             }
 
             // Lethal Boss Stomp
@@ -455,6 +482,51 @@ pub fn update_con_actors(
                         is_player_source: false,
                     });
                     sound_events.send(crate::audio::PlaySoundEvent { sound_id: 110 });
+                }
+            }
+
+            // Battlelord & Mini-Battlelord Combat Attacks: Minigun Barrage & Lobbed Mortar Artillery
+            if matches!(enemy.kind, EnemyKind::Boss1Battlelord | EnemyKind::Boss1Mini)
+                && can_see
+                && dist_to_player <= 40.0
+                && player_ctrl.health > 0
+            {
+                enemy.attack_timer += dt;
+                if enemy.attack_timer <= 1.8 {
+                    let sub_tick = (enemy.attack_timer / 0.1) as i32;
+                    let prev_sub_tick = ((enemy.attack_timer - dt) / 0.1) as i32;
+                    if sub_tick != prev_sub_tick || enemy.attack_timer == dt {
+                        let right = dir_to_player.cross(Vec3::Y).normalize_or_zero();
+                        let up = Vec3::Y;
+                        let spread_x = (rng.next_f32() - 0.5) * 0.06;
+                        let spread_y = (rng.next_f32() - 0.5) * 0.04;
+                        let bullet_dir =
+                            (dir_to_player + right * spread_x + up * spread_y).normalize_or_zero();
+                        let gun_origin = trans.translation + Vec3::Y * 1.5 + dir_to_player * 0.8;
+                        projectile_events.send(SpawnProjectileEvent {
+                            projectile_type: ProjectileType::HitscanBullet,
+                            origin: gun_origin,
+                            direction: bullet_dir,
+                            velocity: 150.0,
+                            damage: 9,
+                            is_player_source: false,
+                        });
+                        sound_events.send(crate::audio::PlaySoundEvent { sound_id: 6 }); // CHAINGUN_FIRE
+                    }
+                } else if enemy.attack_timer >= 2.4 && (enemy.attack_timer - dt) < 2.4 {
+                    let mortar_origin = trans.translation + Vec3::Y * 2.2 + dir_to_player * 0.8;
+                    let mortar_dir = (dir_to_player + Vec3::Y * 0.35).normalize_or_zero();
+                    projectile_events.send(SpawnProjectileEvent {
+                        projectile_type: ProjectileType::Mortar,
+                        origin: mortar_origin,
+                        direction: mortar_dir,
+                        velocity: 30.0,
+                        damage: 60,
+                        is_player_source: false,
+                    });
+                    sound_events.send(crate::audio::PlaySoundEvent { sound_id: 112 }); // MORTAR
+                } else if enemy.attack_timer >= 3.5 {
+                    enemy.attack_timer = 0.0;
                 }
             }
         }
@@ -549,6 +621,31 @@ pub fn update_con_actors(
                 kcc.translation = Some(final_movement);
             } else {
                 trans.translation += final_movement;
+            }
+
+            // Boss footstep screen shake and heavy walk sound
+            if let Some(ref enemy) = enemy_opt {
+                let is_massive_boss = matches!(
+                    enemy.kind,
+                    EnemyKind::Boss1Battlelord
+                        | EnemyKind::Boss1Mini
+                        | EnemyKind::Boss2Overlord
+                        | EnemyKind::Boss3Cycloid
+                        | EnemyKind::Boss4Queen
+                );
+                if is_massive_boss {
+                    let step_cycle = ((time.elapsed_seconds() * 2.0) % 2.0) as i32;
+                    let prev_step_cycle = (((time.elapsed_seconds() - dt) * 2.0) % 2.0) as i32;
+                    if step_cycle != prev_step_cycle {
+                        let dist_factor = (1.0 - (dist_to_player / 35.0)).clamp(0.0, 1.0);
+                        if dist_factor > 0.0 {
+                            if let Some(ref mut shake) = camera_shake {
+                                shake.intensity = shake.intensity.max(0.06 * dist_factor);
+                            }
+                            sound_events.send(crate::audio::PlaySoundEvent { sound_id: 113 }); // BOSS_WALK
+                        }
+                    }
+                }
             }
         }
 

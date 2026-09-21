@@ -810,18 +810,20 @@ pub fn update_earthquake_camera_shake(
 
     if active_earthquake {
         shake.intensity = max_intensity;
-        if shake.intensity > 0.0 {
-            use rand::Rng;
-            let mut rng = rand::thread_rng();
-            let rx = rng.gen_range(-1.0..=1.0);
-            let ry = rng.gen_range(-1.0..=1.0);
-            let rz = rng.gen_range(-1.0..=1.0);
-            shake.offset = Vec3::new(rx, ry, rz) * shake.intensity;
-        } else {
-            shake.offset = Vec3::ZERO;
-        }
+    } else if shake.intensity > 0.0 {
+        // Smoothly decay transient impulse shake (e.g. from boss footsteps or explosions)
+        let dt = _time.delta_seconds();
+        shake.intensity = (shake.intensity - dt * 2.5).max(0.0);
+    }
+
+    if shake.intensity > 0.0 {
+        use rand::Rng;
+        let mut rng = rand::thread_rng();
+        let rx = rng.gen_range(-1.0..=1.0);
+        let ry = rng.gen_range(-1.0..=1.0);
+        let rz = rng.gen_range(-1.0..=1.0);
+        shake.offset = Vec3::new(rx, ry, rz) * shake.intensity;
     } else {
-        shake.intensity = 0.0;
         shake.offset = Vec3::ZERO;
     }
 

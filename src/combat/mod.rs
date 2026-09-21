@@ -786,4 +786,103 @@ mod tests {
             crate::interactivity::PickupKind::ShotgunBox | crate::interactivity::PickupKind::ArmorVest
         ));
     }
+
+    #[test]
+    fn test_battlelord_combat_mechanics_and_boss_level_completion() {
+        let mut app = App::new();
+        app.add_event::<SpawnProjectileEvent>()
+            .add_event::<crate::audio::PlaySoundEvent>()
+            .add_event::<crate::audio::PlayDukeVoiceEvent>()
+            .add_event::<crate::interactivity::ExplosionDamageEvent>()
+            .add_event::<GibEvent>()
+            .add_event::<crate::game_flow::LevelCompletedEvent>()
+            .insert_resource(Time::<()>::default())
+            .insert_resource(crate::net::DeterministicRng::new(42))
+            .insert_resource(crate::interactivity::EarthquakeCameraShake::default())
+            .insert_resource(crate::game_flow::LevelProgress {
+                current_episode: 1,
+                current_level: 7,
+                ..default()
+            })
+            .insert_resource(
+                crate::scripting::ConScriptEngine::from_source(
+                    crate::scripting::DEFAULT_CORE_CON_SCRIPT,
+                )
+                .unwrap(),
+            )
+            .add_systems(Update, ai::update_con_actors);
+
+        // Spawn player
+        let mut player_ctrl = crate::player::types::PlayerController::default();
+        player_ctrl.health = 100;
+        app.world_mut().spawn((
+            player_ctrl,
+            TransformBundle::from_transform(Transform::from_xyz(0.0, 0.0, 0.0)),
+        ));
+
+        // Spawn Battlelord at 10 meters distance
+        let mut battlelord_actor = EnemyActor::new_battlelord(false);
+        battlelord_actor.health = 4500;
+        let mut con_actor = crate::scripting::ConActor::new(BOSS1, 0, 0, 4500);
+        // Set a move pointer so boss moves and triggers footstep shake
+        con_actor.registers.move_ptr = Some(0);
+        con_actor.hitag = crate::scripting::move_flags::SEEK_PLAYER as i16;
+
+        let boss_entity = app.world_mut().spawn((
+            battlelord_actor,
+            con_actor,
+            TransformBundle::from_transform(Transform::from_xyz(0.0, 0.0, 10.0)),
+        )).id();
+
+        // Advance time by 0.1s: Boss minigun barrage fires and footsteps trigger shake
+        {
+            let mut time = app.world_mut().resource_mut::<Time>();
+            time.advance_by(std::time::Duration::from_millis(100));
+        }
+        app.update();
+
+        // 1. Verify Minigun Projectile emitted
+        let proj_events = app.world().resource::<Events<SpawnProjectileEvent>>();
+        let mut proj_reader = proj_events.get_reader();
+        let projs: Vec<_> = proj_reader.read(proj_events).cloned().collect();
+        assert!(
+            projs.iter().any(|p| p.projectile_type == ProjectileType::HitscanBullet),
+            "Battlelord minigun barrage must fire HitscanBullet projectiles"
+        );
+
+        // 2. Advance time to mortar phase (advance to attack_timer = 2.45s)
+        {
+            let mut enemy = app.world_mut().get_mut::<EnemyActor>(boss_entity).unwrap();
+            enemy.attack_timer = 2.39;
+            let mut time = app.world_mut().resource_mut::<Time>();
+            time.advance_by(std::time::Duration::from_millis(100));
+        }
+        app.update();
+
+        let proj_events = app.world().resource::<Events<SpawnProjectileEvent>>();
+        let mut proj_reader = proj_events.get_reader();
+        let projs: Vec<_> = proj_reader.read(proj_events).cloned().collect();
+        assert!(
+            projs.iter().any(|p| p.projectile_type == ProjectileType::Mortar),
+            "Battlelord must fire lobbed Mortar artillery projectile"
+        );
+
+        // 3. Test Boss Defeat triggering LevelCompletedEvent in E1L7
+        {
+            let mut enemy = app.world_mut().get_mut::<EnemyActor>(boss_entity).unwrap();
+            enemy.health = 10;
+            let mut con = app.world_mut().get_mut::<crate::scripting::ConActor>(boss_entity).unwrap();
+            con.extra = 0; // Dead
+        }
+        app.update();
+
+        let level_events = app.world().resource::<Events<crate::game_flow::LevelCompletedEvent>>();
+        let mut level_reader = level_events.get_reader();
+        let level_completed: Vec<_> = level_reader.read(level_events).cloned().collect();
+        assert_eq!(
+            level_completed.len(),
+            1,
+            "Defeating Battlelord in E1L7 must trigger LevelCompletedEvent"
+        );
+    }
 }
