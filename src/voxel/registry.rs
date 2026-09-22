@@ -556,13 +556,71 @@ pub fn update_voxel_instances(
     }
 }
 
+/// Tag component for motorized ceiling fans rotating continuously.
+#[derive(Component, Clone, Debug)]
+pub struct CeilingFanVoxel {
+    pub speed: f32,
+}
+
+impl Default for CeilingFanVoxel {
+    fn default() -> Self {
+        Self { speed: 4.5 }
+    }
+}
+
+/// Tag component for motorized security surveillance cameras sweeping back and forth.
+#[derive(Component, Clone, Debug)]
+pub struct SecurityCameraVoxel {
+    pub base_yaw: f32,
+    pub sweep_range: f32,
+    pub sweep_speed: f32,
+    pub timer: f32,
+}
+
+impl SecurityCameraVoxel {
+    pub fn new(base_yaw: f32, sweep_range: f32, sweep_speed: f32) -> Self {
+        Self {
+            base_yaw,
+            sweep_range,
+            sweep_speed,
+            timer: 0.0,
+        }
+    }
+}
+
+/// System that animates motorized environmental voxel props (ceiling fans and security cameras).
+pub fn update_kinetic_voxel_props(
+    time: Res<Time>,
+    config: Res<VoxelConfig>,
+    mut fans: Query<(&mut Transform, &CeilingFanVoxel), Without<SecurityCameraVoxel>>,
+    mut cameras: Query<(&mut Transform, &mut SecurityCameraVoxel), Without<CeilingFanVoxel>>,
+) {
+    if !config.enabled {
+        return;
+    }
+    let dt = time.delta_seconds();
+
+    for (mut transform, fan) in &mut fans {
+        transform.rotate_y(fan.speed * dt);
+    }
+
+    for (mut transform, mut camera) in &mut cameras {
+        camera.timer += camera.sweep_speed * dt;
+        let current_yaw = camera.base_yaw + camera.timer.sin() * camera.sweep_range;
+        transform.rotation = Quat::from_rotation_y(current_yaw);
+    }
+}
+
 pub struct VoxelPlugin;
 
 impl Plugin for VoxelPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<VoxelConfig>()
             .insert_resource(VoxelRegistry::new())
-            .add_systems(Update, update_voxel_instances);
+            .add_systems(
+                Update,
+                (update_voxel_instances, update_kinetic_voxel_props),
+            );
     }
 }
 
@@ -689,5 +747,66 @@ pub mod tests {
         let fan_mesh = reg.get_or_create_mesh(617, &pal, &mut meshes).unwrap();
         let mesh = meshes.get(&fan_mesh).unwrap();
         assert!(mesh.count_vertices() > 0);
+    }
+
+    #[test]
+    fn test_ceiling_fan_continuous_rotation() {
+        let mut app = App::new();
+        app.insert_resource(Time::<()>::default())
+            .insert_resource(VoxelConfig::default())
+            .add_systems(Update, update_kinetic_voxel_props);
+
+        let fan_entity = app
+            .world_mut()
+            .spawn((
+                Transform::from_xyz(0.0, 5.0, 0.0),
+                CeilingFanVoxel { speed: 4.0 },
+            ))
+            .id();
+
+        // Advance time by 0.5s
+        {
+            let mut time = app.world_mut().resource_mut::<Time>();
+            time.advance_by(std::time::Duration::from_millis(500));
+        }
+        app.update();
+
+        let transform = app.world().get::<Transform>(fan_entity).unwrap();
+        assert!(
+            transform.rotation != Quat::IDENTITY,
+            "Ceiling fan should rotate after time advances"
+        );
+    }
+
+    #[test]
+    fn test_security_camera_sweep_oscillation() {
+        let mut app = App::new();
+        app.insert_resource(Time::<()>::default())
+            .insert_resource(VoxelConfig::default())
+            .add_systems(Update, update_kinetic_voxel_props);
+
+        let camera_entity = app
+            .world_mut()
+            .spawn((
+                Transform::from_xyz(2.0, 3.0, 2.0),
+                SecurityCameraVoxel::new(0.0, 0.7, 2.0),
+            ))
+            .id();
+
+        // Advance time by 0.25s
+        {
+            let mut time = app.world_mut().resource_mut::<Time>();
+            time.advance_by(std::time::Duration::from_millis(250));
+        }
+        app.update();
+
+        let transform = app.world().get::<Transform>(camera_entity).unwrap();
+        let camera = app.world().get::<SecurityCameraVoxel>(camera_entity).unwrap();
+
+        assert!(camera.timer > 0.0, "Camera timer should advance");
+        assert!(
+            transform.rotation != Quat::IDENTITY,
+            "Camera transform should oscillate away from base orientation"
+        );
     }
 }

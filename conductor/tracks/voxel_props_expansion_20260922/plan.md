@@ -11,15 +11,15 @@
   - [x] Verify generated voxel models produce valid surface-culled meshes with correct palette colors
 
 ## Phase 2: Kinetic & Motorized Voxel Prop Systems
-- [ ] Task: Write Tests for Kinetic Prop Animations
-  - [ ] Unit test verifying ceiling fan continuous rotation over time
-  - [ ] Unit test verifying security camera yaw oscillation sweep over time
-- [ ] Task: Implement Kinetic Prop Systems
-  - [ ] Create `CeilingFanVoxel` and `SecurityCameraVoxel` components in `src/voxel/registry.rs`
-  - [ ] Implement `update_kinetic_voxel_props` system updating rotation and sweep angles
-  - [ ] Register system in `VoxelPlugin`
-- [ ] Task: Phase 2 Verification & Checkpoint (Refer to workflow.md)
-  - [ ] Verify ceiling fans spin smoothly and security cameras oscillate without jitter
+- [x] Task: Write Tests for Kinetic Prop Animations
+  - [x] Unit test verifying ceiling fan continuous rotation over time
+  - [x] Unit test verifying security camera yaw oscillation sweep over time
+- [x] Task: Implement Kinetic Prop Systems
+  - [x] Create `CeilingFanVoxel` and `SecurityCameraVoxel` components in `src/voxel/registry.rs`
+  - [x] Implement `update_kinetic_voxel_props` system updating rotation and sweep angles
+  - [x] Register system in `VoxelPlugin`
+- [x] Task: Phase 2 Verification & Checkpoint (Refer to workflow.md)
+  - [x] Verify ceiling fans spin smoothly and security cameras oscillate without jitter
 
 ## Phase 3: Wall, Floor & Ceiling Alignment & Spawning
 - [ ] Task: Write Tests for Prop World Spawning & Alignment
