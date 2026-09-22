@@ -13,16 +13,16 @@
   - [x] Verify weapon discharges, flying projectiles, and explosions cast dynamic light with smooth decay and no leaks
 
 ## Phase 2: Ken Silverman KVX Voxel Binary Parser
-- [ ] Task: Write Tests for KVX Parsing & Slab Extraction
-  - [ ] Unit test parsing KVX headers (`xsiz`, `ysiz`, `zsiz`, `xpivot`, `ypivot`, `zpivot`)
-  - [ ] Unit test column offset decoding and slab structure (`ztop`, `zend`, color indices)
-  - [ ] Unit test boundary validation on malformed/truncated KVX byte arrays
-- [ ] Task: Implement Pure-Rust KVX Parser
-  - [ ] Create `src/voxel/kvx.rs` and `src/voxel/mod.rs`
-  - [ ] Implement `KvxModel::parse(&[u8]) -> Result<KvxModel, KvxError>`
-  - [ ] Expose 3D voxel color grid queries `get_voxel(x, y, z)` and dimensions
-- [ ] Task: Phase 2 Verification & Checkpoint (Refer to workflow.md)
-  - [ ] Verify parsing of sample/synthesized KVX assets and check data integrity against Build specs
+- [x] Task: Write Tests for KVX Parsing & Slab Extraction
+  - [x] Unit test parsing KVX headers (`xsiz`, `ysiz`, `zsiz`, `xpivot`, `ypivot`, `zpivot`)
+  - [x] Unit test column offset decoding and slab structure (`ztop`, `zend`, color indices)
+  - [x] Unit test boundary validation on malformed/truncated KVX byte arrays
+- [x] Task: Implement Pure-Rust KVX Parser
+  - [x] Create `src/voxel/kvx.rs` and `src/voxel/mod.rs`
+  - [x] Implement `KvxModel::parse(&[u8]) -> Result<KvxModel, KvxError>`
+  - [x] Expose 3D voxel color grid queries `get_voxel(x, y, z)` and dimensions
+- [x] Task: Phase 2 Verification & Checkpoint (Refer to workflow.md)
+  - [x] Verify parsing of sample/synthesized KVX assets and check data integrity against Build specs
 
 ## Phase 3: Voxel 3D Mesh Generation & Palette Shading
 - [ ] Task: Write Tests for Voxel Surface Meshing

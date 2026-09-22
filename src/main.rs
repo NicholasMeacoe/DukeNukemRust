@@ -21,6 +21,7 @@ pub mod save;
 mod scripting;
 pub mod sector_map;
 mod sky;
+pub mod voxel;
 
 pub type Player = player::PlayerController;
 
