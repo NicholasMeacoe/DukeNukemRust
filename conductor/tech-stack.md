@@ -7,6 +7,8 @@
 - **2D Polygon Tessellation**: Lyon Tessellation 1.0 (Sector floor and ceiling polygon triangulation)
 - **Audio Processing**: Hound 3.5 (WAV encoding for in-memory KWV playback) + Bevy Audio
 - **Random Number Generation**: Rand 0.8
+- **3D Voxel Models & Shading**: Ken Silverman Build `.KVX` parser & surface-culled mesh generator (`src/voxel/`)
+- **Lighting Pipeline**: Real-time dynamic transient point lighting engine with pooling and decay (`src/lighting.rs`)
 
 ## Reference Codebase
 - **Duke Nukem 3D 1.3D/Atomic C Source**: Located at `dukenukem3d/` (submodule)
