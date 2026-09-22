@@ -182,6 +182,10 @@ pub fn handle_player_interactions(
                 fountain.uses_left -= 1;
                 heal_events.send(PlayerHealEvent { amount: 1 });
                 sound_events.send(PlaySoundEvent { sound_id: 36 }); // DUKE_DRINKING
+                if fountain.uses_left == 0 {
+                    fountain.is_broken = true;
+                    sound_events.send(PlaySoundEvent { sound_id: 19 }); // GLASS_BREAKING
+                }
             }
         }
 
@@ -290,6 +294,8 @@ pub fn handle_explosions(
     mut explosion_events: EventReader<ExplosionDamageEvent>,
     mut barrel_explode_events: EventWriter<BarrelExplodeEvent>,
     mut barrels: Query<(Entity, &Transform, &mut ExplodingBarrel)>,
+    mut fire_extinguishers: Query<(Entity, &Transform, &mut FireExtinguisher)>,
+    mut fountains: Query<(&Transform, &mut WaterFountain)>,
     mut crack_walls: Query<(&Transform, &mut CrackWall)>,
     mut glass_windows: Query<(Entity, &Transform, &mut BreakableGlass)>,
     mut players: Query<(&Transform, &mut crate::player::PlayerController)>,
@@ -383,6 +389,10 @@ pub fn handle_explosions(
                             radius: barrel.damage_radius,
                             damage: barrel.damage,
                         });
+                        gib_events.send(crate::combat::GibEvent {
+                            origin: trans.translation,
+                            gib_count: 6,
+                        });
                         commands.entity(entity).despawn_recursive();
                     }
                 }
@@ -416,6 +426,47 @@ pub fn handle_explosions(
                     glass.is_broken = true;
                     sound_events.send(PlaySoundEvent { sound_id: 19 }); // GLASS_BREAKING
                     commands.entity(entity).despawn_recursive();
+                }
+            }
+        }
+
+        // 6. Damage Fire Extinguishers
+        for (entity, trans, mut ext) in fire_extinguishers.iter_mut() {
+            if !ext.is_exploded {
+                let dist = trans.translation.distance(origin);
+                if dist <= exp.radius {
+                    let dmg = calculate_hitradius_damage(dist, exp.radius, exp.damage);
+                    ext.health -= dmg;
+                    if ext.health <= 0 {
+                        ext.is_exploded = true;
+                        sound_events.send(PlaySoundEvent { sound_id: 14 }); // PIPEBOMB_EXPLODE
+                        barrel_explode_events.send(BarrelExplodeEvent {
+                            origin: trans.translation,
+                            radius: 4.0,
+                            damage: 80,
+                        });
+                        gib_events.send(crate::combat::GibEvent {
+                            origin: trans.translation,
+                            gib_count: 4,
+                        });
+                        commands.entity(entity).despawn_recursive();
+                    }
+                }
+            }
+        }
+
+        // 7. Damage Water Fountains
+        for (trans, mut fountain) in fountains.iter_mut() {
+            if !fountain.is_broken {
+                let dist = trans.translation.distance(origin);
+                if dist <= exp.radius {
+                    fountain.is_broken = true;
+                    fountain.uses_left = 0;
+                    sound_events.send(PlaySoundEvent { sound_id: 19 }); // GLASS_BREAKING
+                    gib_events.send(crate::combat::GibEvent {
+                        origin: trans.translation,
+                        gib_count: 3,
+                    });
                 }
             }
         }
@@ -565,5 +616,110 @@ mod tests {
 
         // 3. Verify barrel entity despawned
         assert!(app.world().get_entity(barrel_entity).is_none());
+    }
+
+    #[test]
+    fn test_voxel_prop_destruction_debris_and_lights() {
+        let mut app = App::new();
+        app.add_event::<ExplosionDamageEvent>()
+            .add_event::<BarrelExplodeEvent>()
+            .add_event::<ActivateTagEvent>()
+            .add_event::<PlaySoundEvent>()
+            .add_event::<crate::combat::GibEvent>()
+            .add_event::<crate::lighting::SpawnDynamicLightEvent>()
+            .init_resource::<crate::hud::ScreenTintState>()
+            .add_systems(Update, handle_explosions);
+
+        // Spawn a barrel and a fire extinguisher
+        let barrel_entity = app.world_mut().spawn((
+            ExplodingBarrel {
+                health: 20,
+                damage_radius: 6.0,
+                damage: 100,
+                is_exploded: false,
+            },
+            Transform::from_xyz(0.0, 0.0, 1.5),
+        )).id();
+
+        let fireext_entity = app.world_mut().spawn((
+            FireExtinguisher {
+                health: 10,
+                is_exploded: false,
+            },
+            Transform::from_xyz(0.0, 0.0, 2.5),
+        )).id();
+
+        let fountain_entity = app.world_mut().spawn((
+            WaterFountain {
+                uses_left: 10,
+                is_broken: false,
+                broken_tile: 566,
+            },
+            Transform::from_xyz(0.0, 0.0, 3.0),
+        )).id();
+
+        // Trigger an explosion
+        app.world_mut().send_event(ExplosionDamageEvent {
+            origin: Vec3::new(0.0, 0.0, 0.0),
+            radius: 5.0,
+            damage: 80,
+        });
+
+        app.update();
+
+        // Verify dynamic point lights sent for explosion
+        let light_events = app.world().resource::<Events<crate::lighting::SpawnDynamicLightEvent>>();
+        assert!(!light_events.is_empty(), "Explosion must spawn dynamic light flash");
+
+        // Verify debris gib events sent
+        let gib_events = app.world().resource::<Events<crate::combat::GibEvent>>();
+        assert!(!gib_events.is_empty(), "Prop explosions must emit debris particles");
+
+        // Verify barrel and fire extinguisher despawned
+        assert!(app.world().get_entity(barrel_entity).is_none(), "Barrel must despawn upon destruction");
+        assert!(app.world().get_entity(fireext_entity).is_none(), "Fire extinguisher must despawn upon explosion");
+
+        // Verify fountain is marked broken and uses depleted
+        let fountain = app.world().get::<WaterFountain>(fountain_entity).unwrap();
+        assert!(fountain.is_broken, "Water fountain must be broken by explosion");
+        assert_eq!(fountain.uses_left, 0, "Water fountain uses must be 0 after break");
+    }
+
+    #[test]
+    fn test_water_fountain_depletion_and_damage_break() {
+        let mut app = App::new();
+        app.add_event::<InteractEvent>()
+            .add_event::<ActivateTagEvent>()
+            .add_event::<PlayerHealEvent>()
+            .add_event::<PlaySoundEvent>()
+            .add_event::<crate::audio::PlayDukeVoiceEvent>()
+            .add_event::<crate::game_flow::LevelCompletedEvent>()
+            .init_resource::<Assets<StandardMaterial>>()
+            .add_systems(Update, handle_player_interactions);
+
+        // Spawn player at (0, 0, 0)
+        app.world_mut().spawn(crate::player::PlayerController::default());
+
+        // Spawn fountain with 1 use left within interaction range
+        let fountain_entity = app.world_mut().spawn((
+            Transform::from_xyz(0.0, 0.0, 1.0),
+            WaterFountain {
+                uses_left: 1,
+                is_broken: false,
+                broken_tile: 566,
+            },
+        )).id();
+
+        // Send interact event
+        app.world_mut().send_event(InteractEvent {
+            player_pos: Vec3::ZERO,
+            player_dir: Vec3::Z,
+        });
+        app.update();
+
+        // Fountain should now be used up and broken
+        let fountain = app.world().get::<WaterFountain>(fountain_entity).unwrap();
+        assert_eq!(fountain.uses_left, 0);
+        assert!(fountain.is_broken, "Fountain must become broken after last use");
     }
 }

@@ -33,14 +33,14 @@
   - [x] Verify props spawn in their authentic orientations flush against walls, floors, and ceilings
 
 ## Phase 4: Destructible Voxel Prop State Transitions
-- [ ] Task: Write Tests for Voxel Prop Destruction & Debris
-  - [ ] Unit test verifying barrel explosion despawns voxel model, damages radius, and triggers dynamic point light
-  - [ ] Unit test verifying fire extinguisher explosion and water fountain state transition
-- [ ] Task: Integrate Destruction State Transitions
-  - [ ] Connect voxel entity destruction hooks in `src/interactivity/props.rs`
-  - [ ] Spawn debris particles and dynamic explosion point lights upon barrel / fire extinguisher destruction
-- [ ] Task: Phase 4 Verification & Checkpoint (Refer to workflow.md)
-  - [ ] Verify shooting barrels or fire extinguishers causes high-impact explosion with debris and light flash
+- [x] Task: Write Tests for Voxel Prop Destruction & Debris
+  - [x] Unit test verifying barrel explosion despawns voxel model, damages radius, and triggers dynamic point light
+  - [x] Unit test verifying fire extinguisher explosion and water fountain state transition
+- [x] Task: Integrate Destruction State Transitions
+  - [x] Connect voxel entity destruction hooks in `src/interactivity/props.rs`
+  - [x] Spawn debris particles and dynamic explosion point lights upon barrel / fire extinguisher destruction
+- [x] Task: Phase 4 Verification & Checkpoint (Refer to workflow.md)
+  - [x] Verify shooting barrels or fire extinguishers causes high-impact explosion with debris and light flash
 
 ## Phase 5: Full Verification, Warnings Audit & Review
 - [ ] Task: Comprehensive Test Suite & Warning Audit

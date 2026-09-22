@@ -24,9 +24,11 @@ pub fn handle_wall_damage(
     mut mirror_query: Query<(&Transform, &mut MirrorProp)>,
     mut fire_ext_query: Query<(Entity, &Transform, &mut FireExtinguisher)>,
     mut barrel_query: Query<(Entity, &Transform, &mut ExplodingBarrel)>,
+    mut fountain_query: Query<(Entity, &Transform, &mut WaterFountain)>,
     mut tag_events: EventWriter<ActivateTagEvent>,
     mut explosion_events: EventWriter<ExplosionDamageEvent>,
     mut sound_events: EventWriter<PlaySoundEvent>,
+    mut gib_events: EventWriter<crate::combat::GibEvent>,
 ) {
     for ev in wall_damage_events.read() {
         let hit_pt = ev.hit_point;
@@ -120,6 +122,10 @@ pub fn handle_wall_damage(
                         radius: 4.0,
                         damage: 80,
                     });
+                    gib_events.send(crate::combat::GibEvent {
+                        origin: trans.translation,
+                        gib_count: 4,
+                    });
                     commands.entity(entity).despawn_recursive();
                 }
             }
@@ -142,8 +148,30 @@ pub fn handle_wall_damage(
                         radius: barrel.damage_radius,
                         damage: barrel.damage,
                     });
+                    gib_events.send(crate::combat::GibEvent {
+                        origin: trans.translation,
+                        gib_count: 6,
+                    });
                     commands.entity(entity).despawn_recursive();
                 }
+            }
+        }
+
+        // 7. Water Fountains (breaks upon impact damage)
+        for (entity, trans, mut fountain) in fountain_query.iter_mut() {
+            if fountain.is_broken {
+                continue;
+            }
+            let is_direct = ev.hit_entity == Some(entity);
+            let is_near = trans.translation.distance_squared(hit_pt) < 1.44;
+            if is_direct || is_near {
+                fountain.is_broken = true;
+                fountain.uses_left = 0;
+                sound_events.send(PlaySoundEvent { sound_id: 19 }); // GLASS_BREAKING
+                gib_events.send(crate::combat::GibEvent {
+                    origin: trans.translation,
+                    gib_count: 3,
+                });
             }
         }
     }
