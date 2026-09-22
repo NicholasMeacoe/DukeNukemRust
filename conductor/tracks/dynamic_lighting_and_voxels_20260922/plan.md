@@ -36,16 +36,16 @@
   - [x] Verify generated Bevy `Mesh` compiles with valid vertex positions, normals, and colors
 
 ## Phase 4: Sprite Voxel Replacement Registry & Pickup Integration
-- [ ] Task: Write Tests for Voxel Sprite Registry & Rotation
-  - [ ] Unit tests verifying picnum registration (`VoxelRegistry`)
-  - [ ] Unit tests for spinning item rotation and bobbing animation
-- [ ] Task: Implement Voxel Model Spawning & World Integration
-  - [ ] Create `VoxelRegistry` resource in `src/voxel/registry.rs`
-  - [ ] Map core items (Medkits, Armor, Ammo, Keycards, Atomic Health) to voxel models
-  - [ ] Hook into `src/builder.rs` / `src/map.rs` sprite spawning: instantiate 3D voxel mesh instead of flat billboard sprite when model exists
-  - [ ] Add console/cvar toggle `r_voxels 0/1` in `src/player/console.rs`
-- [ ] Task: Phase 4 Verification & Checkpoint (Refer to workflow.md)
-  - [ ] Verify in-game pickups render as rotating 3D voxel models standing properly on sector floors
+- [x] Task: Write Tests for Voxel Sprite Registry & Rotation
+  - [x] Unit tests verifying picnum registration (`VoxelRegistry`)
+  - [x] Unit tests for spinning item rotation and bobbing animation
+- [x] Task: Implement Voxel Model Spawning & World Integration
+  - [x] Create `VoxelRegistry` resource in `src/voxel/registry.rs`
+  - [x] Map core items (Medkits, Armor, Ammo, Keycards, Atomic Health) to voxel models
+  - [x] Hook into `src/builder.rs` / `src/map.rs` sprite spawning: instantiate 3D voxel mesh instead of flat billboard sprite when model exists
+  - [x] Add console/cvar toggle `r_voxels 0/1` in `src/player/console.rs`
+- [x] Task: Phase 4 Verification & Checkpoint (Refer to workflow.md)
+  - [x] Verify in-game pickups render as rotating 3D voxel models standing properly on sector floors
 
 ## Phase 5: Full Verification, Warnings Audit & Review
 - [ ] Task: Comprehensive Test Suite & Warning Audit

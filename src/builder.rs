@@ -103,10 +103,19 @@ impl<'a> MapMeshBuilder<'a> {
         meshes: &mut Assets<Mesh>,
         materials: &mut Assets<StandardMaterial>,
         skill_level: u8,
+        voxel_registry: Option<&mut crate::voxel::VoxelRegistry>,
+        palette: Option<&crate::palette::Palette>,
     ) {
         self.build_sectors(commands, meshes, materials);
         self.build_walls(commands, meshes, materials);
-        self.build_sprites(commands, meshes, materials, skill_level);
+        self.build_sprites(
+            commands,
+            meshes,
+            materials,
+            skill_level,
+            voxel_registry,
+            palette,
+        );
     }
 
     fn build_sectors(
@@ -767,6 +776,8 @@ impl<'a> MapMeshBuilder<'a> {
         meshes: &mut Assets<Mesh>,
         materials: &mut Assets<StandardMaterial>,
         skill_level: u8,
+        mut voxel_registry: Option<&mut crate::voxel::VoxelRegistry>,
+        palette: Option<&crate::palette::Palette>,
     ) {
         for sprite in &self.map.sprites {
             // Editor utility sprites (picnum 1..=8: SECTOREFFECTOR, ACTIVATOR, TOUCHPLATE, etc.)
@@ -836,7 +847,13 @@ impl<'a> MapMeshBuilder<'a> {
                 }
             }
 
-            if self.tile_textures.contains_key(&sprite.picnum) {
+            let has_voxel_model = if let Some(ref reg) = voxel_registry {
+                reg.has_voxel(sprite.picnum)
+            } else {
+                false
+            };
+
+            if self.tile_textures.contains_key(&sprite.picnum) || has_voxel_model {
                 let (tw, th) = self.get_tile_size(sprite.picnum);
                 let mut pos = Vec3::new(
                     sprite.x as f32 / 1024.0,
@@ -851,18 +868,7 @@ impl<'a> MapMeshBuilder<'a> {
                 let scale_x = (sprite.xrepeat as f32 * tw as f32) / divisor;
                 let scale_y = (sprite.yrepeat as f32 * th as f32) / divisor;
 
-
-
                 let is_enemy = sprite.picnum == PIGCOP;
-
-                let sprite_alpha = if (sprite.cstat & 512) != 0 {
-                    MaterialAlphaMode::Blend(66)
-                } else if (sprite.cstat & 2) != 0 || sprite.picnum == GLASS || sprite.picnum == GLASS2 {
-                    MaterialAlphaMode::Blend(40)
-                } else {
-                    MaterialAlphaMode::Mask
-                };
-                let sprite_mat = self.get_material(sprite.picnum, sprite_alpha, materials);
 
                 // In Build Engine, Z is the bottom of the sprite unless cstat & 128 is set (Centered)
                 let is_centered = (sprite.cstat & 128) != 0;
@@ -870,61 +876,79 @@ impl<'a> MapMeshBuilder<'a> {
                     pos.y += scale_y / 2.0;
                 }
 
-                let mut transform = Transform::from_translation(pos);
+                // Check if a 3D voxel model is available for this sprite
+                let mut voxel_mesh_opt = None;
+                let mut voxel_mat_opt = None;
 
-                if is_wall_aligned {
-                    // Wall aligned sprite: rotate around Y axis
-                    // ang represents the NORMAL. 
-                    // 0 = East (+X). 512 = South (+Z). 1024 = West (-X). 1536 = North (-Z).
-                    // Our Bevy Quad spans along the X axis by default, meaning its normal is +Z.
-                    // To get +X at 0, we must rotate by +90 degrees.
-                    let angle_rad = ((512.0 - sprite.ang as f32) / 2048.0) * std::f32::consts::TAU;
-                    transform.rotation = Quat::from_rotation_y(angle_rad);
-                } else if is_floor_aligned {
-                    // Floor aligned sprite: lay flat
-                    let angle_rad = ((sprite.ang as f32 - 512.0) / 2048.0) * std::f32::consts::TAU;
-                    transform.rotation = Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2) * Quat::from_rotation_z(angle_rad);
+                if !is_wall_aligned && !is_floor_aligned {
+                    if let (Some(ref mut reg), Some(pal)) = (&mut voxel_registry, palette) {
+                        if reg.has_voxel(sprite.picnum) {
+                            voxel_mesh_opt = reg.get_or_create_mesh(sprite.picnum, pal, meshes);
+                            voxel_mat_opt = Some(reg.get_or_create_material(materials));
+                        }
+                    }
                 }
 
-                transform.scale = Vec3::new(scale_x, scale_y, 1.0);
+                let is_voxel = voxel_mesh_opt.is_some() && voxel_mat_opt.is_some();
 
-                // Create a custom mesh for the sprite with slightly clamped UVs to prevent
-                // texture wrap-around streaks when using Repeat sampler globally.
-                let mut sprite_mesh = Mesh::new(
-                    bevy::render::mesh::PrimitiveTopology::TriangleList,
-                    bevy::render::render_asset::RenderAssetUsages::default(),
-                );
-                // 1.0x1.0 quad, centered
-                sprite_mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, vec![
-                    [-0.5, -0.5, 0.0],
-                    [0.5, -0.5, 0.0],
-                    [0.5, 0.5, 0.0],
-                    [-0.5, 0.5, 0.0],
-                ]);
-                // UVs clamped slightly inside to avoid edge bleeding
-                sprite_mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, vec![
-                    [0.001, 0.999], // Bottom-left
-                    [0.999, 0.999], // Bottom-right
-                    [0.999, 0.001], // Top-right
-                    [0.001, 0.001], // Top-left
-                ]);
-                sprite_mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, vec![
-                    [0.0, 0.0, 1.0],
-                    [0.0, 0.0, 1.0],
-                    [0.0, 0.0, 1.0],
-                    [0.0, 0.0, 1.0],
-                ]);
-                let sprite_tint = Palette::authentic_shade_to_tint(sprite.shade);
-                sprite_mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, vec![sprite_tint; 4]);
-                sprite_mesh.insert_indices(bevy::render::mesh::Indices::U32(vec![
-                    0, 1, 2, 0, 2, 3, // Front
-                    0, 2, 1, 0, 3, 2  // Back
-                ]));
+                let (mesh_handle, mat_handle, transform) = if is_voxel {
+                    let t = Transform::from_translation(pos);
+                    (voxel_mesh_opt.unwrap(), voxel_mat_opt.unwrap(), t)
+                } else {
+                    let sprite_alpha = if (sprite.cstat & 512) != 0 {
+                        MaterialAlphaMode::Blend(66)
+                    } else if (sprite.cstat & 2) != 0 || sprite.picnum == GLASS || sprite.picnum == GLASS2 {
+                        MaterialAlphaMode::Blend(40)
+                    } else {
+                        MaterialAlphaMode::Mask
+                    };
+                    let sprite_mat = self.get_material(sprite.picnum, sprite_alpha, materials);
+
+                    let mut t = Transform::from_translation(pos);
+                    if is_wall_aligned {
+                        let angle_rad = ((512.0 - sprite.ang as f32) / 2048.0) * std::f32::consts::TAU;
+                        t.rotation = Quat::from_rotation_y(angle_rad);
+                    } else if is_floor_aligned {
+                        let angle_rad = ((sprite.ang as f32 - 512.0) / 2048.0) * std::f32::consts::TAU;
+                        t.rotation = Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2) * Quat::from_rotation_z(angle_rad);
+                    }
+                    t.scale = Vec3::new(scale_x, scale_y, 1.0);
+
+                    let mut sprite_mesh = Mesh::new(
+                        bevy::render::mesh::PrimitiveTopology::TriangleList,
+                        bevy::render::render_asset::RenderAssetUsages::default(),
+                    );
+                    sprite_mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, vec![
+                        [-0.5, -0.5, 0.0],
+                        [0.5, -0.5, 0.0],
+                        [0.5, 0.5, 0.0],
+                        [-0.5, 0.5, 0.0],
+                    ]);
+                    sprite_mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, vec![
+                        [0.001, 0.999],
+                        [0.999, 0.999],
+                        [0.999, 0.001],
+                        [0.001, 0.001],
+                    ]);
+                    sprite_mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, vec![
+                        [0.0, 0.0, 1.0],
+                        [0.0, 0.0, 1.0],
+                        [0.0, 0.0, 1.0],
+                        [0.0, 0.0, 1.0],
+                    ]);
+                    let sprite_tint = Palette::authentic_shade_to_tint(sprite.shade);
+                    sprite_mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, vec![sprite_tint; 4]);
+                    sprite_mesh.insert_indices(bevy::render::mesh::Indices::U32(vec![
+                        0, 1, 2, 0, 2, 3,
+                        0, 2, 1, 0, 3, 2,
+                    ]));
+                    (meshes.add(sprite_mesh), sprite_mat, t)
+                };
 
                 let mut entity_cmds = commands.spawn((
                     PbrBundle {
-                        mesh: meshes.add(sprite_mesh),
-                        material: sprite_mat.clone(),
+                        mesh: mesh_handle,
+                        material: mat_handle.clone(),
                         transform,
                         ..default()
                     },
@@ -940,18 +964,17 @@ impl<'a> MapMeshBuilder<'a> {
                     entity_cmds.insert(RigidBody::Fixed);
                     
                     if !is_wall_aligned && !is_floor_aligned {
-                        // Face sprites: narrow cylinder
                         entity_cmds.insert(Collider::cylinder(0.4, 0.4));
                     } else if is_wall_aligned {
-                        // Wall aligned: thin cuboid
                         entity_cmds.insert(Collider::cuboid(0.5, 0.5, 0.05));
                     } else {
-                        // Floor aligned: flat cuboid
                         entity_cmds.insert(Collider::cuboid(0.5, 0.05, 0.5));
                     }
                 }
 
-                if !is_wall_aligned && !is_floor_aligned {
+                if is_voxel {
+                    entity_cmds.insert(crate::voxel::VoxelModelInstance::new_pickup(sprite.picnum, pos.y));
+                } else if !is_wall_aligned && !is_floor_aligned {
                     entity_cmds.insert(crate::SpriteBillboard);
                 }
 
@@ -968,7 +991,7 @@ impl<'a> MapMeshBuilder<'a> {
                             lotag: sprite.lotag,
                             hitag: sprite.hitag,
                             sound_id: 10,
-                            material_handle: Some(sprite_mat.clone()),
+                            material_handle: Some(mat_handle.clone()),
                         });
                     }
                     // KEYCARDS (Tiles ACCESSCARD..=177: Blue, Red, Yellow)
@@ -1517,15 +1540,17 @@ impl<'a> MapMeshBuilder<'a> {
                     _ => {}
                 }
 
-                // Check for tile animation on sprite
-                if let Some(&picanm) = self.picanm_map.get(&sprite.picnum) {
-                    if picanm.num_frames > 0 && picanm.anim_type > 0 {
-                        entity_cmds.insert(AnimatedTileMaterial {
-                            base_picnum: sprite.picnum,
-                            picanm,
-                            current_offset: 0,
-                            material_handle: sprite_mat,
-                        });
+                // Check for tile animation on sprite (only for 2D billboard sprites)
+                if !is_voxel {
+                    if let Some(&picanm) = self.picanm_map.get(&sprite.picnum) {
+                        if picanm.num_frames > 0 && picanm.anim_type > 0 {
+                            entity_cmds.insert(AnimatedTileMaterial {
+                                base_picnum: sprite.picnum,
+                                picanm,
+                                current_offset: 0,
+                                material_handle: mat_handle.clone(),
+                            });
+                        }
                     }
                 }
             }
@@ -1807,5 +1832,85 @@ mod tests {
         assert_eq!(eval_wall_alpha(0), MaterialAlphaMode::Mask);
         assert_eq!(eval_wall_alpha(128), MaterialAlphaMode::Blend(33));
         assert_eq!(eval_wall_alpha(512), MaterialAlphaMode::Blend(66));
+    }
+
+    #[test]
+    fn test_voxel_sprite_spawning_replaces_billboard() {
+        let mut app = App::new();
+        let map = crate::map::Map {
+            version: 7,
+            posx: 0,
+            posy: 0,
+            posz: 0,
+            ang: 0,
+            cursectnum: 0,
+            sectors: Vec::new(),
+            walls: Vec::new(),
+            sprites: vec![
+                crate::map::Sprite {
+                    x: 1024,
+                    y: 1024,
+                    z: -16384,
+                    cstat: 0, // Face sprite
+                    shade: 0,
+                    pal: 0,
+                    clipdist: 32,
+                    _filler: 0,
+                    xrepeat: 64,
+                    yrepeat: 64,
+                    xoffset: 0,
+                    yoffset: 0,
+                    picnum: FIRSTAID,
+                    ang: 0,
+                    xvel: 0,
+                    yvel: 0,
+                    zvel: 0,
+                    owner: 0,
+                    sectnum: 0,
+                    statnum: 0,
+                    lotag: 0,
+                    hitag: 0,
+                    extra: -1,
+                },
+            ],
+        };
+
+        let tile_textures = HashMap::new();
+        let tile_sizes = HashMap::new();
+        let picanm_map = HashMap::new();
+        let mut materials: Assets<StandardMaterial> = Assets::default();
+        let default_material = materials.add(StandardMaterial::default());
+        let mut meshes: Assets<Mesh> = Assets::default();
+
+        let builder = MapMeshBuilder::new(
+            &map,
+            &tile_textures,
+            &tile_sizes,
+            &picanm_map,
+            default_material,
+        );
+
+        let mut voxel_reg = crate::voxel::VoxelRegistry::new();
+        let pal = crate::palette::Palette::default();
+
+        let mut commands = app.world_mut().commands();
+        builder.build(
+            &mut commands,
+            &mut meshes,
+            &mut materials,
+            1,
+            Some(&mut voxel_reg),
+            Some(&pal),
+        );
+        app.update();
+
+        let mut voxel_query = app.world_mut().query::<(&crate::voxel::VoxelModelInstance, Option<&crate::SpriteBillboard>)>();
+        let mut found = false;
+        for (instance, billboard) in voxel_query.iter(app.world()) {
+            assert_eq!(instance.picnum, FIRSTAID);
+            assert!(billboard.is_none(), "Voxel pickups must not have SpriteBillboard");
+            found = true;
+        }
+        assert!(found, "Expected voxel model instance to be spawned for FIRSTAID");
     }
 }

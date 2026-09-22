@@ -92,7 +92,9 @@ fn main() {
         .add_plugins(config::ConfigPlugin)
         .add_plugins(net::NetPlugin)
         .add_plugins(lighting::DynamicLightingPlugin)
+        .add_plugins(voxel::VoxelPlugin)
         .init_resource::<palette::PaletteFlashState>()
+        .init_resource::<palette::Palette>()
         .configure_sets(
             Update,
             (
@@ -169,6 +171,7 @@ fn setup(
                         pal.lookups.len()
                     );
                 }
+                commands.insert_resource(pal.clone());
 
                 let mut art_files_found = 0;
                 for entry in &grp.entries {

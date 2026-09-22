@@ -17,6 +17,8 @@ pub fn handle_load_level_events(
     mut progress: ResMut<LevelProgress>,
     mut found_secrets: Option<ResMut<FoundSecretSectors>>,
     mut sound_events: EventWriter<crate::audio::PlayMusicTrackEvent>,
+    mut voxel_registry: Option<ResMut<crate::voxel::VoxelRegistry>>,
+    palette: Option<Res<crate::palette::Palette>>,
 ) {
     let Some(ref game_assets) = assets else {
         return;
@@ -123,6 +125,8 @@ pub fn handle_load_level_events(
                         &mut meshes,
                         &mut materials,
                         progress.skill as u8,
+                        voxel_registry.as_deref_mut(),
+                        palette.as_deref(),
                     );
 
                     // 7. Build runtime SectorMap for sector-aware gameplay queries

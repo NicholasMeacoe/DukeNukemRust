@@ -45,6 +45,7 @@ impl ConsoleState {
         level_event_writer: &mut EventWriter<crate::game_flow::LoadLevelEvent>,
         mut crt_config: Option<&mut crate::palette::CrtPostProcessConfig>,
         mut dynamic_lighting_config: Option<&mut crate::lighting::DynamicLightingConfig>,
+        mut voxel_config: Option<&mut crate::voxel::VoxelConfig>,
     ) {
         let trimmed = cmd_str.trim();
         if trimmed.is_empty() {
@@ -88,6 +89,10 @@ impl ConsoleState {
                 );
                 self.log(
                     "  clear                 - Clear console text buffer",
+                    [0.9, 0.9, 0.9, 1.0],
+                );
+                self.log(
+                    "  r_voxels <0|1>        - Toggle 3D voxel model replacement",
                     [0.9, 0.9, 0.9, 1.0],
                 );
                 self.log(
@@ -295,6 +300,25 @@ impl ConsoleState {
                     [0.2, 1.0, 0.8, 1.0],
                 );
             }
+            "r_voxels" | "voxels" => {
+                let enabled = if let Some(arg) = args.first() {
+                    arg.starts_with("1")
+                        || arg.eq_ignore_ascii_case("true")
+                        || arg.eq_ignore_ascii_case("on")
+                } else {
+                    true
+                };
+                if let Some(ref mut config) = voxel_config {
+                    config.enabled = enabled;
+                }
+                self.log(
+                    &format!(
+                        "3D Voxel Model Replacement: {}",
+                        if enabled { "ENABLED" } else { "DISABLED" }
+                    ),
+                    [0.2, 1.0, 0.8, 1.0],
+                );
+            }
             "r_stats" | "stats" => {
                 let enabled = if let Some(arg) = args.first() {
                     arg.starts_with("1")
@@ -354,6 +378,7 @@ pub fn handle_console_input_system(
     mut level_event_writer: EventWriter<crate::game_flow::LoadLevelEvent>,
     mut crt_config: Option<ResMut<crate::palette::CrtPostProcessConfig>>,
     mut dynamic_lighting_config: Option<ResMut<crate::lighting::DynamicLightingConfig>>,
+    mut voxel_config: Option<ResMut<crate::voxel::VoxelConfig>>,
 ) {
     if !console.is_open {
         return;
@@ -367,6 +392,7 @@ pub fn handle_console_input_system(
             &mut level_event_writer,
             crt_config.as_deref_mut(),
             dynamic_lighting_config.as_deref_mut(),
+            voxel_config.as_deref_mut(),
         );
         return;
     }
@@ -479,5 +505,47 @@ mod tests {
         // Toggle on
         light_config.enabled = true;
         assert!(light_config.enabled);
+    }
+
+    #[test]
+    fn test_console_voxels_cvar_mutation() {
+        let mut voxel_config = crate::voxel::VoxelConfig::default();
+        assert!(voxel_config.enabled);
+
+        // Toggle off
+        voxel_config.enabled = false;
+        assert!(!voxel_config.enabled);
+
+        // Toggle on
+        voxel_config.enabled = true;
+        assert!(voxel_config.enabled);
+    }
+
+    #[test]
+    fn test_console_voxel_cvar_command() {
+        let mut app = App::new();
+        app.add_event::<crate::game_flow::LoadLevelEvent>();
+        app.init_resource::<ConsoleState>();
+        app.init_resource::<crate::voxel::VoxelConfig>();
+
+        fn run_cmd(
+            mut console: ResMut<ConsoleState>,
+            mut player_query: Query<&mut crate::player::PlayerController>,
+            mut level_event_writer: EventWriter<crate::game_flow::LoadLevelEvent>,
+            mut voxel_config: ResMut<crate::voxel::VoxelConfig>,
+        ) {
+            console.execute_command(
+                "r_voxels 0",
+                &mut player_query,
+                &mut level_event_writer,
+                None,
+                None,
+                Some(&mut voxel_config),
+            );
+        }
+        app.add_systems(Update, run_cmd);
+        app.update();
+
+        assert!(!app.world().resource::<crate::voxel::VoxelConfig>().enabled);
     }
 }

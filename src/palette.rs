@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use std::collections::HashMap;
 
+#[derive(Resource, Clone, Debug)]
 pub struct Palette {
     pub colors: [[u8; 4]; 256],
     pub num_shades: u16,
@@ -9,6 +10,24 @@ pub struct Palette {
     pub water_palette: Option<[[u8; 4]; 256]>,
     pub slime_palette: Option<[[u8; 4]; 256]>,
     pub title_palette: Option<[[u8; 4]; 256]>,
+}
+
+impl Default for Palette {
+    fn default() -> Self {
+        let mut colors = [[0u8; 4]; 256];
+        for i in 0..256 {
+            colors[i] = [i as u8, i as u8, i as u8, 255];
+        }
+        Self {
+            colors,
+            num_shades: 32,
+            shade_tables: Vec::new(),
+            lookups: HashMap::new(),
+            water_palette: None,
+            slime_palette: None,
+            title_palette: None,
+        }
+    }
 }
 
 impl Palette {
