@@ -302,11 +302,18 @@ pub fn handle_explosions(
     mut tag_events: EventWriter<ActivateTagEvent>,
     mut sound_events: EventWriter<PlaySoundEvent>,
     mut gib_events: EventWriter<crate::combat::GibEvent>,
+    mut light_events: EventWriter<crate::lighting::SpawnDynamicLightEvent>,
     mut tint: Option<ResMut<crate::hud::ScreenTintState>>,
     mut commands: Commands,
 ) {
     for exp in explosion_events.read() {
         let origin = exp.origin;
+
+        // Dynamic point light flash for explosion
+        light_events.send(crate::lighting::SpawnDynamicLightEvent::explosion(
+            origin,
+            exp.radius * 20.0,
+        ));
 
         // Screen tint flash on major explosion
         if let Some(ref mut t) = tint {
@@ -515,6 +522,7 @@ mod tests {
             .add_event::<ActivateTagEvent>()
             .add_event::<PlaySoundEvent>()
             .add_event::<crate::combat::GibEvent>()
+            .add_event::<crate::lighting::SpawnDynamicLightEvent>()
             .init_resource::<crate::hud::ScreenTintState>()
             .add_systems(Update, handle_explosions);
 

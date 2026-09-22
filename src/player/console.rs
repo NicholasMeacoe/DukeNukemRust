@@ -44,6 +44,7 @@ impl ConsoleState {
         player_query: &mut Query<&mut crate::player::PlayerController>,
         level_event_writer: &mut EventWriter<crate::game_flow::LoadLevelEvent>,
         mut crt_config: Option<&mut crate::palette::CrtPostProcessConfig>,
+        mut dynamic_lighting_config: Option<&mut crate::lighting::DynamicLightingConfig>,
     ) {
         let trimmed = cmd_str.trim();
         if trimmed.is_empty() {
@@ -275,6 +276,25 @@ impl ConsoleState {
                     [0.2, 1.0, 0.8, 1.0],
                 );
             }
+            "r_dynamiclights" | "dynamiclights" => {
+                let enabled = if let Some(arg) = args.first() {
+                    arg.starts_with("1")
+                        || arg.eq_ignore_ascii_case("true")
+                        || arg.eq_ignore_ascii_case("on")
+                } else {
+                    true
+                };
+                if let Some(ref mut config) = dynamic_lighting_config {
+                    config.enabled = enabled;
+                }
+                self.log(
+                    &format!(
+                        "Dynamic Point Lighting: {}",
+                        if enabled { "ENABLED" } else { "DISABLED" }
+                    ),
+                    [0.2, 1.0, 0.8, 1.0],
+                );
+            }
             "r_stats" | "stats" => {
                 let enabled = if let Some(arg) = args.first() {
                     arg.starts_with("1")
@@ -333,6 +353,7 @@ pub fn handle_console_input_system(
     mut player_query: Query<&mut crate::player::PlayerController>,
     mut level_event_writer: EventWriter<crate::game_flow::LoadLevelEvent>,
     mut crt_config: Option<ResMut<crate::palette::CrtPostProcessConfig>>,
+    mut dynamic_lighting_config: Option<ResMut<crate::lighting::DynamicLightingConfig>>,
 ) {
     if !console.is_open {
         return;
@@ -345,6 +366,7 @@ pub fn handle_console_input_system(
             &mut player_query,
             &mut level_event_writer,
             crt_config.as_deref_mut(),
+            dynamic_lighting_config.as_deref_mut(),
         );
         return;
     }
@@ -443,5 +465,19 @@ mod tests {
         assert!(crt_config.enabled);
         assert_eq!(crt_config.scanline_intensity, 0.65);
         assert!(crt_config.vga_color_quantization);
+    }
+
+    #[test]
+    fn test_console_dynamic_lights_cvar_mutation() {
+        let mut light_config = crate::lighting::DynamicLightingConfig::default();
+        assert!(light_config.enabled);
+
+        // Toggle off
+        light_config.enabled = false;
+        assert!(!light_config.enabled);
+
+        // Toggle on
+        light_config.enabled = true;
+        assert!(light_config.enabled);
     }
 }

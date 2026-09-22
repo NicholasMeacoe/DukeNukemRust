@@ -24,7 +24,46 @@ pub fn spawn_projectiles(mut events: EventReader<SpawnProjectileEvent>, mut comm
             _ => 0,
         };
 
-        commands.spawn((
+        let maybe_light = match ev.projectile_type {
+            ProjectileType::Rocket | ProjectileType::Mortar => Some(crate::lighting::ProjectileLight {
+                color: Color::srgb(1.0, 0.5, 0.1),
+                intensity: 80_000.0,
+                range: 15.0,
+            }),
+            ProjectileType::DevastatorMissile => Some(crate::lighting::ProjectileLight {
+                color: Color::srgb(1.0, 0.6, 0.2),
+                intensity: 60_000.0,
+                range: 12.0,
+            }),
+            ProjectileType::ShrinkRay => Some(crate::lighting::ProjectileLight {
+                color: Color::srgb(0.3, 1.0, 0.2),
+                intensity: 70_000.0,
+                range: 12.0,
+            }),
+            ProjectileType::FreezeShard => Some(crate::lighting::ProjectileLight {
+                color: Color::srgb(0.3, 0.85, 1.0),
+                intensity: 50_000.0,
+                range: 10.0,
+            }),
+            ProjectileType::AlienBlaster => Some(crate::lighting::ProjectileLight {
+                color: Color::srgb(1.0, 0.2, 0.1),
+                intensity: 60_000.0,
+                range: 12.0,
+            }),
+            ProjectileType::PsiBlast => Some(crate::lighting::ProjectileLight {
+                color: Color::srgb(0.8, 0.2, 0.9),
+                intensity: 65_000.0,
+                range: 13.0,
+            }),
+            ProjectileType::ExpanderRay => Some(crate::lighting::ProjectileLight {
+                color: Color::srgb(0.85, 0.35, 1.0),
+                intensity: 60_000.0,
+                range: 12.0,
+            }),
+            _ => None,
+        };
+
+        let mut ent_cmd = commands.spawn((
             Projectile {
                 projectile_type: ev.projectile_type,
                 velocity: vel,
@@ -35,6 +74,10 @@ pub fn spawn_projectiles(mut events: EventReader<SpawnProjectileEvent>, mut comm
             },
             TransformBundle::from_transform(Transform::from_translation(ev.origin)),
         ));
+
+        if let Some(light) = maybe_light {
+            ent_cmd.insert(light);
+        }
     }
 }
 

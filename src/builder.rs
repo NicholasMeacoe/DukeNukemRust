@@ -78,7 +78,7 @@ impl<'a> MapMeshBuilder<'a> {
                 base_color_texture: Some(tex_handle.clone()),
                 base_color,
                 alpha_mode: bevy_alpha,
-                unlit: true,
+                unlit: false,
                 double_sided: true,
                 perceptual_roughness: 1.0,
                 ..default()

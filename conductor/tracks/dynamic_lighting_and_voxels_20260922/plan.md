@@ -1,16 +1,16 @@
 # Implementation Plan: Dynamic Lighting & Ken Silverman KVX Voxel Model Support
 
 ## Phase 1: Dynamic Point Lighting Engine & Transient Light Lifecycle
-- [ ] Task: Write Tests for Dynamic Light Lifecycles & Pooling
-  - [ ] Unit tests for transient light decay (`DynamicLightPool`, `TransientLight`, max count limits)
-  - [ ] Unit tests for muzzle flash and explosion light parameter mapping (radius, intensity, color)
-- [ ] Task: Implement Dynamic Light Entities & Systems
-  - [ ] Create `src/lighting.rs` with `DynamicLight`, `TransientLight`, and `DynamicLightingConfig`
-  - [ ] Implement decay system `update_transient_lights` attenuating intensity and despawning expired lights
-  - [ ] Implement dynamic light emitter hooks in `player/weapons.rs` (muzzle flashes), `combat/projectiles.rs` (rocket/laser trails), and `interactivity/props.rs` (explosions)
-  - [ ] Add console/cvar toggle `r_dynamiclights 0/1` in `src/player/console.rs`
-- [ ] Task: Phase 1 Verification & Checkpoint (Refer to workflow.md)
-  - [ ] Verify weapon discharges, flying projectiles, and explosions cast dynamic light with smooth decay and no leaks
+- [x] Task: Write Tests for Dynamic Light Lifecycles & Pooling
+  - [x] Unit tests for transient light decay (`DynamicLightPool`, `TransientLight`, max count limits)
+  - [x] Unit tests for muzzle flash and explosion light parameter mapping (radius, intensity, color)
+- [x] Task: Implement Dynamic Light Entities & Systems
+  - [x] Create `src/lighting.rs` with `DynamicLight`, `TransientLight`, and `DynamicLightingConfig`
+  - [x] Implement decay system `update_transient_lights` attenuating intensity and despawning expired lights
+  - [x] Implement dynamic light emitter hooks in `player/weapons.rs` (muzzle flashes), `combat/projectiles.rs` (rocket/laser trails), and `interactivity/props.rs` (explosions)
+  - [x] Add console/cvar toggle `r_dynamiclights 0/1` in `src/player/console.rs`
+- [x] Task: Phase 1 Verification & Checkpoint (Refer to workflow.md)
+  - [x] Verify weapon discharges, flying projectiles, and explosions cast dynamic light with smooth decay and no leaks
 
 ## Phase 2: Ken Silverman KVX Voxel Binary Parser
 - [ ] Task: Write Tests for KVX Parsing & Slab Extraction

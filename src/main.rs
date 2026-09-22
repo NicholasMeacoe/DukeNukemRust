@@ -11,6 +11,7 @@ mod grp;
 pub mod hud;
 mod interactivity;
 mod kwv;
+pub mod lighting;
 mod map;
 pub mod names;
 pub mod net;
@@ -89,6 +90,7 @@ fn main() {
         .add_plugins(demo::DemoPlugin)
         .add_plugins(config::ConfigPlugin)
         .add_plugins(net::NetPlugin)
+        .add_plugins(lighting::DynamicLightingPlugin)
         .init_resource::<palette::PaletteFlashState>()
         .configure_sets(
             Update,
@@ -309,26 +311,15 @@ fn setup(
         commands.insert_resource(con_engine);
     }
 
-    commands.spawn(PointLightBundle {
-        point_light: PointLight {
-            shadows_enabled: true,
-            intensity: 10_000_000.0,
-            range: 2000.0,
-            ..default()
-        },
-        transform: Transform::from_xyz(start_pos.x, start_pos.y + 20.0, start_pos.z),
-        ..default()
-    });
-
     commands.insert_resource(AmbientLight {
         color: Color::WHITE,
-        brightness: 2000.0,
+        brightness: 800.0,
     });
 
     commands.spawn(DirectionalLightBundle {
         directional_light: DirectionalLight {
-            shadows_enabled: true,
-            illuminance: 20000.0,
+            shadows_enabled: false,
+            illuminance: 800.0,
             ..default()
         },
         transform: Transform::from_rotation(Quat::from_rotation_x(-std::f32::consts::FRAC_PI_4)),

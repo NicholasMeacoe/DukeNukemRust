@@ -84,10 +84,19 @@ pub fn handle_weapon_firing(
     time: Res<Time>,
     mut query: Query<(&Transform, &mut PlayerController), Without<Projectile>>,
     camera_query: Query<&Transform, (With<Camera>, Without<PlayerController>, Without<Projectile>)>,
-    mut projectile_events: EventWriter<SpawnProjectileEvent>,
-    mut explosion_events: EventWriter<ExplosionDamageEvent>,
-    mut sound_events: EventWriter<PlaySoundEvent>,
-    mut casing_events: EventWriter<crate::combat::gore::SpawnCasingEvent>,
+    (
+        mut projectile_events,
+        mut explosion_events,
+        mut sound_events,
+        mut casing_events,
+        mut light_events,
+    ): (
+        EventWriter<SpawnProjectileEvent>,
+        EventWriter<ExplosionDamageEvent>,
+        EventWriter<PlaySoundEvent>,
+        EventWriter<crate::combat::gore::SpawnCasingEvent>,
+        EventWriter<crate::lighting::SpawnDynamicLightEvent>,
+    ),
     pipebomb_query: Query<(Entity, &Transform, &Projectile), Without<PlayerController>>,
     mut commands: Commands,
     mut rng: ResMut<crate::net::DeterministicRng>,
@@ -169,6 +178,10 @@ pub fn handle_weapon_firing(
                     radius: 7.0,
                     damage: 150,
                 });
+                light_events.send(crate::lighting::SpawnDynamicLightEvent::explosion(
+                    p_trans.translation,
+                    7.0 * 20.0,
+                ));
                 commands.entity(entity).despawn_recursive();
             }
         }
@@ -213,6 +226,10 @@ pub fn handle_weapon_firing(
                     player.weapons[cur_idx].ammo = player.weapons[cur_idx].ammo.saturating_sub(1);
                     player.weapons[cur_idx].fire_timer = player.weapons[cur_idx].fire_delay;
                     sound_events.send(PlaySoundEvent { sound_id: 3 }); // PISTOL_FIRE
+                    light_events.send(crate::lighting::SpawnDynamicLightEvent::muzzle_flash(
+                        fire_pos,
+                        WeaponType::Pistol,
+                    ));
 
                     casing_events.send(crate::combat::gore::SpawnCasingEvent {
                         origin: fire_pos,
@@ -242,6 +259,10 @@ pub fn handle_weapon_firing(
                     player.weapons[cur_idx].ammo -= 1;
                     player.weapons[cur_idx].fire_timer = player.weapons[cur_idx].fire_delay;
                     sound_events.send(PlaySoundEvent { sound_id: 109 }); // SHOTGUN_FIRE
+                    light_events.send(crate::lighting::SpawnDynamicLightEvent::muzzle_flash(
+                        fire_pos,
+                        WeaponType::Shotgun,
+                    ));
 
                     casing_events.send(crate::combat::gore::SpawnCasingEvent {
                         origin: fire_pos,
@@ -272,6 +293,10 @@ pub fn handle_weapon_firing(
                     player.weapons[cur_idx].ammo -= 1;
                     player.weapons[cur_idx].fire_timer = player.weapons[cur_idx].fire_delay;
                     sound_events.send(PlaySoundEvent { sound_id: 6 }); // CHAINGUN_FIRE
+                    light_events.send(crate::lighting::SpawnDynamicLightEvent::muzzle_flash(
+                        fire_pos,
+                        WeaponType::Chaingun,
+                    ));
 
                     casing_events.send(crate::combat::gore::SpawnCasingEvent {
                         origin: fire_pos,
@@ -299,6 +324,10 @@ pub fn handle_weapon_firing(
                     player.weapons[cur_idx].ammo -= 1;
                     player.weapons[cur_idx].fire_timer = player.weapons[cur_idx].fire_delay;
                     sound_events.send(PlaySoundEvent { sound_id: 7 }); // RPG_FIRE
+                    light_events.send(crate::lighting::SpawnDynamicLightEvent::muzzle_flash(
+                        fire_pos,
+                        WeaponType::Rpg,
+                    ));
 
                     projectile_events.send(SpawnProjectileEvent {
                         projectile_type: ProjectileType::Rocket,
@@ -333,6 +362,10 @@ pub fn handle_weapon_firing(
                     player.weapons[cur_idx].ammo -= 1;
                     player.weapons[cur_idx].fire_timer = player.weapons[cur_idx].fire_delay;
                     sound_events.send(PlaySoundEvent { sound_id: 11 }); // SHRINKER_FIRE
+                    light_events.send(crate::lighting::SpawnDynamicLightEvent::muzzle_flash(
+                        fire_pos,
+                        WeaponType::Shrinker,
+                    ));
 
                     projectile_events.send(SpawnProjectileEvent {
                         projectile_type: ProjectileType::ShrinkRay,
@@ -349,6 +382,10 @@ pub fn handle_weapon_firing(
                     player.weapons[cur_idx].ammo -= 1;
                     player.weapons[cur_idx].fire_timer = player.weapons[cur_idx].fire_delay;
                     sound_events.send(PlaySoundEvent { sound_id: 10 }); // CAT_FIRE
+                    light_events.send(crate::lighting::SpawnDynamicLightEvent::muzzle_flash(
+                        fire_pos,
+                        WeaponType::Devastator,
+                    ));
 
                     player.devastator_alt_side = !player.devastator_alt_side;
                     let side_offset = if player.devastator_alt_side {
@@ -486,6 +523,10 @@ pub fn handle_weapon_firing(
                     player.weapons[cur_idx].ammo -= 1;
                     player.weapons[cur_idx].fire_timer = player.weapons[cur_idx].fire_delay;
                     sound_events.send(PlaySoundEvent { sound_id: 110 }); // SOMETHINGFROZE
+                    light_events.send(crate::lighting::SpawnDynamicLightEvent::muzzle_flash(
+                        fire_pos,
+                        WeaponType::Freezethrower,
+                    ));
 
                     projectile_events.send(SpawnProjectileEvent {
                         projectile_type: ProjectileType::FreezeShard,
@@ -502,6 +543,10 @@ pub fn handle_weapon_firing(
                     player.weapons[cur_idx].ammo -= 1;
                     player.weapons[cur_idx].fire_timer = player.weapons[cur_idx].fire_delay;
                     sound_events.send(PlaySoundEvent { sound_id: 11 }); // EXPANDER_FIRE
+                    light_events.send(crate::lighting::SpawnDynamicLightEvent::muzzle_flash(
+                        fire_pos,
+                        WeaponType::Expander,
+                    ));
 
                     projectile_events.send(SpawnProjectileEvent {
                         projectile_type: ProjectileType::ExpanderRay,
@@ -524,6 +569,10 @@ pub fn handle_weapon_firing(
                             radius: 7.0,
                             damage: 150,
                         });
+                        light_events.send(crate::lighting::SpawnDynamicLightEvent::explosion(
+                            p_trans.translation,
+                            7.0 * 20.0,
+                        ));
                         commands.entity(entity).despawn_recursive();
                     }
                 }
