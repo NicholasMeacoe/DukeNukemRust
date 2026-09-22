@@ -1,14 +1,14 @@
 # Implementation Plan: Environmental & Interactive 3D Voxel Props Expansion
 
 ## Phase 1: Environmental Prop Voxel Models & Procedural Generation
-- [ ] Task: Write Tests for Prop Voxel Models
-  - [ ] Unit tests verifying registration of prop picnums in `VoxelRegistry` (Barrels, Fire Extinguisher, Camera, Fan, Fountain)
-  - [ ] Unit tests verifying prop voxel dimensions, solid voxel counts, and pivot offsets
-- [ ] Task: Implement Procedural KVX Voxel Models
-  - [ ] Implement `create_barrel_model`, `create_fireext_model`, `create_camera_model`, `create_fan_model`, and `create_fountain_model` in `src/voxel/registry.rs`
-  - [ ] Register all environmental prop models in `VoxelRegistry::register_default_models`
-- [ ] Task: Phase 1 Verification & Checkpoint (Refer to workflow.md)
-  - [ ] Verify generated voxel models produce valid surface-culled meshes with correct palette colors
+- [x] Task: Write Tests for Prop Voxel Models
+  - [x] Unit tests verifying registration of prop picnums in `VoxelRegistry` (Barrels, Fire Extinguisher, Camera, Fan, Fountain)
+  - [x] Unit tests verifying prop voxel dimensions, solid voxel counts, and pivot offsets
+- [x] Task: Implement Procedural KVX Voxel Models
+  - [x] Implement `create_barrel_model`, `create_fireext_model`, `create_camera_model`, `create_fan_model`, and `create_fountain_model` in `src/voxel/registry.rs`
+  - [x] Register all environmental prop models in `VoxelRegistry::register_default_models`
+- [x] Task: Phase 1 Verification & Checkpoint (Refer to workflow.md)
+  - [x] Verify generated voxel models produce valid surface-culled meshes with correct palette colors
 
 ## Phase 2: Kinetic & Motorized Voxel Prop Systems
 - [ ] Task: Write Tests for Kinetic Prop Animations

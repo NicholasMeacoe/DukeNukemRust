@@ -256,7 +256,276 @@ impl VoxelRegistry {
             rpg.set_voxel(x, 3, 4, Some(96));
         }
         self.register(RPGSPRITE, rpg);
+
+        // 11. Explosive & Radioactive Barrels
+        self.register(EXPLODINGBARREL, create_barrel_model(240, 0, Some(144), false, false));
+        self.register(EXPLODINGBARREL2, create_barrel_model(242, 0, Some(144), false, false));
+        self.register(FIREBARREL, create_barrel_model(24, 0, None, false, false));
+        self.register(NUKEBARREL, create_barrel_model(96, 0, Some(144), false, false));
+        self.register(NUKEBARRELDENTED, create_barrel_model(96, 0, Some(144), true, false));
+        self.register(NUKEBARRELLEAKED, create_barrel_model(96, 0, Some(144), false, true));
+
+        // 12. Fire Extinguisher
+        self.register(FIREEXT, create_fireext_model());
+
+        // 13. Security Camera
+        self.register(CAMERA1, create_camera_model());
+
+        // 14. Ceiling Fan (Tile 617)
+        self.register(617, create_fan_model());
+
+        // 15. Drinking Water Fountain
+        let fountain = create_fountain_model();
+        self.register(WATERFOUNTAIN, fountain.clone());
+        self.register(565, fountain);
     }
+}
+
+/// Procedural voxel model generator for explosive, burning, and toxic waste barrels.
+pub fn create_barrel_model(
+    body_color: u8,
+    rim_color: u8,
+    stripe_color: Option<u8>,
+    dented: bool,
+    leaked: bool,
+) -> KvxModel {
+    let mut barrel = KvxModel::new(16, 16, 22, Vec3::new(8.0, 8.0, 0.0));
+    for x in 0..16 {
+        for y in 0..16 {
+            let dx = x as f32 - 7.5;
+            let dy = y as f32 - 7.5;
+            let dist_sq = dx * dx + dy * dy;
+            if dist_sq <= 49.0 {
+                for z in 0..22 {
+                    if dented && x >= 10 && y >= 10 && (6..14).contains(&z) {
+                        continue; // Dent cutout
+                    }
+                    let color = if z == 0 || z == 1 || z == 10 || z == 11 || z == 20 || z == 21 {
+                        rim_color
+                    } else if let Some(sc) = stripe_color {
+                        if (8..14).contains(&z) && (x + y) % 4 < 2 {
+                            sc
+                        } else {
+                            body_color
+                        }
+                    } else {
+                        body_color
+                    };
+                    barrel.set_voxel(x, y, z, Some(color));
+                }
+            }
+        }
+    }
+    if leaked {
+        // Toxic green puddle base
+        for x in 2..14 {
+            for y in 2..14 {
+                let dx = x as f32 - 7.5;
+                let dy = y as f32 - 7.5;
+                if dx * dx + dy * dy <= 36.0 && barrel.get_voxel(x, y, 21).is_none() {
+                    barrel.set_voxel(x, y, 21, Some(100)); // Toxic slime
+                }
+            }
+        }
+    }
+    barrel
+}
+
+/// Procedural voxel model generator for wall-mounted red fire extinguisher.
+pub fn create_fireext_model() -> KvxModel {
+    let mut model = KvxModel::new(10, 10, 20, Vec3::new(5.0, 5.0, 0.0));
+    for x in 0..10 {
+        for y in 0..10 {
+            let dx = x as f32 - 4.5;
+            let dy = y as f32 - 4.5;
+            let dist_sq = dx * dx + dy * dy;
+            if dist_sq <= 16.0 {
+                for z in 3..18 {
+                    let color = if (8..12).contains(&z) && y >= 7 && (3..7).contains(&x) {
+                        250 // White instruction label
+                    } else {
+                        240 // Red tank
+                    };
+                    model.set_voxel(x, y, z, Some(color));
+                }
+            }
+        }
+    }
+    // Valve and handle at top
+    for z in 0..3 {
+        for x in 4..6 {
+            for y in 4..6 {
+                model.set_voxel(x, y, z, Some(0)); // Valve stem
+            }
+        }
+    }
+    for x in 3..8 {
+        model.set_voxel(x, 5, 1, Some(0)); // Handle lever
+    }
+    model.set_voxel(6, 4, 1, Some(250)); // Pressure gauge
+    // Side hose
+    for z in 3..13 {
+        model.set_voxel(1, 5, z, Some(0));
+    }
+    model
+}
+
+/// Procedural voxel model generator for security / surveillance camera.
+pub fn create_camera_model() -> KvxModel {
+    let mut model = KvxModel::new(12, 16, 10, Vec3::new(6.0, 2.0, 5.0));
+    // Wall mount plate
+    for x in 4..8 {
+        for y in 0..3 {
+            for z in 3..7 {
+                model.set_voxel(x, y, z, Some(24));
+            }
+        }
+    }
+    // Swivel joint
+    for x in 5..7 {
+        for y in 2..5 {
+            for z in 4..6 {
+                model.set_voxel(x, y, z, Some(16));
+            }
+        }
+    }
+    // Camera main body
+    for x in 2..10 {
+        for y in 5..15 {
+            for z in 2..8 {
+                model.set_voxel(x, y, z, Some(248)); // Pale industrial beige
+            }
+        }
+    }
+    // Front lens
+    for x in 4..8 {
+        for z in 3..7 {
+            model.set_voxel(x, 15, z, Some(0)); // Black lens bezel
+        }
+    }
+    for x in 5..7 {
+        for z in 4..6 {
+            model.set_voxel(x, 15, z, Some(196)); // Blue optical glass
+        }
+    }
+    // Status LED
+    model.set_voxel(3, 15, 7, Some(240)); // Red recording LED
+    model
+}
+
+/// Procedural voxel model generator for 4-blade industrial ceiling fan.
+pub fn create_fan_model() -> KvxModel {
+    let mut model = KvxModel::new(28, 28, 6, Vec3::new(14.0, 14.0, 5.0));
+    // Motor hub
+    for x in 0..28 {
+        for y in 0..28 {
+            let dx = x as f32 - 13.5;
+            let dy = y as f32 - 13.5;
+            let dist_sq = dx * dx + dy * dy;
+            if dist_sq <= 12.0 {
+                for z in 1..5 {
+                    model.set_voxel(x, y, z, Some(24)); // Steel housing
+                }
+            }
+            if dist_sq <= 3.0 {
+                model.set_voxel(x, y, 0, Some(0)); // Downrod mount
+            }
+        }
+    }
+    // 4 Blades (+X, -X, +Y, -Y)
+    for x in 17..27 {
+        for y in 12..16 {
+            model.set_voxel(x, y, 3, Some(160)); // Wood blade
+        }
+    }
+    for x in 1..11 {
+        for y in 12..16 {
+            model.set_voxel(x, y, 3, Some(160));
+        }
+    }
+    for y in 17..27 {
+        for x in 12..16 {
+            model.set_voxel(x, y, 3, Some(160));
+        }
+    }
+    for y in 1..11 {
+        for x in 12..16 {
+            model.set_voxel(x, y, 3, Some(160));
+        }
+    }
+    // Brass blade brackets
+    for x in 14..18 {
+        for y in 13..15 {
+            model.set_voxel(x, y, 3, Some(144));
+        }
+    }
+    for x in 10..14 {
+        for y in 13..15 {
+            model.set_voxel(x, y, 3, Some(144));
+        }
+    }
+    for y in 14..18 {
+        for x in 13..15 {
+            model.set_voxel(x, y, 3, Some(144));
+        }
+    }
+    for y in 10..14 {
+        for x in 13..15 {
+            model.set_voxel(x, y, 3, Some(144));
+        }
+    }
+    model
+}
+
+/// Procedural voxel model generator for drinking water fountain.
+pub fn create_fountain_model() -> KvxModel {
+    let mut model = KvxModel::new(14, 12, 14, Vec3::new(7.0, 2.0, 7.0));
+    // Wall backplate
+    for x in 2..12 {
+        for y in 0..2 {
+            for z in 1..13 {
+                model.set_voxel(x, y, z, Some(24));
+            }
+        }
+    }
+    // Basin body
+    for x in 3..11 {
+        for y in 2..10 {
+            for z in 4..12 {
+                model.set_voxel(x, y, z, Some(250)); // Brushed steel
+            }
+        }
+    }
+    // Recessed basin cutout
+    for x in 4..10 {
+        for y in 3..9 {
+            for z in 4..7 {
+                model.set_voxel(x, y, z, None);
+            }
+        }
+    }
+    // Water pool
+    for x in 5..9 {
+        for y in 4..8 {
+            model.set_voxel(x, y, 6, Some(196)); // Water blue
+        }
+    }
+    // Bubbler spigot
+    for x in 6..8 {
+        for y in 7..9 {
+            for z in 2..5 {
+                model.set_voxel(x, y, z, Some(248)); // Chrome
+            }
+        }
+    }
+    // Side push bar
+    for z in 7..9 {
+        for y in 4..8 {
+            model.set_voxel(11, y, z, Some(0));
+            model.set_voxel(12, y, z, Some(0));
+        }
+    }
+    model
 }
 
 /// System that rotates and bobs 3D voxel pickups in the game world.
@@ -363,5 +632,62 @@ pub mod tests {
 
         let atomic = reg.get_model(ATOMICHEALTH).unwrap();
         assert!(atomic.solid_count() > 50);
+    }
+
+    #[test]
+    fn test_environmental_prop_voxel_models_registration() {
+        let reg = VoxelRegistry::new();
+
+        // 1. Barrels
+        assert!(reg.has_voxel(EXPLODINGBARREL), "Explosive barrel 1 must be registered");
+        assert!(reg.has_voxel(EXPLODINGBARREL2), "Explosive barrel 2 must be registered");
+        assert!(reg.has_voxel(FIREBARREL), "Fire barrel must be registered");
+        assert!(reg.has_voxel(NUKEBARREL), "Nuke barrel must be registered");
+        assert!(reg.has_voxel(NUKEBARRELDENTED), "Nuke barrel dented must be registered");
+        assert!(reg.has_voxel(NUKEBARRELLEAKED), "Nuke barrel leaked must be registered");
+
+        // 2. Fire extinguisher
+        assert!(reg.has_voxel(FIREEXT), "Fire extinguisher must be registered");
+
+        // 3. Security camera
+        assert!(reg.has_voxel(CAMERA1), "Security camera must be registered");
+
+        // 4. Ceiling fan
+        assert!(reg.has_voxel(617), "Ceiling fan (tile 617) must be registered");
+
+        // 5. Water fountain
+        assert!(reg.has_voxel(WATERFOUNTAIN), "Water fountain must be registered");
+        assert!(reg.has_voxel(565), "Water fountain variant 565 must be registered");
+
+        let barrel = reg.get_model(EXPLODINGBARREL).unwrap();
+        assert!(barrel.solid_count() > 100, "Barrel must have solid voxel volume");
+        assert!(barrel.xsiz >= 10 && barrel.zsiz >= 16);
+
+        let fireext = reg.get_model(FIREEXT).unwrap();
+        assert!(fireext.solid_count() > 30);
+
+        let camera = reg.get_model(CAMERA1).unwrap();
+        assert!(camera.solid_count() > 20);
+
+        let fan = reg.get_model(617).unwrap();
+        assert!(fan.solid_count() > 30);
+
+        let fountain = reg.get_model(WATERFOUNTAIN).unwrap();
+        assert!(fountain.solid_count() > 50);
+    }
+
+    #[test]
+    fn test_prop_voxel_surface_meshing() {
+        let mut reg = VoxelRegistry::new();
+        let pal = Palette::default();
+        let mut meshes = Assets::<Mesh>::default();
+
+        let barrel_mesh = reg.get_or_create_mesh(EXPLODINGBARREL, &pal, &mut meshes).unwrap();
+        let mesh = meshes.get(&barrel_mesh).unwrap();
+        assert!(mesh.count_vertices() > 0);
+
+        let fan_mesh = reg.get_or_create_mesh(617, &pal, &mut meshes).unwrap();
+        let mesh = meshes.get(&fan_mesh).unwrap();
+        assert!(mesh.count_vertices() > 0);
     }
 }
