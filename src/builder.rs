@@ -870,9 +870,32 @@ impl<'a> MapMeshBuilder<'a> {
 
                 let is_enemy = sprite.picnum == PIGCOP;
 
+                let is_barrel = matches!(
+                    sprite.picnum,
+                    EXPLODINGBARREL
+                        | EXPLODINGBARREL2
+                        | FIREBARREL
+                        | NUKEBARREL
+                        | NUKEBARRELDENTED
+                        | NUKEBARRELLEAKED
+                );
+                let is_wall_prop = matches!(
+                    sprite.picnum,
+                    FIREEXT | CAMERA1 | 500 | WATERFOUNTAIN | 564 | 565
+                );
+                let is_ceiling_fan = sprite.picnum == 617;
+                let is_env_prop = is_barrel || is_wall_prop || is_ceiling_fan;
+
                 // In Build Engine, Z is the bottom of the sprite unless cstat & 128 is set (Centered)
                 let is_centered = (sprite.cstat & 128) != 0;
-                if !is_centered {
+                if is_ceiling_fan {
+                    if let Some(sector) = self.map.sectors.get(sprite.sectnum as usize) {
+                        pos.y = -(sector.ceilingz as f32) / (1024.0 * 16.0);
+                    }
+                } else if is_barrel {
+                    // For barrels with voxel models, pivot.z == 0 means mesh bottom is at local y=0.
+                    // Keep pos.y directly at the floor elevation without half-height offset.
+                } else if !is_centered {
                     pos.y += scale_y / 2.0;
                 }
 
@@ -880,19 +903,27 @@ impl<'a> MapMeshBuilder<'a> {
                 let mut voxel_mesh_opt = None;
                 let mut voxel_mat_opt = None;
 
-                if !is_wall_aligned && !is_floor_aligned {
-                    if let (Some(ref mut reg), Some(pal)) = (&mut voxel_registry, palette) {
-                        if reg.has_voxel(sprite.picnum) {
-                            voxel_mesh_opt = reg.get_or_create_mesh(sprite.picnum, pal, meshes);
-                            voxel_mat_opt = Some(reg.get_or_create_material(materials));
-                        }
+                if let (Some(ref mut reg), Some(pal)) = (&mut voxel_registry, palette) {
+                    if reg.has_voxel(sprite.picnum) {
+                        voxel_mesh_opt = reg.get_or_create_mesh(sprite.picnum, pal, meshes);
+                        voxel_mat_opt = Some(reg.get_or_create_material(materials));
                     }
                 }
 
                 let is_voxel = voxel_mesh_opt.is_some() && voxel_mat_opt.is_some();
 
                 let (mesh_handle, mat_handle, transform) = if is_voxel {
-                    let t = Transform::from_translation(pos);
+                    let mut t = Transform::from_translation(pos);
+                    if is_wall_aligned || is_wall_prop {
+                        let angle_rad = ((512.0 - sprite.ang as f32) / 2048.0) * std::f32::consts::TAU;
+                        t.rotation = Quat::from_rotation_y(angle_rad);
+                        // Standoff offset along outward wall normal to avoid clipping into wall collider
+                        let normal = t.rotation * Vec3::Z;
+                        t.translation += normal * 0.05;
+                    } else if is_ceiling_fan {
+                        let angle_rad = ((512.0 - sprite.ang as f32) / 2048.0) * std::f32::consts::TAU;
+                        t.rotation = Quat::from_rotation_y(angle_rad);
+                    }
                     (voxel_mesh_opt.unwrap(), voxel_mat_opt.unwrap(), t)
                 } else {
                     let sprite_alpha = if (sprite.cstat & 512) != 0 {
@@ -973,7 +1004,14 @@ impl<'a> MapMeshBuilder<'a> {
                 }
 
                 if is_voxel {
-                    entity_cmds.insert(crate::voxel::VoxelModelInstance::new_pickup(sprite.picnum, pos.y));
+                    if is_env_prop {
+                        entity_cmds.insert(crate::voxel::VoxelModelInstance::new_prop(sprite.picnum, pos.y));
+                    } else {
+                        entity_cmds.insert(crate::voxel::VoxelModelInstance::new_pickup(sprite.picnum, pos.y));
+                    }
+                    if is_ceiling_fan {
+                        entity_cmds.insert(crate::voxel::CeilingFanVoxel::default());
+                    }
                 } else if !is_wall_aligned && !is_floor_aligned {
                     entity_cmds.insert(crate::SpriteBillboard);
                 }
@@ -1224,12 +1262,16 @@ impl<'a> MapMeshBuilder<'a> {
                     }
                     // SECURITY CAMERA (CAMERA1)
                     CAMERA1 | 500 => {
+                        let angle_rad = ((512.0 - sprite.ang as f32) / 2048.0) * std::f32::consts::TAU;
                         entity_cmds.insert(crate::interactivity::SecurityCamera {
                             tag: sprite.hitag,
                             sweep_angle: 0.0,
                             sweep_speed: 1.0,
                             base_yaw: sprite.ang as f32,
                         });
+                        if is_voxel {
+                            entity_cmds.insert(crate::voxel::SecurityCameraVoxel::new(angle_rad, 0.7, 1.2));
+                        }
                     }
                     // EXPLODING BARREL & RADIOACTIVE BARRELS
                     EXPLODINGBARREL | EXPLODINGBARREL2 | FIREBARREL | NUKEBARREL | NUKEBARRELDENTED | NUKEBARRELLEAKED => {
@@ -1912,5 +1954,251 @@ mod tests {
             found = true;
         }
         assert!(found, "Expected voxel model instance to be spawned for FIRSTAID");
+    }
+
+    #[test]
+    fn test_environmental_prop_voxel_spawning_and_alignment() {
+        let mut app = App::new();
+        let test_sector = crate::map::Sector {
+            wallptr: 0,
+            wallnum: 0,
+            ceilingz: -16384, // World Y = -(-16384) / 16384 = 1.0
+            floorz: 0,       // World Y = 0.0
+            ceilingstat: 0,
+            floorstat: 0,
+            ceilingpicnum: 0,
+            ceilingheinum: 0,
+            ceilingshade: 0,
+            ceilingpal: 0,
+            ceilingxpanning: 0,
+            ceilingypanning: 0,
+            floorpicnum: 0,
+            floorheinum: 0,
+            floorshade: 0,
+            floorpal: 0,
+            floorxpanning: 0,
+            floorypanning: 0,
+            visibility: 0,
+            _filler: 0,
+            lotag: 0,
+            hitag: 0,
+            extra: -1,
+        };
+
+        let map = crate::map::Map {
+            version: 7,
+            posx: 0,
+            posy: 0,
+            posz: 0,
+            ang: 0,
+            cursectnum: 0,
+            sectors: vec![test_sector],
+            walls: Vec::new(),
+            sprites: vec![
+                // 1. Standing explosive barrel on floor
+                crate::map::Sprite {
+                    x: 1024,
+                    y: 1024,
+                    z: 0,
+                    cstat: 1, // Blocking floor prop
+                    shade: 0,
+                    pal: 0,
+                    clipdist: 32,
+                    _filler: 0,
+                    xrepeat: 64,
+                    yrepeat: 64,
+                    xoffset: 0,
+                    yoffset: 0,
+                    picnum: EXPLODINGBARREL,
+                    ang: 0,
+                    xvel: 0,
+                    yvel: 0,
+                    zvel: 0,
+                    owner: 0,
+                    sectnum: 0,
+                    statnum: 0,
+                    lotag: 0,
+                    hitag: 0,
+                    extra: -1,
+                },
+                // 2. Wall-mounted fire extinguisher
+                crate::map::Sprite {
+                    x: 2048,
+                    y: 2048,
+                    z: -8192,
+                    cstat: 16, // Wall-aligned
+                    shade: 0,
+                    pal: 0,
+                    clipdist: 32,
+                    _filler: 0,
+                    xrepeat: 64,
+                    yrepeat: 64,
+                    xoffset: 0,
+                    yoffset: 0,
+                    picnum: FIREEXT,
+                    ang: 512, // Facing South (+Z in Bevy)
+                    xvel: 0,
+                    yvel: 0,
+                    zvel: 0,
+                    owner: 0,
+                    sectnum: 0,
+                    statnum: 0,
+                    lotag: 0,
+                    hitag: 0,
+                    extra: -1,
+                },
+                // 3. Wall-mounted security camera
+                crate::map::Sprite {
+                    x: 3072,
+                    y: 3072,
+                    z: -12288,
+                    cstat: 16,
+                    shade: 0,
+                    pal: 0,
+                    clipdist: 32,
+                    _filler: 0,
+                    xrepeat: 64,
+                    yrepeat: 64,
+                    xoffset: 0,
+                    yoffset: 0,
+                    picnum: CAMERA1,
+                    ang: 512,
+                    xvel: 0,
+                    yvel: 0,
+                    zvel: 0,
+                    owner: 0,
+                    sectnum: 0,
+                    statnum: 0,
+                    lotag: 0,
+                    hitag: 42,
+                    extra: -1,
+                },
+                // 4. Ceiling-anchored fan
+                crate::map::Sprite {
+                    x: 4096,
+                    y: 4096,
+                    z: 0, // Sprite z is 0, but ceiling fan should anchor to sector ceiling (-16384)
+                    cstat: 32,
+                    shade: 0,
+                    pal: 0,
+                    clipdist: 32,
+                    _filler: 0,
+                    xrepeat: 64,
+                    yrepeat: 64,
+                    xoffset: 0,
+                    yoffset: 0,
+                    picnum: 617,
+                    ang: 0,
+                    xvel: 0,
+                    yvel: 0,
+                    zvel: 0,
+                    owner: 0,
+                    sectnum: 0,
+                    statnum: 0,
+                    lotag: 0,
+                    hitag: 0,
+                    extra: -1,
+                },
+            ],
+        };
+
+        let tile_textures = HashMap::new();
+        let tile_sizes = HashMap::new();
+        let picanm_map = HashMap::new();
+        let mut materials: Assets<StandardMaterial> = Assets::default();
+        let default_material = materials.add(StandardMaterial::default());
+        let mut meshes: Assets<Mesh> = Assets::default();
+
+        let builder = MapMeshBuilder::new(
+            &map,
+            &tile_textures,
+            &tile_sizes,
+            &picanm_map,
+            default_material,
+        );
+
+        let mut voxel_reg = crate::voxel::VoxelRegistry::new();
+        let pal = crate::palette::Palette::default();
+
+        let mut commands = app.world_mut().commands();
+        builder.build(
+            &mut commands,
+            &mut meshes,
+            &mut materials,
+            1,
+            Some(&mut voxel_reg),
+            Some(&pal),
+        );
+        app.update();
+
+        // 1. Verify Barrel: floor grounded at Y=0.0, non-bobbing/non-rotating prop
+        let mut barrel_query = app
+            .world_mut()
+            .query::<(&crate::voxel::VoxelModelInstance, &Transform, &crate::interactivity::ExplodingBarrel)>();
+        let mut found_barrel = false;
+        for (inst, transform, barrel) in barrel_query.iter(app.world()) {
+            assert_eq!(inst.picnum, EXPLODINGBARREL);
+            assert!(!inst.rotates, "Barrels must not rotate like pickups");
+            assert!(!inst.bobs, "Barrels must not bob like pickups");
+            assert!(
+                (transform.translation.y - 0.0).abs() < 0.001,
+                "Barrel must be grounded flush on floor at Y=0.0, got {}",
+                transform.translation.y
+            );
+            assert_eq!(barrel.health, 20);
+            found_barrel = true;
+        }
+        assert!(found_barrel, "Exploding barrel voxel prop was not found");
+
+        // 2. Verify Fire Extinguisher: wall mounted with standoff offset
+        let mut fireext_query = app
+            .world_mut()
+            .query::<(&crate::voxel::VoxelModelInstance, &Transform, &crate::interactivity::FireExtinguisher)>();
+        let mut found_fireext = false;
+        for (inst, transform, ext) in fireext_query.iter(app.world()) {
+            assert_eq!(inst.picnum, FIREEXT);
+            assert!(!inst.rotates);
+            assert!(!ext.is_exploded);
+            // Ang 512 is facing South (+Z in Bevy). World pos was (2.0, 0.5, 2.0).
+            // Normal standoff should push translation.z beyond 2.0 (by +0.05).
+            assert!(
+                transform.translation.z > 2.04,
+                "Wall standoff offset must shift prop outward along normal: z={}",
+                transform.translation.z
+            );
+            found_fireext = true;
+        }
+        assert!(found_fireext, "Fire extinguisher voxel prop was not found");
+
+        // 3. Verify Security Camera: has SecurityCameraVoxel with sweep config
+        let mut camera_query = app
+            .world_mut()
+            .query::<(&crate::voxel::VoxelModelInstance, &crate::interactivity::SecurityCamera, &crate::voxel::SecurityCameraVoxel)>();
+        let mut found_camera = false;
+        for (inst, sec_cam, vox_cam) in camera_query.iter(app.world()) {
+            assert_eq!(inst.picnum, CAMERA1);
+            assert_eq!(sec_cam.tag, 42);
+            assert!(vox_cam.sweep_range > 0.0);
+            assert!(vox_cam.sweep_speed > 0.0);
+            found_camera = true;
+        }
+        assert!(found_camera, "Security camera voxel prop was not found");
+
+        // 4. Verify Ceiling Fan: anchored to sector ceiling elevation Y=1.0 and has CeilingFanVoxel
+        let mut fan_query = app
+            .world_mut()
+            .query::<(&crate::voxel::VoxelModelInstance, &Transform, &crate::voxel::CeilingFanVoxel)>();
+        let mut found_fan = false;
+        for (inst, transform, fan) in fan_query.iter(app.world()) {
+            assert_eq!(inst.picnum, 617);
+            assert!(fan.speed > 0.0);
+            assert!(
+                (transform.translation.y - 1.0).abs() < 0.001,
+                "Ceiling fan must anchor to sector ceiling at Y=1.0, got {}",
+                transform.translation.y
+            );
+            found_fan = true;
+        }
+        assert!(found_fan, "Ceiling fan voxel prop was not found");
     }
 }

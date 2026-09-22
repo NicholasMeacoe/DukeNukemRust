@@ -22,15 +22,15 @@
   - [x] Verify ceiling fans spin smoothly and security cameras oscillate without jitter
 
 ## Phase 3: Wall, Floor & Ceiling Alignment & Spawning
-- [ ] Task: Write Tests for Prop World Spawning & Alignment
-  - [ ] Unit test verifying floor alignment for standing barrels
-  - [ ] Unit test verifying wall-normal alignment and surface offset for wall-mounted props (`FIREEXT`, `CAMERA1`, `WATERFOUNTAIN`)
-  - [ ] Unit test verifying ceiling anchoring for ceiling fans
-- [ ] Task: Integrate Voxel Prop Spawning in Map Builder
-  - [ ] Update `src/builder.rs` sprite spawning to instantiate 3D voxel models for environmental props
-  - [ ] Attach interactive components (`ExplodingBarrel`, `FireExtinguisher`, `SecurityCamera`, `WaterFountain`) directly to voxel entities
-- [ ] Task: Phase 3 Verification & Checkpoint (Refer to workflow.md)
-  - [ ] Verify props spawn in their authentic orientations flush against walls, floors, and ceilings
+- [x] Task: Write Tests for Prop World Spawning & Alignment
+  - [x] Unit test verifying floor alignment for standing barrels
+  - [x] Unit test verifying wall-normal alignment and surface offset for wall-mounted props (`FIREEXT`, `CAMERA1`, `WATERFOUNTAIN`)
+  - [x] Unit test verifying ceiling anchoring for ceiling fans
+- [x] Task: Integrate Voxel Prop Spawning in Map Builder
+  - [x] Update `src/builder.rs` sprite spawning to instantiate 3D voxel models for environmental props
+  - [x] Attach interactive components (`ExplodingBarrel`, `FireExtinguisher`, `SecurityCamera`, `WaterFountain`) directly to voxel entities
+- [x] Task: Phase 3 Verification & Checkpoint (Refer to workflow.md)
+  - [x] Verify props spawn in their authentic orientations flush against walls, floors, and ceilings
 
 ## Phase 4: Destructible Voxel Prop State Transitions
 - [ ] Task: Write Tests for Voxel Prop Destruction & Debris

@@ -49,6 +49,16 @@ impl VoxelModelInstance {
             bob_phase: 0.0,
         }
     }
+
+    pub fn new_prop(picnum: i16, base_y: f32) -> Self {
+        Self {
+            picnum,
+            rotates: false,
+            bobs: false,
+            base_y,
+            bob_phase: 0.0,
+        }
+    }
 }
 
 /// Central registry mapping tile picnums to 3D KVX voxel models and cached GPU meshes.
