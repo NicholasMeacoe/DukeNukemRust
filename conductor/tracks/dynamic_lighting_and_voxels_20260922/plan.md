@@ -1,0 +1,56 @@
+# Implementation Plan: Dynamic Lighting & Ken Silverman KVX Voxel Model Support
+
+## Phase 1: Dynamic Point Lighting Engine & Transient Light Lifecycle
+- [ ] Task: Write Tests for Dynamic Light Lifecycles & Pooling
+  - [ ] Unit tests for transient light decay (`DynamicLightPool`, `TransientLight`, max count limits)
+  - [ ] Unit tests for muzzle flash and explosion light parameter mapping (radius, intensity, color)
+- [ ] Task: Implement Dynamic Light Entities & Systems
+  - [ ] Create `src/lighting.rs` with `DynamicLight`, `TransientLight`, and `DynamicLightingConfig`
+  - [ ] Implement decay system `update_transient_lights` attenuating intensity and despawning expired lights
+  - [ ] Implement dynamic light emitter hooks in `player/weapons.rs` (muzzle flashes), `combat/projectiles.rs` (rocket/laser trails), and `interactivity/props.rs` (explosions)
+  - [ ] Add console/cvar toggle `r_dynamiclights 0/1` in `src/player/console.rs`
+- [ ] Task: Phase 1 Verification & Checkpoint (Refer to workflow.md)
+  - [ ] Verify weapon discharges, flying projectiles, and explosions cast dynamic light with smooth decay and no leaks
+
+## Phase 2: Ken Silverman KVX Voxel Binary Parser
+- [ ] Task: Write Tests for KVX Parsing & Slab Extraction
+  - [ ] Unit test parsing KVX headers (`xsiz`, `ysiz`, `zsiz`, `xpivot`, `ypivot`, `zpivot`)
+  - [ ] Unit test column offset decoding and slab structure (`ztop`, `zend`, color indices)
+  - [ ] Unit test boundary validation on malformed/truncated KVX byte arrays
+- [ ] Task: Implement Pure-Rust KVX Parser
+  - [ ] Create `src/voxel/kvx.rs` and `src/voxel/mod.rs`
+  - [ ] Implement `KvxModel::parse(&[u8]) -> Result<KvxModel, KvxError>`
+  - [ ] Expose 3D voxel color grid queries `get_voxel(x, y, z)` and dimensions
+- [ ] Task: Phase 2 Verification & Checkpoint (Refer to workflow.md)
+  - [ ] Verify parsing of sample/synthesized KVX assets and check data integrity against Build specs
+
+## Phase 3: Voxel 3D Mesh Generation & Palette Shading
+- [ ] Task: Write Tests for Voxel Surface Meshing
+  - [ ] Unit tests verifying visible face extraction (unexposed internal face culling)
+  - [ ] Unit tests for quad vertex generation, normals, and vertex colors mapped from `PALETTE.DAT`
+  - [ ] Unit tests for pivot offset centering
+- [ ] Task: Implement Voxel Mesh Builder
+  - [ ] Implement `generate_voxel_mesh(model: &KvxModel, palette: &Palette) -> Mesh` in `src/voxel/mesh.rs`
+  - [ ] Generate Bevy `Mesh` with `Mesh::ATTRIBUTE_POSITION`, `Mesh::ATTRIBUTE_NORMAL`, and `Mesh::ATTRIBUTE_COLOR`
+- [ ] Task: Phase 3 Verification & Checkpoint (Refer to workflow.md)
+  - [ ] Verify generated Bevy `Mesh` compiles with valid vertex positions, normals, and colors
+
+## Phase 4: Sprite Voxel Replacement Registry & Pickup Integration
+- [ ] Task: Write Tests for Voxel Sprite Registry & Rotation
+  - [ ] Unit tests verifying picnum registration (`VoxelRegistry`)
+  - [ ] Unit tests for spinning item rotation and bobbing animation
+- [ ] Task: Implement Voxel Model Spawning & World Integration
+  - [ ] Create `VoxelRegistry` resource in `src/voxel/registry.rs`
+  - [ ] Map core items (Medkits, Armor, Ammo, Keycards, Atomic Health) to voxel models
+  - [ ] Hook into `src/builder.rs` / `src/map.rs` sprite spawning: instantiate 3D voxel mesh instead of flat billboard sprite when model exists
+  - [ ] Add console/cvar toggle `r_voxels 0/1` in `src/player/console.rs`
+- [ ] Task: Phase 4 Verification & Checkpoint (Refer to workflow.md)
+  - [ ] Verify in-game pickups render as rotating 3D voxel models standing properly on sector floors
+
+## Phase 5: Full Verification, Warnings Audit & Review
+- [ ] Task: Comprehensive Test Suite & Warning Audit
+  - [ ] Run `cargo check --tests` (ensure 0 compiler warnings)
+  - [ ] Run full test suite (ensure 100% pass rate across all tests)
+  - [ ] Review completed track with `conductor-review`
+- [ ] Task: Phase 5 Verification & Checkpoint (Refer to workflow.md)
+  - [ ] Final end-to-end verification and commit
