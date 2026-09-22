@@ -43,9 +43,9 @@
   - [x] Verify shooting barrels or fire extinguishers causes high-impact explosion with debris and light flash
 
 ## Phase 5: Full Verification, Warnings Audit & Review
-- [ ] Task: Comprehensive Test Suite & Warning Audit
-  - [ ] Run `cargo check --tests` (ensure 0 compiler warnings)
-  - [ ] Run full test suite (ensure 100% pass rate across all tests)
-  - [ ] Review completed track with `conductor-review`
-- [ ] Task: Phase 5 Verification & Checkpoint (Refer to workflow.md)
-  - [ ] Final end-to-end verification and commit
+- [x] Task: Comprehensive Test Suite & Warning Audit
+  - [x] Run `cargo check --tests` (ensure 0 compiler warnings)
+  - [x] Run full test suite (ensure 100% pass rate across all tests)
+  - [x] Review completed track with `conductor-review`
+- [x] Task: Phase 5 Verification & Checkpoint (Refer to workflow.md)
+  - [x] Final end-to-end verification and commit
