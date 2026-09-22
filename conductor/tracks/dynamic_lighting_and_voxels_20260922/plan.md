@@ -25,15 +25,15 @@
   - [x] Verify parsing of sample/synthesized KVX assets and check data integrity against Build specs
 
 ## Phase 3: Voxel 3D Mesh Generation & Palette Shading
-- [ ] Task: Write Tests for Voxel Surface Meshing
-  - [ ] Unit tests verifying visible face extraction (unexposed internal face culling)
-  - [ ] Unit tests for quad vertex generation, normals, and vertex colors mapped from `PALETTE.DAT`
-  - [ ] Unit tests for pivot offset centering
-- [ ] Task: Implement Voxel Mesh Builder
-  - [ ] Implement `generate_voxel_mesh(model: &KvxModel, palette: &Palette) -> Mesh` in `src/voxel/mesh.rs`
-  - [ ] Generate Bevy `Mesh` with `Mesh::ATTRIBUTE_POSITION`, `Mesh::ATTRIBUTE_NORMAL`, and `Mesh::ATTRIBUTE_COLOR`
-- [ ] Task: Phase 3 Verification & Checkpoint (Refer to workflow.md)
-  - [ ] Verify generated Bevy `Mesh` compiles with valid vertex positions, normals, and colors
+- [x] Task: Write Tests for Voxel Surface Meshing
+  - [x] Unit tests verifying visible face extraction (unexposed internal face culling)
+  - [x] Unit tests for quad vertex generation, normals, and vertex colors mapped from `PALETTE.DAT`
+  - [x] Unit tests for pivot offset centering
+- [x] Task: Implement Voxel Mesh Builder
+  - [x] Implement `generate_voxel_mesh(model: &KvxModel, palette: &Palette) -> Mesh` in `src/voxel/mesh.rs`
+  - [x] Generate Bevy `Mesh` with `Mesh::ATTRIBUTE_POSITION`, `Mesh::ATTRIBUTE_NORMAL`, and `Mesh::ATTRIBUTE_COLOR`
+- [x] Task: Phase 3 Verification & Checkpoint (Refer to workflow.md)
+  - [x] Verify generated Bevy `Mesh` compiles with valid vertex positions, normals, and colors
 
 ## Phase 4: Sprite Voxel Replacement Registry & Pickup Integration
 - [ ] Task: Write Tests for Voxel Sprite Registry & Rotation
