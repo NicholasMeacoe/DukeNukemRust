@@ -218,7 +218,10 @@ pub fn handle_player_interactions(
                 if facing > 0.1 {
                     nuke.is_activated = true;
                     sound_events.send(PlaySoundEvent { sound_id: 83 }); // END_OF_LEVEL_WARN
-                    level_completed_events.send(crate::game_flow::LevelCompletedEvent);
+                    level_completed_events.send(crate::game_flow::LevelCompletedEvent {
+                        is_secret: nuke.is_secret,
+                        is_boss_victory: false,
+                    });
                 }
             }
         }

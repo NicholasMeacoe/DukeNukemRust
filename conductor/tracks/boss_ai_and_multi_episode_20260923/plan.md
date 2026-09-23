@@ -13,15 +13,15 @@
   - [x] Verify boss entities initiate correct attack sequences and spawn projectiles toward target
 
 ## Phase 2: Boss Level Victory Triggers & Death Sequence
-- [ ] Task: Write Tests for Boss Level Defeat Detection
-  - [ ] Unit test verifying boss defeat on E1L6 (Battlelord), E2L9 (Overlord), and E3L9 (Cycloid) triggers level completion
-  - [ ] Unit test verifying mini-bosses (e.g. Boss1Mini in E2L7/E3L7) and non-boss levels do NOT trigger level completion
-- [ ] Task: Implement Accurate Boss Level Victory Triggers in `src/combat/ai.rs` & `src/game_flow/`
-  - [ ] Update `is_boss_level` detection to query `CampaignMapInfo` from `src/campaign/episodes.rs`
-  - [ ] Update `LevelCompletedEvent` to support `is_boss_victory: bool` and `is_secret: bool`
-  - [ ] Dispatch boss death taunts, atomic health drops, and victory event transition
-- [ ] Task: Phase 2 Verification & Checkpoint (Refer to workflow.md)
-  - [ ] Verify defeating each episode's boss initiates the victory sequence
+- [x] Task: Write Tests for Boss Level Defeat Detection
+  - [x] Unit test verifying boss defeat on E1L6 (Battlelord), E2L9 (Overlord), and E3L9 (Cycloid) triggers level completion
+  - [x] Unit test verifying mini-bosses (e.g. Boss1Mini in E2L7/E3L7) and non-boss levels do NOT trigger level completion
+- [x] Task: Implement Accurate Boss Level Victory Triggers in `src/combat/ai.rs` & `src/game_flow/`
+  - [x] Update `is_boss_level` detection to query `CampaignMapInfo` from `src/campaign/episodes.rs`
+  - [x] Update `LevelCompletedEvent` to support `is_boss_victory: bool` and `is_secret: bool`
+  - [x] Dispatch boss death taunts, atomic health drops, and victory event transition
+- [x] Task: Phase 2 Verification & Checkpoint (Refer to workflow.md)
+  - [x] Verify defeating each episode's boss initiates the victory sequence
 
 ## Phase 3: Multi-Episode Campaign Progression & Secret Level Routing
 - [ ] Task: Write Tests for Campaign Map Traversal & Secret Destinations

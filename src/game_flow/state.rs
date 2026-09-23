@@ -66,6 +66,8 @@ pub struct LevelProgress {
     pub level_time_seconds: f32,
     pub par_time_seconds: f32,
     pub is_level_completed: bool,
+    pub is_boss_victory: bool,
+    pub is_secret_exit: bool,
 }
 
 impl Default for LevelProgress {
@@ -81,6 +83,8 @@ impl Default for LevelProgress {
             level_time_seconds: 0.0,
             par_time_seconds: 180.0, // 3 minutes standard par
             is_level_completed: false,
+            is_boss_victory: false,
+            is_secret_exit: false,
         }
     }
 }
@@ -96,6 +100,8 @@ impl LevelProgress {
         self.secrets_found = 0;
         self.level_time_seconds = 0.0;
         self.is_level_completed = false;
+        self.is_boss_victory = false;
+        self.is_secret_exit = false;
 
         // Episode 1 has 7 standard levels (E1L1..E1L7: Faces of Death)
         if self.current_level > 7 {
@@ -107,8 +113,11 @@ impl LevelProgress {
     }
 }
 
-#[derive(Event, Debug, Clone)]
-pub struct LevelCompletedEvent;
+#[derive(Event, Debug, Clone, Default, PartialEq)]
+pub struct LevelCompletedEvent {
+    pub is_secret: bool,
+    pub is_boss_victory: bool,
+}
 
 #[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct LevelEntity;

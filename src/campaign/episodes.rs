@@ -536,3 +536,15 @@ impl CampaignRegistry {
         self.quotes.get(&quote_id).map(|s| s.as_str())
     }
 }
+
+pub fn find_campaign_map(episode: usize, level: usize) -> Option<&'static CampaignMapInfo> {
+    ALL_CAMPAIGN_MAPS
+        .iter()
+        .find(|m| m.episode == episode && m.level == level)
+}
+
+pub fn is_boss_level(episode: usize, level: usize) -> bool {
+    find_campaign_map(episode, level)
+        .map(|m| m.is_boss_level)
+        .unwrap_or(false)
+}

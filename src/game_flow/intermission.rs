@@ -44,8 +44,10 @@ pub fn handle_level_completed_events(
     mut progress: ResMut<LevelProgress>,
     mut anim_state: ResMut<IntermissionAnimationState>,
 ) {
-    for _ in events.read() {
+    for ev in events.read() {
         progress.is_level_completed = true;
+        progress.is_boss_victory = ev.is_boss_victory;
+        progress.is_secret_exit = ev.is_secret;
         anim_state.stage = IntermissionStage::BackgroundFadeIn;
         anim_state.timer = 0.0;
         anim_state.displayed_kills = 0;

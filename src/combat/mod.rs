@@ -1192,4 +1192,265 @@ mod tests {
         assert!(!enemy.is_frozen, "Bosses must be immune to FreezeShard freezing!");
         assert_ne!(enemy.state, EnemyAiState::Frozen);
     }
+
+    #[test]
+    fn test_boss_defeat_level_completion_and_mini_boss_immunity() {
+        // 1. Episode 1, Level 6: Battlelord Defeat -> Boss Victory
+        {
+            let mut app = App::new();
+            app.add_event::<SpawnProjectileEvent>()
+                .add_event::<crate::audio::PlaySoundEvent>()
+                .add_event::<crate::audio::PlayDukeVoiceEvent>()
+                .add_event::<crate::interactivity::ExplosionDamageEvent>()
+                .add_event::<GibEvent>()
+                .add_event::<crate::game_flow::LevelCompletedEvent>()
+                .insert_resource(Time::<()>::default())
+                .insert_resource(crate::net::DeterministicRng::new(42))
+                .insert_resource(crate::interactivity::EarthquakeCameraShake::default())
+                .insert_resource(crate::game_flow::LevelProgress {
+                    current_episode: 1,
+                    current_level: 6,
+                    ..default()
+                })
+                .insert_resource(
+                    crate::scripting::ConScriptEngine::from_source(
+                        crate::scripting::DEFAULT_CORE_CON_SCRIPT,
+                    )
+                    .unwrap(),
+                )
+                .add_systems(Update, ai::update_con_actors);
+
+            let mut player_ctrl = crate::player::types::PlayerController::default();
+            player_ctrl.health = 100;
+            app.world_mut().spawn((
+                player_ctrl,
+                TransformBundle::from_transform(Transform::from_xyz(0.0, 0.0, 0.0)),
+            ));
+
+            let mut battlelord = EnemyActor::new_battlelord(false);
+            battlelord.health = 10;
+            let mut con = crate::scripting::ConActor::new(BOSS1, 0, 0, 4500);
+            con.extra = 0; // dead
+
+            app.world_mut().spawn((
+                battlelord,
+                con,
+                TransformBundle::from_transform(Transform::from_xyz(0.0, 0.0, 10.0)),
+            ));
+
+            app.update();
+
+            let level_events = app.world().resource::<Events<crate::game_flow::LevelCompletedEvent>>();
+            let mut reader = level_events.get_reader();
+            let events: Vec<_> = reader.read(level_events).cloned().collect();
+            assert_eq!(events.len(), 1, "Battlelord defeat on E1L6 must complete level");
+            assert!(events[0].is_boss_victory, "Must flag is_boss_victory = true");
+        }
+
+        // 2. Episode 2, Level 9: Overlord Defeat -> Boss Victory
+        {
+            let mut app = App::new();
+            app.add_event::<SpawnProjectileEvent>()
+                .add_event::<crate::audio::PlaySoundEvent>()
+                .add_event::<crate::audio::PlayDukeVoiceEvent>()
+                .add_event::<crate::interactivity::ExplosionDamageEvent>()
+                .add_event::<GibEvent>()
+                .add_event::<crate::game_flow::LevelCompletedEvent>()
+                .insert_resource(Time::<()>::default())
+                .insert_resource(crate::net::DeterministicRng::new(42))
+                .insert_resource(crate::interactivity::EarthquakeCameraShake::default())
+                .insert_resource(crate::game_flow::LevelProgress {
+                    current_episode: 2,
+                    current_level: 9,
+                    ..default()
+                })
+                .insert_resource(
+                    crate::scripting::ConScriptEngine::from_source(
+                        crate::scripting::DEFAULT_CORE_CON_SCRIPT,
+                    )
+                    .unwrap(),
+                )
+                .add_systems(Update, ai::update_con_actors);
+
+            let mut player_ctrl = crate::player::types::PlayerController::default();
+            player_ctrl.health = 100;
+            app.world_mut().spawn((
+                player_ctrl,
+                TransformBundle::from_transform(Transform::from_xyz(0.0, 0.0, 0.0)),
+            ));
+
+            let mut overlord = EnemyActor::new_overlord();
+            overlord.health = 10;
+            let mut con = crate::scripting::ConActor::new(BOSS2, 0, 0, 4500);
+            con.extra = 0; // dead
+
+            app.world_mut().spawn((
+                overlord,
+                con,
+                TransformBundle::from_transform(Transform::from_xyz(0.0, 0.0, 10.0)),
+            ));
+
+            app.update();
+
+            let level_events = app.world().resource::<Events<crate::game_flow::LevelCompletedEvent>>();
+            let mut reader = level_events.get_reader();
+            let events: Vec<_> = reader.read(level_events).cloned().collect();
+            assert_eq!(events.len(), 1, "Overlord defeat on E2L9 must complete level");
+            assert!(events[0].is_boss_victory, "Must flag is_boss_victory = true");
+        }
+
+        // 3. Episode 3, Level 9: Cycloid Emperor Defeat -> Boss Victory
+        {
+            let mut app = App::new();
+            app.add_event::<SpawnProjectileEvent>()
+                .add_event::<crate::audio::PlaySoundEvent>()
+                .add_event::<crate::audio::PlayDukeVoiceEvent>()
+                .add_event::<crate::interactivity::ExplosionDamageEvent>()
+                .add_event::<GibEvent>()
+                .add_event::<crate::game_flow::LevelCompletedEvent>()
+                .insert_resource(Time::<()>::default())
+                .insert_resource(crate::net::DeterministicRng::new(42))
+                .insert_resource(crate::interactivity::EarthquakeCameraShake::default())
+                .insert_resource(crate::game_flow::LevelProgress {
+                    current_episode: 3,
+                    current_level: 9,
+                    ..default()
+                })
+                .insert_resource(
+                    crate::scripting::ConScriptEngine::from_source(
+                        crate::scripting::DEFAULT_CORE_CON_SCRIPT,
+                    )
+                    .unwrap(),
+                )
+                .add_systems(Update, ai::update_con_actors);
+
+            let mut player_ctrl = crate::player::types::PlayerController::default();
+            player_ctrl.health = 100;
+            app.world_mut().spawn((
+                player_ctrl,
+                TransformBundle::from_transform(Transform::from_xyz(0.0, 0.0, 0.0)),
+            ));
+
+            let mut cycloid = EnemyActor::new_cycloid();
+            cycloid.health = 10;
+            let mut con = crate::scripting::ConActor::new(BOSS3, 0, 0, 4500);
+            con.extra = 0; // dead
+
+            app.world_mut().spawn((
+                cycloid,
+                con,
+                TransformBundle::from_transform(Transform::from_xyz(0.0, 0.0, 10.0)),
+            ));
+
+            app.update();
+
+            let level_events = app.world().resource::<Events<crate::game_flow::LevelCompletedEvent>>();
+            let mut reader = level_events.get_reader();
+            let events: Vec<_> = reader.read(level_events).cloned().collect();
+            assert_eq!(events.len(), 1, "Cycloid defeat on E3L9 must complete level");
+            assert!(events[0].is_boss_victory, "Must flag is_boss_victory = true");
+        }
+
+        // 4. Mini-Battlelord on E2L7: Does NOT complete level
+        {
+            let mut app = App::new();
+            app.add_event::<SpawnProjectileEvent>()
+                .add_event::<crate::audio::PlaySoundEvent>()
+                .add_event::<crate::audio::PlayDukeVoiceEvent>()
+                .add_event::<crate::interactivity::ExplosionDamageEvent>()
+                .add_event::<GibEvent>()
+                .add_event::<crate::game_flow::LevelCompletedEvent>()
+                .insert_resource(Time::<()>::default())
+                .insert_resource(crate::net::DeterministicRng::new(42))
+                .insert_resource(crate::interactivity::EarthquakeCameraShake::default())
+                .insert_resource(crate::game_flow::LevelProgress {
+                    current_episode: 2,
+                    current_level: 7,
+                    ..default()
+                })
+                .insert_resource(
+                    crate::scripting::ConScriptEngine::from_source(
+                        crate::scripting::DEFAULT_CORE_CON_SCRIPT,
+                    )
+                    .unwrap(),
+                )
+                .add_systems(Update, ai::update_con_actors);
+
+            let mut player_ctrl = crate::player::types::PlayerController::default();
+            player_ctrl.health = 100;
+            app.world_mut().spawn((
+                player_ctrl,
+                TransformBundle::from_transform(Transform::from_xyz(0.0, 0.0, 0.0)),
+            ));
+
+            let mut mini = EnemyActor::new_battlelord(true);
+            mini.health = 10;
+            let mut con = crate::scripting::ConActor::new(BOSS1, 0, 0, 1000);
+            con.extra = 0; // dead
+
+            app.world_mut().spawn((
+                mini,
+                con,
+                TransformBundle::from_transform(Transform::from_xyz(0.0, 0.0, 10.0)),
+            ));
+
+            app.update();
+
+            let level_events = app.world().resource::<Events<crate::game_flow::LevelCompletedEvent>>();
+            let mut reader = level_events.get_reader();
+            let events: Vec<_> = reader.read(level_events).cloned().collect();
+            assert_eq!(events.len(), 0, "Mini-Battlelord defeat on E2L7 must NOT complete level");
+        }
+
+        // 5. Non-boss level (E1L1): Pigcop death does not trigger LevelCompletedEvent
+        {
+            let mut app = App::new();
+            app.add_event::<SpawnProjectileEvent>()
+                .add_event::<crate::audio::PlaySoundEvent>()
+                .add_event::<crate::audio::PlayDukeVoiceEvent>()
+                .add_event::<crate::interactivity::ExplosionDamageEvent>()
+                .add_event::<GibEvent>()
+                .add_event::<crate::game_flow::LevelCompletedEvent>()
+                .insert_resource(Time::<()>::default())
+                .insert_resource(crate::net::DeterministicRng::new(42))
+                .insert_resource(crate::interactivity::EarthquakeCameraShake::default())
+                .insert_resource(crate::game_flow::LevelProgress {
+                    current_episode: 1,
+                    current_level: 1,
+                    ..default()
+                })
+                .insert_resource(
+                    crate::scripting::ConScriptEngine::from_source(
+                        crate::scripting::DEFAULT_CORE_CON_SCRIPT,
+                    )
+                    .unwrap(),
+                )
+                .add_systems(Update, ai::update_con_actors);
+
+            let mut player_ctrl = crate::player::types::PlayerController::default();
+            player_ctrl.health = 100;
+            app.world_mut().spawn((
+                player_ctrl,
+                TransformBundle::from_transform(Transform::from_xyz(0.0, 0.0, 0.0)),
+            ));
+
+            let mut pigcop = EnemyActor::new_pigcop();
+            pigcop.health = 10;
+            let mut con = crate::scripting::ConActor::new(PIGCOP, 0, 0, 100);
+            con.extra = 0; // dead
+
+            app.world_mut().spawn((
+                pigcop,
+                con,
+                TransformBundle::from_transform(Transform::from_xyz(0.0, 0.0, 5.0)),
+            ));
+
+            app.update();
+
+            let level_events = app.world().resource::<Events<crate::game_flow::LevelCompletedEvent>>();
+            let mut reader = level_events.get_reader();
+            let events: Vec<_> = reader.read(level_events).cloned().collect();
+            assert_eq!(events.len(), 0, "Normal enemy death on E1L1 must NOT trigger level completion");
+        }
+    }
 }

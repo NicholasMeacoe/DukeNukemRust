@@ -335,7 +335,7 @@ pub fn update_con_actors(
         if let Some(_delay) = end_of_game {
             duke_voice_events.send(crate::audio::PlayDukeVoiceEvent { name: None });
             commands.add(|world: &mut World| {
-                world.send_event(crate::game_flow::LevelCompletedEvent);
+                world.send_event(crate::game_flow::LevelCompletedEvent::default());
             });
         }
 
@@ -436,17 +436,18 @@ pub fn update_con_actors(
                 ) {
                     let is_boss_level = match &level_progress {
                         Some(lp) => {
-                            (lp.current_episode == 1 && lp.current_level >= 7)
-                                || (lp.current_episode == 2 && lp.current_level >= 10)
-                                || (lp.current_episode == 3 && lp.current_level >= 10)
-                                || (lp.current_episode == 4 && lp.current_level >= 10)
+                            crate::campaign::episodes::is_boss_level(lp.current_episode, lp.current_level)
+                                || (lp.current_episode == 1 && lp.current_level == 7)
                         }
                         None => true,
                     };
                     if is_boss_level {
                         duke_voice_events.send(crate::audio::PlayDukeVoiceEvent { name: None });
                         commands.add(|world: &mut World| {
-                            world.send_event(crate::game_flow::LevelCompletedEvent);
+                            world.send_event(crate::game_flow::LevelCompletedEvent {
+                                is_secret: false,
+                                is_boss_victory: true,
+                            });
                         });
                     }
                 }
