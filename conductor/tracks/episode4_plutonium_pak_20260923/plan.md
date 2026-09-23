@@ -13,14 +13,14 @@
   - [x] Verify Alien Queen initiates combat attacks, spawns projectiles towards player, and resists status effects
 
 ## Phase 2: Episode 4 Boss Level Victory Sequence
-- [ ] Task: Write Tests for Queen Boss Defeat Level Completion on E4L10
-  - [ ] Unit test verifying Queen defeat on E4L10 ("The Queen") triggers `LevelCompletedEvent { is_secret: false, is_boss_victory: true }`
-  - [ ] Unit test verifying non-boss levels or mini-bosses do NOT trigger level completion
-- [ ] Task: Wire Boss Defeat Level Completion on E4L10 & Victory Intermission Banner
-  - [ ] Verify `crate::campaign::episodes::is_boss_level(4, 10)` triggers victory event on Queen death
-  - [ ] Verify Intermission UI displays gold "E4L10: EPISODE VICTORY!" and plays bonus victory quote
-- [ ] Task: Phase 2 Verification & Checkpoint (Refer to workflow.md)
-  - [ ] Verify beating the Queen on E4L10 cleanly advances to episode completion
+- [x] Task: Write Tests for Queen Boss Defeat Level Completion on E4L10
+  - [x] Unit test verifying Queen defeat on E4L10 ("The Queen") triggers `LevelCompletedEvent { is_secret: false, is_boss_victory: true }`
+  - [x] Unit test verifying non-boss levels or mini-bosses do NOT trigger level completion
+- [x] Task: Wire Boss Defeat Level Completion on E4L10 & Victory Intermission Banner
+  - [x] Verify `crate::campaign::episodes::is_boss_level(4, 10)` triggers victory event on Queen death
+  - [x] Verify Intermission UI displays gold "E4L10: EPISODE VICTORY!" and plays bonus victory quote
+- [x] Task: Phase 2 Verification & Checkpoint (Refer to workflow.md)
+  - [x] Verify beating the Queen on E4L10 cleanly advances to episode completion
 
 ## Phase 3: Episode 4 Campaign Map Traversal & Secret Level Routing
 - [ ] Task: Write Tests for Episode 4 Map Traversal & Secret Level Routing

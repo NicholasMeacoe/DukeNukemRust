@@ -1560,5 +1560,108 @@ mod tests {
             let events: Vec<_> = reader.read(level_events).cloned().collect();
             assert_eq!(events.len(), 0, "Normal enemy death on E1L1 must NOT trigger level completion");
         }
+
+        // 6. Episode 4, Level 10: Alien Queen Defeat -> Boss Victory
+        {
+            let mut app = App::new();
+            app.add_event::<SpawnProjectileEvent>()
+                .add_event::<crate::audio::PlaySoundEvent>()
+                .add_event::<crate::audio::PlayDukeVoiceEvent>()
+                .add_event::<crate::interactivity::ExplosionDamageEvent>()
+                .add_event::<GibEvent>()
+                .add_event::<crate::game_flow::LevelCompletedEvent>()
+                .insert_resource(Time::<()>::default())
+                .insert_resource(crate::net::DeterministicRng::new(42))
+                .insert_resource(crate::interactivity::EarthquakeCameraShake::default())
+                .insert_resource(crate::game_flow::LevelProgress {
+                    current_episode: 4,
+                    current_level: 10,
+                    ..default()
+                })
+                .insert_resource(
+                    crate::scripting::ConScriptEngine::from_source(
+                        crate::scripting::DEFAULT_CORE_CON_SCRIPT,
+                    )
+                    .unwrap(),
+                )
+                .add_systems(Update, ai::update_con_actors);
+
+            let mut player_ctrl = crate::player::types::PlayerController::default();
+            player_ctrl.health = 100;
+            app.world_mut().spawn((
+                player_ctrl,
+                TransformBundle::from_transform(Transform::from_xyz(0.0, 0.0, 0.0)),
+            ));
+
+            let mut queen = EnemyActor::new_queen();
+            queen.health = 10;
+            let mut con = crate::scripting::ConActor::new(BOSS4, 0, 0, 6000);
+            con.extra = 0; // dead
+
+            app.world_mut().spawn((
+                queen,
+                con,
+                TransformBundle::from_transform(Transform::from_xyz(0.0, 0.0, 10.0)),
+            ));
+
+            app.update();
+
+            let level_events = app.world().resource::<Events<crate::game_flow::LevelCompletedEvent>>();
+            let mut reader = level_events.get_reader();
+            let events: Vec<_> = reader.read(level_events).cloned().collect();
+            assert_eq!(events.len(), 1, "Alien Queen defeat on E4L10 must complete level");
+            assert!(events[0].is_boss_victory, "Must flag is_boss_victory = true");
+        }
+
+        // 7. Episode 4, Level 1: Alien Queen defeat on non-boss map does NOT trigger LevelCompletedEvent
+        {
+            let mut app = App::new();
+            app.add_event::<SpawnProjectileEvent>()
+                .add_event::<crate::audio::PlaySoundEvent>()
+                .add_event::<crate::audio::PlayDukeVoiceEvent>()
+                .add_event::<crate::interactivity::ExplosionDamageEvent>()
+                .add_event::<GibEvent>()
+                .add_event::<crate::game_flow::LevelCompletedEvent>()
+                .insert_resource(Time::<()>::default())
+                .insert_resource(crate::net::DeterministicRng::new(42))
+                .insert_resource(crate::interactivity::EarthquakeCameraShake::default())
+                .insert_resource(crate::game_flow::LevelProgress {
+                    current_episode: 4,
+                    current_level: 1,
+                    ..default()
+                })
+                .insert_resource(
+                    crate::scripting::ConScriptEngine::from_source(
+                        crate::scripting::DEFAULT_CORE_CON_SCRIPT,
+                    )
+                    .unwrap(),
+                )
+                .add_systems(Update, ai::update_con_actors);
+
+            let mut player_ctrl = crate::player::types::PlayerController::default();
+            player_ctrl.health = 100;
+            app.world_mut().spawn((
+                player_ctrl,
+                TransformBundle::from_transform(Transform::from_xyz(0.0, 0.0, 0.0)),
+            ));
+
+            let mut queen = EnemyActor::new_queen();
+            queen.health = 10;
+            let mut con = crate::scripting::ConActor::new(BOSS4, 0, 0, 6000);
+            con.extra = 0; // dead
+
+            app.world_mut().spawn((
+                queen,
+                con,
+                TransformBundle::from_transform(Transform::from_xyz(0.0, 0.0, 10.0)),
+            ));
+
+            app.update();
+
+            let level_events = app.world().resource::<Events<crate::game_flow::LevelCompletedEvent>>();
+            let mut reader = level_events.get_reader();
+            let events: Vec<_> = reader.read(level_events).cloned().collect();
+            assert_eq!(events.len(), 0, "Alien Queen defeat on non-boss level (E4L1) must NOT complete level");
+        }
     }
 }

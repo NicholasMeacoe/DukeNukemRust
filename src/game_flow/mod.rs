@@ -1323,6 +1323,24 @@ mod tests {
         let mut footer_q = app.world_mut().query_filtered::<&Text, With<MenuFooterText>>();
         let footer_text = footer_q.single(app.world());
         assert!(footer_text.sections[0].value.contains("ADVANCE TO NEXT EPISODE"));
+
+        // 3. Episode 4 Boss victory (E4L10 Alien Queen defeat)
+        {
+            let mut progress = app.world_mut().resource_mut::<LevelProgress>();
+            progress.current_episode = 4;
+            progress.current_level = 10;
+            progress.is_boss_victory = true;
+        }
+        app.update();
+
+        let mut header_q = app.world_mut().query_filtered::<&Text, With<MenuHeaderTitle>>();
+        let header_text = header_q.single(app.world());
+        assert_eq!(header_text.sections[0].value, "E4L10: EPISODE VICTORY!");
+        assert_eq!(header_text.sections[0].style.color, DUKE_GOLD);
+
+        let mut subheader_q = app.world_mut().query_filtered::<&Text, With<MenuSubheaderText>>();
+        let subheader_text = subheader_q.single(app.world());
+        assert_eq!(subheader_text.sections[0].value, "EPISODE COMPLETED");
     }
 
     #[test]
