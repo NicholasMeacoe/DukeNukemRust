@@ -95,7 +95,12 @@ impl LevelProgress {
     }
 
     pub fn advance_to_next_level(&mut self) -> bool {
-        self.current_level += 1;
+        let is_boss_victory = self.is_boss_victory;
+        let is_secret_exit = self.is_secret_exit;
+        let current_ep = self.current_episode;
+        let current_lvl = self.current_level;
+
+        // Reset per-level stats
         self.kills_count = 0;
         self.secrets_found = 0;
         self.level_time_seconds = 0.0;
@@ -103,11 +108,49 @@ impl LevelProgress {
         self.is_boss_victory = false;
         self.is_secret_exit = false;
 
-        // Episode 1 has 7 standard levels (E1L1..E1L7: Faces of Death)
-        if self.current_level > 7 {
+        // 1. Secret Level Branching
+        if is_secret_exit {
+            if let Some(map_info) = crate::campaign::episodes::find_campaign_map(current_ep, current_lvl) {
+                if let Some(dest) = map_info.secret_destination {
+                    self.current_level = dest;
+                    return false;
+                }
+            }
+        }
+
+        // 2. Returning from a Secret Level
+        let is_current_secret = crate::campaign::episodes::find_campaign_map(current_ep, current_lvl)
+            .map(|m| m.is_secret)
+            .unwrap_or(false);
+
+        if is_current_secret {
+            let return_level = match (current_ep, current_lvl) {
+                (1, 8) => 4,   // E1L8 -> E1L4
+                (2, 10) => 6,  // E2L10 -> E2L6
+                (2, 11) => 9,  // E2L11 -> E2L9
+                (3, 10) => 6,  // E3L10 -> E3L6
+                (3, 11) => 9,  // E3L11 -> E3L9
+                (4, 11) => 6,  // E4L11 -> E4L6
+                _ => current_lvl + 1,
+            };
+            self.current_level = return_level;
+            return false;
+        }
+
+        // 3. Boss Victory or Standard Campaign Progression
+        let max_level = match current_ep {
+            1 => 7,
+            2 => 9,
+            3 => 9,
+            4 => 10,
+            _ => 7,
+        };
+
+        if is_boss_victory || current_lvl >= max_level {
             self.current_level = 1;
             true // Episode completed!
         } else {
+            self.current_level += 1;
             false
         }
     }

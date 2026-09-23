@@ -24,16 +24,16 @@
   - [x] Verify defeating each episode's boss initiates the victory sequence
 
 ## Phase 3: Multi-Episode Campaign Progression & Secret Level Routing
-- [ ] Task: Write Tests for Campaign Map Traversal & Secret Destinations
-  - [ ] Unit test verifying `advance_to_next_level` supports variable level counts across Episode 1, 2, and 3
-  - [ ] Unit test verifying secret exit button routes player to secret level destination (E1L3 -> E1L8, E2L5 -> E2L10, E3L5 -> E3L10)
-  - [ ] Unit test verifying completing secret level returns to canonical post-secret stage (E1L8 -> E1L4, E2L10 -> E2L6, E3L10 -> E3L6)
-- [ ] Task: Implement Dynamic Campaign Traversal in `src/game_flow/state.rs` & `src/game_flow/intermission.rs`
-  - [ ] Update `LevelProgress::advance_to_next_level` to accept `is_secret: bool` and use `ALL_CAMPAIGN_MAPS`
-  - [ ] Connect `NukeExitSwitch { is_secret }` to `LevelCompletedEvent { is_secret }` in `src/interactivity/props.rs`
-  - [ ] Implement episode transition on boss victory (advancing to next episode or MainMenu if campaign complete)
-- [ ] Task: Phase 3 Verification & Checkpoint (Refer to workflow.md)
-  - [ ] Verify level transitions, secret level warping, and episode advancements flow seamlessly
+- [x] Task: Write Tests for Campaign Map Traversal & Secret Destinations
+  - [x] Unit test verifying `advance_to_next_level` supports variable level counts across Episode 1, 2, and 3
+  - [x] Unit test verifying secret exit button routes player to secret level destination (E1L3 -> E1L8, E2L5 -> E2L10, E3L5 -> E3L10)
+  - [x] Unit test verifying completing secret level returns to canonical post-secret stage (E1L8 -> E1L4, E2L10 -> E2L6, E3L10 -> E3L6)
+- [x] Task: Implement Dynamic Campaign Traversal in `src/game_flow/state.rs` & `src/game_flow/intermission.rs`
+  - [x] Update `LevelProgress::advance_to_next_level` to accept `is_secret: bool` and use `ALL_CAMPAIGN_MAPS`
+  - [x] Connect `NukeExitSwitch { is_secret }` to `LevelCompletedEvent { is_secret }` in `src/interactivity/props.rs`
+  - [x] Implement episode transition on boss victory (advancing to next episode or MainMenu if campaign complete)
+- [x] Task: Phase 3 Verification & Checkpoint (Refer to workflow.md)
+  - [x] Verify level transitions, secret level warping, and episode advancements flow seamlessly
 
 ## Phase 4: Episode-Specific Atmospheric Skyboxes & Victory Intermission UI
 - [ ] Task: Write Tests for Episode Skybox Selection & Victory Banner

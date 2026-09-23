@@ -82,6 +82,96 @@ mod tests {
     }
 
     #[test]
+    fn test_multi_episode_progression_episodes_2_and_3() {
+        // Episode 2: Spaceport -> ... -> Overlord (L1..L9)
+        let mut progress = LevelProgress {
+            current_episode: 2,
+            current_level: 1,
+            ..default()
+        };
+        for l in 1..9 {
+            assert_eq!(progress.current_level, l);
+            assert!(!progress.advance_to_next_level());
+        }
+        assert_eq!(progress.current_level, 9);
+        assert_eq!(progress.current_map_filename(), "E2L9.MAP");
+
+        // Overlord defeated on E2L9 -> Episode 2 finished!
+        progress.is_boss_victory = true;
+        assert!(progress.advance_to_next_level());
+        assert_eq!(progress.current_level, 1);
+
+        // Episode 3: Raw Meat -> ... -> Stadium (L1..L9)
+        let mut progress = LevelProgress {
+            current_episode: 3,
+            current_level: 1,
+            ..default()
+        };
+        for l in 1..9 {
+            assert_eq!(progress.current_level, l);
+            assert!(!progress.advance_to_next_level());
+        }
+        assert_eq!(progress.current_level, 9);
+        assert_eq!(progress.current_map_filename(), "E3L9.MAP");
+
+        // Cycloid defeated on E3L9 -> Episode 3 finished!
+        progress.is_boss_victory = true;
+        assert!(progress.advance_to_next_level());
+        assert_eq!(progress.current_level, 1);
+    }
+
+    #[test]
+    fn test_secret_level_routing_and_canonical_return() {
+        // Episode 1: E1L3 -> E1L8 (Secret) -> E1L4 (Canonical return)
+        let mut progress = LevelProgress {
+            current_episode: 1,
+            current_level: 3,
+            ..default()
+        };
+        progress.is_secret_exit = true;
+        assert!(!progress.advance_to_next_level());
+        assert_eq!(progress.current_level, 8);
+        assert_eq!(progress.current_map_filename(), "E1L8.MAP");
+
+        // Complete secret level E1L8 -> returns to E1L4
+        assert!(!progress.advance_to_next_level());
+        assert_eq!(progress.current_level, 4);
+        assert_eq!(progress.current_map_filename(), "E1L4.MAP");
+
+        // Episode 2: E2L5 -> E2L10 (Secret) -> E2L6 (Canonical return)
+        let mut progress = LevelProgress {
+            current_episode: 2,
+            current_level: 5,
+            ..default()
+        };
+        progress.is_secret_exit = true;
+        assert!(!progress.advance_to_next_level());
+        assert_eq!(progress.current_level, 10);
+        assert_eq!(progress.current_map_filename(), "E2L10.MAP");
+
+        // Complete secret level E2L10 -> returns to E2L6
+        assert!(!progress.advance_to_next_level());
+        assert_eq!(progress.current_level, 6);
+        assert_eq!(progress.current_map_filename(), "E2L6.MAP");
+
+        // Episode 3: E3L5 -> E3L10 (Secret) -> E3L6 (Canonical return)
+        let mut progress = LevelProgress {
+            current_episode: 3,
+            current_level: 5,
+            ..default()
+        };
+        progress.is_secret_exit = true;
+        assert!(!progress.advance_to_next_level());
+        assert_eq!(progress.current_level, 10);
+        assert_eq!(progress.current_map_filename(), "E3L10.MAP");
+
+        // Complete secret level E3L10 -> returns to E3L6
+        assert!(!progress.advance_to_next_level());
+        assert_eq!(progress.current_level, 6);
+        assert_eq!(progress.current_map_filename(), "E3L6.MAP");
+    }
+
+    #[test]
     fn test_intermission_stats_computation() {
         let mut progress = LevelProgress::default();
         progress.kills_count = 25;
