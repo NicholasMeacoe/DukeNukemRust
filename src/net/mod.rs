@@ -1,4 +1,5 @@
 pub mod actor;
+pub mod coop;
 pub mod protocol;
 pub mod pvp;
 pub mod rng;
@@ -7,6 +8,7 @@ pub mod splitscreen;
 pub mod udp;
 
 pub use actor::*;
+pub use coop::*;
 pub use protocol::*;
 pub use pvp::*;
 pub use rng::*;
@@ -24,12 +26,17 @@ impl Plugin for NetPlugin {
             .init_resource::<DeterministicRng>()
             .init_resource::<SplitscreenConfig>()
             .init_resource::<NetTransport>()
+            .init_resource::<SharedKeycards>()
+            .init_resource::<CoopConfig>()
+            .init_resource::<CoopLevelTransition>()
             .add_event::<PvpDamageEvent>()
             .add_event::<PlayerFragEvent>()
             .add_systems(Startup, setup_scoreboard_ui)
             .add_systems(
                 Update,
                 (
+                    sync_coop_keycards_system,
+                    coop_level_advance_system,
                     net_receive_packets_system,
                     net_send_sync_system,
                     net_peer_timeout_system,

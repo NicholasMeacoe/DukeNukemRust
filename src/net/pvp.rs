@@ -47,8 +47,10 @@ pub fn apply_pvp_damage(
         Option<&SpawnInvulnerability>,
     )>,
     net_state: Option<Res<DukematchState>>,
+    coop_config: Option<Res<crate::net::coop::CoopConfig>>,
 ) {
     let mode = net_state.as_ref().map_or(NetMode::SinglePlayer, |s| s.mode);
+    let ff_enabled = coop_config.as_ref().map_or(false, |c| c.friendly_fire);
 
     for ev in damage_events.read() {
         for (_entity, mut player, p_id, invuln) in players.iter_mut() {
@@ -69,7 +71,7 @@ pub fn apply_pvp_damage(
 
             // In Cooperative mode, friendly fire can be disabled
             let is_friendly_fire = ev.attacker_id != ev.target_player_id;
-            if mode == NetMode::Cooperative && is_friendly_fire {
+            if mode == NetMode::Cooperative && is_friendly_fire && !ff_enabled {
                 // If friendly fire disabled in Co-op, ignore
                 continue;
             }

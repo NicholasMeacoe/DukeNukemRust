@@ -54,18 +54,18 @@
   - [x] Verify non-blocking UDP packets transmit and sync player state across peers
 
 ## Phase 5: Cooperative Campaign Mechanics (Shared Keys & Co-op Respawning)
-- [ ] Task: Write Tests for Shared Keycards & Cooperative Respawning
-  - [ ] Unit test for team-shared keycards (Player 1 pickup unlocks for Player 2)
-  - [ ] Unit test for cooperative respawn at sector checkpoint without map reset
-  - [ ] Unit test for friendly fire setting evaluation (damage ignored when friendly fire is disabled)
-  - [ ] Unit test for cooperative level transition synchronization
-- [ ] Task: Implement Cooperative Campaign Features
-  - [ ] Implement `SharedKeycards` resource or synchronize `player.has_keycard` across all co-op players
-  - [ ] Implement co-op respawning logic in `update_player_movement`: revive player at team start without reloading sector meshes/enemies
-  - [ ] Integrate friendly fire rule into `EntityDamageEvent` filter
-  - [ ] Ensure nuke button/level exit advances all players in cooperative sessions
-- [ ] Task: Phase 5 Verification & Checkpoint (Refer to workflow.md)
-  - [ ] Verify co-op gameplay mechanics: shared keys, co-op respawn, friendly fire toggle, level advance
+- [x] Task: Write Tests for Shared Keycards & Cooperative Respawning
+  - [x] Unit test for team-shared keycards (Player 1 pickup unlocks for Player 2)
+  - [x] Unit test for cooperative respawn at sector checkpoint without map reset
+  - [x] Unit test for friendly fire setting evaluation (damage ignored when friendly fire is disabled)
+  - [x] Unit test for cooperative level transition synchronization
+- [x] Task: Implement Cooperative Campaign Features
+  - [x] Implement `SharedKeycards` resource or synchronize `player.has_keycard` across all co-op players
+  - [x] Implement co-op respawning logic in `update_player_movement`: revive player at team start without reloading sector meshes/enemies
+  - [x] Integrate friendly fire rule into `EntityDamageEvent` filter
+  - [x] Ensure nuke button/level exit advances all players in cooperative sessions
+- [x] Task: Phase 5 Verification & Checkpoint (Refer to workflow.md)
+  - [x] Verify co-op gameplay mechanics: shared keys, co-op respawn, friendly fire toggle, level advance
 
 ## Phase 6: Full Verification, Warnings Audit & Review
 - [ ] Task: Comprehensive Test Suite & Warning Audit

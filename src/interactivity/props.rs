@@ -26,6 +26,7 @@ pub fn handle_player_interactions(
     ),
     mut materials: ResMut<Assets<StandardMaterial>>,
     assets: Option<Res<crate::GameAssets>>,
+    mut shared_keycards: Option<ResMut<crate::net::coop::SharedKeycards>>,
     mut commands: Commands,
 ) {
     for event in interact_events.read() {
@@ -33,7 +34,7 @@ pub fn handle_player_interactions(
         let player_dir = event.player_dir.normalize_or_zero();
 
         // 0. Check nearby Keycard pickups
-        if let Ok(mut player) = player_query.get_single_mut() {
+        for mut player in player_query.iter_mut() {
             for (k_entity, k_trans, k_pickup) in keycards.iter() {
                 if k_trans.translation.distance_squared(player_pos) < 6.25 {
                     match k_pickup.key_type {
@@ -41,6 +42,9 @@ pub fn handle_player_interactions(
                         2 => player.has_red_key = true,
                         3 => player.has_yellow_key = true,
                         _ => {}
+                    }
+                    if let Some(ref mut sk) = shared_keycards {
+                        sk.give_key(k_pickup.key_type);
                     }
                     sound_events.send(PlaySoundEvent { sound_id: 65 }); // KEYCARD_GET
                     commands.entity(k_entity).despawn_recursive();
@@ -63,17 +67,16 @@ pub fn handle_player_interactions(
                 if facing > 0.1 {
                     // Check Keycard requirement for Access Switches
                     if let SwitchType::AccessSwitch { key_required } = switch.switch_type {
-                        if let Ok(player) = player_query.get_single() {
-                            let has_key = match key_required {
-                                1 => player.has_blue_key,
-                                2 => player.has_red_key,
-                                3 => player.has_yellow_key,
-                                _ => true,
-                            };
-                            if !has_key {
-                                sound_events.send(PlaySoundEvent { sound_id: 86 }); // ACCESS_DENIED
-                                continue;
-                            }
+                        let has_key = player_query.iter().any(|player| match key_required {
+                            1 => player.has_blue_key,
+                            2 => player.has_red_key,
+                            3 => player.has_yellow_key,
+                            _ => true,
+                        }) || shared_keycards.as_ref().map_or(false, |s| s.has_key(key_required));
+
+                        if !has_key {
+                            sound_events.send(PlaySoundEvent { sound_id: 86 }); // ACCESS_DENIED
+                            continue;
                         }
                     }
 

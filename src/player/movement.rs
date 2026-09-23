@@ -19,6 +19,7 @@ pub fn update_player_movement(
     camera_query: Query<(&Transform, Option<&PlayerCamera>), (With<Camera>, Without<PlayerController>)>,
     effectors: Query<&crate::interactivity::SectorEffectorComponent>,
     spawn_points: Query<&crate::net::MultiplayerSpawnPoint>,
+    checkpoints: Query<&crate::net::coop::CoopCheckpoint>,
     net_state: Option<Res<crate::net::DukematchState>>,
     sector_map: Option<Res<crate::sector_map::SectorMap>>,
     mut sound_events: EventWriter<PlaySoundEvent>,
@@ -41,10 +42,12 @@ pub fn update_player_movement(
             player.death_timer -= dt;
             controller.translation = Some(Vec3::new(0.0, -9.81 * dt, 0.0));
             if player.death_timer <= 0.0 {
-                // Respawn at level spawn or multiplayer spawn point
+                // Respawn at checkpoint, multiplayer spawn, or level start
                 player.health = player.max_health;
                 player.armor = 0;
-                if !spawn_points.is_empty() {
+                if let Some(cp) = checkpoints.iter().filter(|c| c.is_unlocked).max_by_key(|c| c.checkpoint_idx) {
+                    trans.translation = cp.position;
+                } else if !spawn_points.is_empty() {
                     let mut points: Vec<&crate::net::MultiplayerSpawnPoint> = spawn_points.iter().collect();
                     points.sort_by_key(|s| s.spawn_idx);
                     let deaths = net_state.as_ref().map_or(0, |s| s.get_deaths(player_id));
