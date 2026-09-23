@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -178,12 +179,160 @@ pub fn save_config_to_disk(path: &Path, config: &DukeConfig) -> Result<(), std::
     Ok(())
 }
 
+/// Window display mode setting.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum WindowModeSetting {
+    #[default]
+    Windowed,
+    BorderlessFullscreen,
+}
+
+/// Sound volume and audio channel settings.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct SoundConfig {
+    pub master_volume: f32,
+    pub sfx_volume: f32,
+    pub music_volume: f32,
+    pub voice_volume: f32,
+}
+
+impl Default for SoundConfig {
+    fn default() -> Self {
+        Self {
+            master_volume: 1.0,
+            sfx_volume: 1.0,
+            music_volume: 0.7,
+            voice_volume: 1.0,
+        }
+    }
+}
+
+impl SoundConfig {
+    pub fn clamp(&mut self) {
+        self.master_volume = self.master_volume.clamp(0.0, 1.0);
+        self.sfx_volume = self.sfx_volume.clamp(0.0, 1.0);
+        self.music_volume = self.music_volume.clamp(0.0, 1.0);
+        self.voice_volume = self.voice_volume.clamp(0.0, 1.0);
+    }
+}
+
+/// Video rendering and display settings.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct VideoConfig {
+    pub crt_enabled: bool,
+    pub voxels_enabled: bool,
+    pub dynamic_lighting_enabled: bool,
+    pub window_mode: WindowModeSetting,
+}
+
+impl Default for VideoConfig {
+    fn default() -> Self {
+        Self {
+            crt_enabled: false,
+            voxels_enabled: true,
+            dynamic_lighting_enabled: true,
+            window_mode: WindowModeSetting::Windowed,
+        }
+    }
+}
+
+/// Player gameplay and controls settings.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct ControlsConfig {
+    pub mouse_sensitivity: f32,
+    pub invert_mouse_y: bool,
+    pub auto_switch_weapon: bool,
+    pub view_bobbing: bool,
+}
+
+impl Default for ControlsConfig {
+    fn default() -> Self {
+        Self {
+            mouse_sensitivity: 1.0,
+            invert_mouse_y: false,
+            auto_switch_weapon: true,
+            view_bobbing: true,
+        }
+    }
+}
+
+impl ControlsConfig {
+    pub fn clamp(&mut self) {
+        self.mouse_sensitivity = self.mouse_sensitivity.clamp(0.5, 3.0);
+    }
+}
+
+/// Top-level persistent game configuration.
+#[derive(Resource, Serialize, Deserialize, Debug, Clone, PartialEq, Default)]
+pub struct GameConfig {
+    pub sound: SoundConfig,
+    pub video: VideoConfig,
+    pub controls: ControlsConfig,
+}
+
+impl GameConfig {
+    pub const DEFAULT_FILE_NAME: &'static str = "config.json";
+
+    pub fn default_config_path() -> PathBuf {
+        PathBuf::from(Self::DEFAULT_FILE_NAME)
+    }
+
+    pub fn load_or_default(path: impl AsRef<Path>) -> Self {
+        let path = path.as_ref();
+        if path.exists() {
+            if let Ok(contents) = std::fs::read_to_string(path) {
+                match serde_json::from_str::<GameConfig>(&contents) {
+                    Ok(mut cfg) => {
+                        cfg.sound.clamp();
+                        cfg.controls.clamp();
+                        return cfg;
+                    }
+                    Err(e) => {
+                        warn!("Failed to parse config file {:?}: {}. Using defaults.", path, e);
+                    }
+                }
+            } else {
+                warn!("Failed to read config file {:?}. Using defaults.", path);
+            }
+        }
+        Self::default()
+    }
+
+    pub fn save(&self, path: impl AsRef<Path>) -> Result<(), std::io::Error> {
+        let path = path.as_ref();
+        if let Some(parent) = path.parent() {
+            if !parent.as_os_str().is_empty() {
+                std::fs::create_dir_all(parent)?;
+            }
+        }
+        let json_str = serde_json::to_string_pretty(self)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+        std::fs::write(path, json_str)?;
+        Ok(())
+    }
+}
+
 pub struct ConfigPlugin;
 
 impl Plugin for ConfigPlugin {
     fn build(&self, app: &mut App) {
-        let config = load_config_from_disk(&get_default_config_path());
-        app.insert_resource(config);
+        let game_config = GameConfig::load_or_default(GameConfig::default_config_path());
+        app.insert_resource(crate::palette::CrtPostProcessConfig {
+            enabled: game_config.video.crt_enabled,
+            ..Default::default()
+        });
+        app.insert_resource(crate::voxel::registry::VoxelConfig {
+            enabled: game_config.video.voxels_enabled,
+            ..Default::default()
+        });
+        app.insert_resource(crate::lighting::DynamicLightingConfig {
+            enabled: game_config.video.dynamic_lighting_enabled,
+            ..Default::default()
+        });
+        app.insert_resource(game_config);
+
+        let duke_config = load_config_from_disk(&get_default_config_path());
+        app.insert_resource(duke_config);
     }
 }
 
@@ -216,4 +365,83 @@ mod tests {
         assert!(loaded.invert_mouse);
         assert!(loaded.crosshairs);
     }
+
+    #[test]
+    fn test_default_game_config_values() {
+        let config = GameConfig::default();
+        // Sound defaults
+        assert_eq!(config.sound.master_volume, 1.0);
+        assert_eq!(config.sound.sfx_volume, 1.0);
+        assert_eq!(config.sound.music_volume, 0.7);
+        assert_eq!(config.sound.voice_volume, 1.0);
+
+        // Video defaults
+        assert!(!config.video.crt_enabled);
+        assert!(config.video.voxels_enabled);
+        assert!(config.video.dynamic_lighting_enabled);
+        assert_eq!(config.video.window_mode, WindowModeSetting::Windowed);
+
+        // Controls defaults
+        assert_eq!(config.controls.mouse_sensitivity, 1.0);
+        assert!(!config.controls.invert_mouse_y);
+        assert!(config.controls.auto_switch_weapon);
+        assert!(config.controls.view_bobbing);
+    }
+
+    #[test]
+    fn test_game_config_json_roundtrip() {
+        let mut config = GameConfig::default();
+        config.sound.master_volume = 0.8;
+        config.sound.sfx_volume = 0.6;
+        config.sound.music_volume = 0.5;
+        config.sound.voice_volume = 0.9;
+        config.video.crt_enabled = true;
+        config.video.voxels_enabled = false;
+        config.video.dynamic_lighting_enabled = false;
+        config.video.window_mode = WindowModeSetting::BorderlessFullscreen;
+        config.controls.mouse_sensitivity = 2.25;
+        config.controls.invert_mouse_y = true;
+        config.controls.auto_switch_weapon = false;
+        config.controls.view_bobbing = false;
+
+        let json_str = serde_json::to_string_pretty(&config).expect("Serialize to JSON");
+        assert!(json_str.contains("\"master_volume\": 0.8"));
+        assert!(json_str.contains("\"crt_enabled\": true"));
+        assert!(json_str.contains("\"BorderlessFullscreen\""));
+
+        let deserialized: GameConfig = serde_json::from_str(&json_str).expect("Deserialize from JSON");
+        assert_eq!(config, deserialized);
+
+        let temp_dir = std::env::temp_dir();
+        let temp_file = temp_dir.join(format!("dn3d_test_config_{}.json", std::process::id()));
+
+        // Test save to disk
+        config.save(&temp_file).expect("Save config to file");
+        assert!(temp_file.exists());
+
+        // Test load from disk
+        let loaded = GameConfig::load_or_default(&temp_file);
+        assert_eq!(config, loaded);
+
+        // Clean up
+        let _ = std::fs::remove_file(&temp_file);
+    }
+
+    #[test]
+    fn test_game_config_missing_or_corrupted_file_fallback() {
+        let non_existent = PathBuf::from("non_existent_config_path_12345.json");
+        let fallback = GameConfig::load_or_default(&non_existent);
+        assert_eq!(fallback, GameConfig::default());
+
+        let temp_dir = std::env::temp_dir();
+        let corrupt_file = temp_dir.join(format!("dn3d_corrupt_config_{}.json", std::process::id()));
+        std::fs::write(&corrupt_file, "{ invalid_json: definitely not valid }").expect("Write corrupt file");
+
+        let fallback_corrupt = GameConfig::load_or_default(&corrupt_file);
+        assert_eq!(fallback_corrupt, GameConfig::default());
+
+        // Clean up
+        let _ = std::fs::remove_file(&corrupt_file);
+    }
 }
+

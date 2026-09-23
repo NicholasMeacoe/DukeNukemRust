@@ -1,16 +1,16 @@
 # Implementation Plan: In-Game Options Menu & Configuration Persistence
 
 ## Phase 1: Persistent Configuration Architecture & Disk I/O (`config.json`)
-- [ ] Task: Write Tests for Configuration Serialization & Loading
-  - [ ] Unit test verifying default `GameConfig` values
-  - [ ] Unit test verifying JSON round-trip serialization and deserialization
-  - [ ] Unit test verifying graceful fallback to defaults on corrupt/missing file
-- [ ] Task: Implement `GameConfig` and Persistence Services
-  - [ ] Define `GameConfig`, `SoundConfig`, `VideoConfig`, `ControlsConfig` in `src/config.rs`
-  - [ ] Implement `load_config`, `save_config`, and Bevy resource `ResMut<GameConfig>`
-  - [ ] Integrate initial config loading in `App` initialization in `src/main.rs`
-- [ ] Task: Phase 1 Verification & Checkpoint (Refer to workflow.md)
-  - [ ] Verify `config.json` reads and writes reliably with correct types and paths
+- [x] Task: Write Tests for Configuration Serialization & Loading
+  - [x] Unit test verifying default `GameConfig` values
+  - [x] Unit test verifying JSON round-trip serialization and deserialization
+  - [x] Unit test verifying graceful fallback to defaults on corrupt/missing file
+- [x] Task: Implement `GameConfig` and Persistence Services
+  - [x] Define `GameConfig`, `SoundConfig`, `VideoConfig`, `ControlsConfig` in `src/config.rs`
+  - [x] Implement `load_config`, `save_config`, and Bevy resource `ResMut<GameConfig>`
+  - [x] Integrate initial config loading in `App` initialization in `src/main.rs`
+- [x] Task: Phase 1 Verification & Checkpoint (Refer to workflow.md)
+  - [x] Verify `config.json` reads and writes reliably with correct types and paths
 
 ## Phase 2: Game Flow State Machine & Navigation Infrastructure
 - [ ] Task: Write Tests for Options States & Submenu Navigation
