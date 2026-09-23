@@ -25,18 +25,18 @@
   - [x] Verify keyboard navigation, cursor wrapping, and sub-menu transitions without state locks
 
 ## Phase 3: Sound Setup Submenu & Live Audio Volume Modulation
-- [ ] Task: Write Tests for Audio Settings & Slider Adjustments
-  - [ ] Unit test verifying volume slider value clamping (0.0 to 1.0 in 0.1 steps)
-  - [ ] Unit test verifying audio system volume scaling applied to music and sound channels
-- [ ] Task: Implement Sound Setup UI & Slider Controls
-  - [ ] Add UI rendering for Master, Sound FX, Music, and Voice volume sliders in `src/game_flow/ui.rs`
-  - [ ] Implement left/right arrow/key input handler for slider adjustments in `src/game_flow/menu.rs`
-  - [ ] Connect volume settings directly to Bevy audio/music players and SoundFont synth in `src/audio/`
-- [ ] Task: Phase 3 Verification & Checkpoint (Refer to workflow.md)
-  - [ ] Verify volume changes take effect immediately in real-time
+- [x] Task: Write Tests for Audio Settings & Slider Adjustments
+  - [x] Unit test verifying volume slider value clamping (0.0 to 1.0 in 0.1 steps)
+  - [x] Unit test verifying audio system volume scaling applied to music and sound channels
+- [x] Task: Implement Sound Setup UI & Slider Controls
+  - [x] Add UI rendering for Master, Sound FX, Music, and Voice volume sliders in `src/game_flow/ui.rs`
+  - [x] Implement left/right arrow/key input handler for slider adjustments in `src/game_flow/menu.rs`
+  - [x] Connect volume settings directly to Bevy audio/music players and SoundFont synth in `src/audio/`
+- [x] Task: Phase 3 Verification & Checkpoint (Refer to workflow.md)
+  - [x] Verify volume changes take effect immediately in real-time
 
 ## Phase 4: Video & Display Setup Submenu (CRT, Voxels, Lights, Window)
-- [ ] Task: Write Tests for Video Settings Toggles
+- [~] Task: Write Tests for Video Settings Toggles
   - [ ] Unit test verifying CRT shader toggle mutates `CrtSettings.enabled`
   - [ ] Unit test verifying 3D Voxel Models toggle mutates `VoxelConfig.enabled`
   - [ ] Unit test verifying Dynamic Point Lights toggle mutates `DynamicLightingConfig.enabled`

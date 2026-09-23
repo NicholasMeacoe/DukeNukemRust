@@ -148,6 +148,20 @@ pub fn setup_menu_ui(mut commands: Commands) {
         });
 }
 
+pub fn format_slider(label: &str, val: f32) -> String {
+    let pct = (val.clamp(0.0, 1.0) * 100.0).round() as i32;
+    let ticks = (pct + 5) / 10;
+    let mut bar = String::with_capacity(10);
+    for i in 0..10 {
+        if i < ticks {
+            bar.push('=');
+        } else {
+            bar.push('-');
+        }
+    }
+    format!("{:<16} [{}] {:>3}%", label, bar, pct)
+}
+
 pub fn update_menu_ui(
     state: Res<State<GamePhase>>,
     cursor: Res<MenuCursor>,
@@ -156,7 +170,7 @@ pub fn update_menu_ui(
     anim_state: Res<crate::game_flow::intermission::IntermissionAnimationState>,
     save_mgr: Option<Res<crate::save::SaveManager>>,
     options_origin: Option<Res<OptionsOrigin>>,
-    _game_config: Option<Res<crate::config::GameConfig>>,
+    game_config: Option<Res<crate::config::GameConfig>>,
     mut root_query: Query<(&mut Style, &mut BackgroundColor), With<MenuUiRoot>>,
     mut row_query: Query<(&mut Style, &MenuItemRow), Without<MenuUiRoot>>,
     mut header_query: Query<
@@ -364,6 +378,26 @@ pub fn update_menu_ui(
                     format!("SLOT {}: {}", idx + 1, title)
                 } else {
                     format!("SLOT {}: [EMPTY]", idx + 1)
+                };
+                text.sections[0].value = label;
+                if idx == cursor.selected_index {
+                    text.sections[0].style.color = DUKE_GOLD;
+                } else {
+                    text.sections[0].style.color = DUKE_GREY;
+                }
+            } else {
+                text.sections[0].value = "".to_string();
+            }
+        } else if current_phase == GamePhase::SoundSetup {
+            if idx < 4 {
+                let default_cfg = crate::config::GameConfig::default();
+                let sound_cfg = game_config.as_ref().map(|c| &c.sound).unwrap_or(&default_cfg.sound);
+                let label = match idx {
+                    0 => format_slider("MASTER VOLUME", sound_cfg.master_volume),
+                    1 => format_slider("SOUND FX VOLUME", sound_cfg.sfx_volume),
+                    2 => format_slider("MUSIC VOLUME", sound_cfg.music_volume),
+                    3 => format_slider("VOICE VOLUME", sound_cfg.voice_volume),
+                    _ => "".to_string(),
                 };
                 text.sections[0].value = label;
                 if idx == cursor.selected_index {

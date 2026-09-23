@@ -359,6 +359,39 @@ pub fn handle_menu_navigation(
                     let _ = cfg.save(crate::config::GameConfig::default_config_path());
                 }
                 next_state.set(GamePhase::OptionsMenu);
+            } else {
+                let delta = if keys.just_pressed(KeyCode::ArrowLeft) || keys.just_pressed(KeyCode::KeyA) {
+                    Some(-0.1)
+                } else if keys.just_pressed(KeyCode::ArrowRight) || keys.just_pressed(KeyCode::KeyD) {
+                    Some(0.1)
+                } else {
+                    None
+                };
+
+                if let Some(d) = delta {
+                    if let Some(ref mut cfg) = configs.game_config {
+                        match cursor.selected_index {
+                            0 => {
+                                cfg.sound.master_volume =
+                                    ((cfg.sound.master_volume + d).clamp(0.0, 1.0) * 10.0).round() / 10.0;
+                            }
+                            1 => {
+                                cfg.sound.sfx_volume =
+                                    ((cfg.sound.sfx_volume + d).clamp(0.0, 1.0) * 10.0).round() / 10.0;
+                            }
+                            2 => {
+                                cfg.sound.music_volume =
+                                    ((cfg.sound.music_volume + d).clamp(0.0, 1.0) * 10.0).round() / 10.0;
+                            }
+                            3 => {
+                                cfg.sound.voice_volume =
+                                    ((cfg.sound.voice_volume + d).clamp(0.0, 1.0) * 10.0).round() / 10.0;
+                            }
+                            _ => {}
+                        }
+                        events.sound_events.send(PlaySoundEvent { sound_id: 0 });
+                    }
+                }
             }
         }
         GamePhase::VideoSetup => {

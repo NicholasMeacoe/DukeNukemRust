@@ -851,5 +851,95 @@ mod tests {
 
         let _ = std::fs::remove_file(crate::config::GameConfig::default_config_path());
     }
+
+    #[test]
+    fn test_sound_setup_slider_adjustments_and_clamping() {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins);
+        app.add_plugins(bevy::state::app::StatesPlugin);
+        app.init_state::<GamePhase>();
+        app.init_resource::<ButtonInput<KeyCode>>();
+        app.init_resource::<MenuCursor>();
+        app.init_resource::<LevelProgress>();
+        app.init_resource::<SaveLoadOrigin>();
+        app.init_resource::<OptionsOrigin>();
+        app.init_resource::<crate::config::GameConfig>();
+        app.add_event::<crate::audio::PlaySoundEvent>();
+        app.add_event::<LoadLevelEvent>();
+        app.add_event::<crate::save::SaveGameEvent>();
+        app.add_event::<crate::save::LoadGameEvent>();
+        app.add_event::<bevy::app::AppExit>();
+        app.add_systems(Update, handle_menu_navigation);
+
+        app.world_mut().resource_mut::<NextState<GamePhase>>().set(GamePhase::SoundSetup);
+        app.update();
+        app.update();
+        assert_eq!(*app.world().resource::<State<GamePhase>>().get(), GamePhase::SoundSetup);
+
+        // 1. Master Volume (index 0, default 1.0)
+        app.world_mut().resource_mut::<MenuCursor>().selected_index = 0;
+        // Pressing Right at 1.0 clamps at 1.0
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::ArrowRight);
+        app.update();
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().reset_all();
+        assert_eq!(app.world().resource::<crate::config::GameConfig>().sound.master_volume, 1.0);
+
+        // Pressing Left twice decrements by 0.2 to 0.8
+        for _ in 0..2 {
+            app.world_mut().resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::ArrowLeft);
+            app.update();
+            app.world_mut().resource_mut::<ButtonInput<KeyCode>>().reset_all();
+        }
+        assert_eq!(app.world().resource::<crate::config::GameConfig>().sound.master_volume, 0.8);
+
+        // 2. Sound FX Volume (index 1, default 1.0)
+        app.world_mut().resource_mut::<MenuCursor>().selected_index = 1;
+        // Pressing Left 15 times clamps at 0.0
+        for _ in 0..15 {
+            app.world_mut().resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::KeyA);
+            app.update();
+            app.world_mut().resource_mut::<ButtonInput<KeyCode>>().reset_all();
+        }
+        assert_eq!(app.world().resource::<crate::config::GameConfig>().sound.sfx_volume, 0.0);
+
+        // Pressing Right once increments to 0.1
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::KeyD);
+        app.update();
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().reset_all();
+        assert_eq!(app.world().resource::<crate::config::GameConfig>().sound.sfx_volume, 0.1);
+
+        // 3. Music Volume (index 2, default 0.7)
+        app.world_mut().resource_mut::<MenuCursor>().selected_index = 2;
+        // Increment once to 0.8
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::ArrowRight);
+        app.update();
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().reset_all();
+        assert_eq!(app.world().resource::<crate::config::GameConfig>().sound.music_volume, 0.8);
+
+        // 4. Voice Volume (index 3, default 1.0)
+        app.world_mut().resource_mut::<MenuCursor>().selected_index = 3;
+        // Decrement 4 times to 0.6
+        for _ in 0..4 {
+            app.world_mut().resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::ArrowLeft);
+            app.update();
+            app.world_mut().resource_mut::<ButtonInput<KeyCode>>().reset_all();
+        }
+        assert_eq!(app.world().resource::<crate::config::GameConfig>().sound.voice_volume, 0.6);
+    }
+
+    #[test]
+    fn test_slider_formatting() {
+        let max_str = format_slider("MASTER VOLUME", 1.0);
+        assert!(max_str.contains("100%"));
+        assert!(max_str.contains("[==========]"));
+
+        let half_str = format_slider("MUSIC VOLUME", 0.5);
+        assert!(half_str.contains("50%"));
+        assert!(half_str.contains("[=====-----]"));
+
+        let zero_str = format_slider("SFX VOLUME", 0.0);
+        assert!(zero_str.contains("0%"));
+        assert!(zero_str.contains("[----------]"));
+    }
 }
 

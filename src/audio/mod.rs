@@ -149,8 +149,12 @@ pub fn sync_music_volume_system(
     time: Res<Time>,
     mut music_state: ResMut<DynamicMusicState>,
     sink_query: Query<&bevy::audio::AudioSink, With<MusicTrackEmitter>>,
+    game_config: Option<Res<crate::config::GameConfig>>,
 ) {
-    let target = music_state.get_target_volume();
+    let music_scale = game_config
+        .as_ref()
+        .map_or(1.0, |c| c.sound.master_volume * c.sound.music_volume);
+    let target = music_state.get_target_volume() * music_scale;
     // Smooth lerp to prevent popping
     music_state.current_volume = music_state.current_volume
         + (target - music_state.current_volume) * (time.delta_seconds() * 5.0).min(1.0);
@@ -600,12 +604,17 @@ pub fn handle_play_sound_events(
     audio_assets: Res<DukeAudioAssets>,
     mut voice_limiter: Option<ResMut<AudioVoiceLimiter>>,
     voice_query: Query<(Entity, &VoiceChannel)>,
+    game_config: Option<Res<crate::config::GameConfig>>,
     mut commands: Commands,
 ) {
     let max_voices = voice_limiter
         .as_ref()
         .map(|l| l.max_voices)
         .unwrap_or(MAX_ACTIVE_VOICES);
+
+    let sfx_vol = game_config
+        .as_ref()
+        .map_or(1.0, |c| c.sound.master_volume * c.sound.sfx_volume);
 
     let mut current_voices: Vec<(Entity, u64)> = voice_query
         .iter()
@@ -628,7 +637,7 @@ pub fn handle_play_sound_events(
                 .spawn((
                     AudioBundle {
                         source: handle,
-                        ..default()
+                        settings: PlaybackSettings::DESPAWN.with_volume(bevy::audio::Volume::new(sfx_vol)),
                     },
                     VoiceChannel { sequence: seq },
                 ))
@@ -643,12 +652,17 @@ pub fn handle_play_spatial_sound_events(
     audio_assets: Res<DukeAudioAssets>,
     mut voice_limiter: Option<ResMut<AudioVoiceLimiter>>,
     voice_query: Query<(Entity, &VoiceChannel)>,
+    game_config: Option<Res<crate::config::GameConfig>>,
     mut commands: Commands,
 ) {
     let max_voices = voice_limiter
         .as_ref()
         .map(|l| l.max_voices)
         .unwrap_or(MAX_ACTIVE_VOICES);
+
+    let sfx_vol = game_config
+        .as_ref()
+        .map_or(1.0, |c| c.sound.master_volume * c.sound.sfx_volume);
 
     let mut current_voices: Vec<(Entity, u64)> = voice_query
         .iter()
@@ -668,7 +682,7 @@ pub fn handle_play_spatial_sound_events(
             };
 
             let settings = PlaybackSettings::default()
-                .with_volume(bevy::audio::Volume::new(ev.volume))
+                .with_volume(bevy::audio::Volume::new((ev.volume * sfx_vol).clamp(0.0, 1.0)))
                 .with_spatial(true);
             let entity = commands
                 .spawn((
@@ -690,12 +704,17 @@ pub fn handle_play_named_sound_events(
     audio_assets: Res<DukeAudioAssets>,
     mut voice_limiter: Option<ResMut<AudioVoiceLimiter>>,
     voice_query: Query<(Entity, &VoiceChannel)>,
+    game_config: Option<Res<crate::config::GameConfig>>,
     mut commands: Commands,
 ) {
     let max_voices = voice_limiter
         .as_ref()
         .map(|l| l.max_voices)
         .unwrap_or(MAX_ACTIVE_VOICES);
+
+    let sfx_vol = game_config
+        .as_ref()
+        .map_or(1.0, |c| c.sound.master_volume * c.sound.sfx_volume);
 
     let mut current_voices: Vec<(Entity, u64)> = voice_query
         .iter()
@@ -715,7 +734,7 @@ pub fn handle_play_named_sound_events(
             };
 
             let mut settings =
-                PlaybackSettings::default().with_volume(bevy::audio::Volume::new(ev.volume));
+                PlaybackSettings::default().with_volume(bevy::audio::Volume::new((ev.volume * sfx_vol).clamp(0.0, 1.0)));
 
             let entity = if let Some(pos) = ev.position {
                 settings = settings.with_spatial(true);
@@ -800,12 +819,17 @@ pub fn handle_play_duke_voice_events(
     mut music_state: Option<ResMut<DynamicMusicState>>,
     mut voice_limiter: Option<ResMut<AudioVoiceLimiter>>,
     voice_query: Query<(Entity, &VoiceChannel)>,
+    game_config: Option<Res<crate::config::GameConfig>>,
     mut commands: Commands,
 ) {
     let max_voices = voice_limiter
         .as_ref()
         .map(|l| l.max_voices)
         .unwrap_or(MAX_ACTIVE_VOICES);
+
+    let voice_vol = game_config
+        .as_ref()
+        .map_or(1.0, |c| c.sound.master_volume * c.sound.voice_volume);
 
     let mut current_voices: Vec<(Entity, u64)> = voice_query
         .iter()
@@ -914,7 +938,7 @@ pub fn handle_play_duke_voice_events(
                 .spawn((
                     AudioBundle {
                         source: handle,
-                        ..default()
+                        settings: PlaybackSettings::DESPAWN.with_volume(bevy::audio::Volume::new(voice_vol)),
                     },
                     VoiceChannel { sequence: seq },
                 ))
@@ -1318,5 +1342,36 @@ mod tests {
         for seq in remaining_channels {
             assert!(seq >= 4, "Oldest voices should be stolen/culled by voice limiter");
         }
+    }
+
+    #[test]
+    fn test_audio_volume_scaling_with_game_config() {
+        let mut app = App::new();
+        app.init_resource::<Time>();
+        let mut music_state = DynamicMusicState::default();
+        music_state.base_volume = 1.0;
+        music_state.current_volume = 1.0;
+        app.insert_resource(music_state);
+
+        let mut config = crate::config::GameConfig::default();
+        config.sound.master_volume = 0.5;
+        config.sound.music_volume = 0.5;
+        app.insert_resource(config);
+
+        let mut schedule = Schedule::default();
+        schedule.add_systems(sync_music_volume_system);
+
+        // Advance frames with non-zero delta time
+        for _ in 0..10 {
+            app.world_mut()
+                .resource_mut::<Time>()
+                .advance_by(std::time::Duration::from_millis(100));
+            schedule.run(app.world_mut());
+        }
+
+        let final_music_state = app.world().resource::<DynamicMusicState>();
+        // Target is 1.0 * (0.5 * 0.5) = 0.25, volume should have smoothly decayed towards 0.25
+        assert!(final_music_state.current_volume < 1.0);
+        assert!(final_music_state.current_volume >= 0.25);
     }
 }
