@@ -941,5 +941,127 @@ mod tests {
         assert!(zero_str.contains("0%"));
         assert!(zero_str.contains("[----------]"));
     }
+
+    #[test]
+    fn test_video_setup_toggles_and_config_sync() {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins);
+        app.add_plugins(bevy::state::app::StatesPlugin);
+        app.init_state::<GamePhase>();
+        app.init_resource::<ButtonInput<KeyCode>>();
+        app.init_resource::<MenuCursor>();
+        app.init_resource::<LevelProgress>();
+        app.init_resource::<OptionsOrigin>();
+        app.insert_resource(crate::config::GameConfig::default());
+        app.insert_resource(crate::palette::CrtPostProcessConfig {
+            enabled: false,
+            ..default()
+        });
+        app.insert_resource(crate::voxel::registry::VoxelConfig {
+            enabled: true,
+            ..default()
+        });
+        app.insert_resource(crate::lighting::DynamicLightingConfig {
+            enabled: true,
+            ..default()
+        });
+        app.add_event::<crate::audio::PlaySoundEvent>();
+        app.add_event::<LoadLevelEvent>();
+        app.add_event::<crate::save::SaveGameEvent>();
+        app.add_event::<crate::save::LoadGameEvent>();
+        app.add_event::<bevy::app::AppExit>();
+        app.add_systems(Update, handle_menu_navigation);
+
+        app.world_mut().resource_mut::<NextState<GamePhase>>().set(GamePhase::VideoSetup);
+        app.update();
+        app.update();
+        assert_eq!(*app.world().resource::<State<GamePhase>>().get(), GamePhase::VideoSetup);
+
+        // 1. CRT Shader (index 0, default false)
+        app.world_mut().resource_mut::<MenuCursor>().selected_index = 0;
+        assert!(!app.world().resource::<crate::config::GameConfig>().video.crt_enabled);
+        assert!(!app.world().resource::<crate::palette::CrtPostProcessConfig>().enabled);
+
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::Enter);
+        app.update();
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().reset_all();
+        assert!(app.world().resource::<crate::config::GameConfig>().video.crt_enabled);
+        assert!(app.world().resource::<crate::palette::CrtPostProcessConfig>().enabled);
+
+        // Toggle back off
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::Space);
+        app.update();
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().reset_all();
+        assert!(!app.world().resource::<crate::config::GameConfig>().video.crt_enabled);
+        assert!(!app.world().resource::<crate::palette::CrtPostProcessConfig>().enabled);
+
+        // 2. 3D Voxel Models (index 1, default true)
+        app.world_mut().resource_mut::<MenuCursor>().selected_index = 1;
+        assert!(app.world().resource::<crate::config::GameConfig>().video.voxels_enabled);
+        assert!(app.world().resource::<crate::voxel::registry::VoxelConfig>().enabled);
+
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::ArrowRight);
+        app.update();
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().reset_all();
+        assert!(!app.world().resource::<crate::config::GameConfig>().video.voxels_enabled);
+        assert!(!app.world().resource::<crate::voxel::registry::VoxelConfig>().enabled);
+
+        // Toggle back on
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::KeyA);
+        app.update();
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().reset_all();
+        assert!(app.world().resource::<crate::config::GameConfig>().video.voxels_enabled);
+        assert!(app.world().resource::<crate::voxel::registry::VoxelConfig>().enabled);
+
+        // 3. Dynamic Lighting (index 2, default true)
+        app.world_mut().resource_mut::<MenuCursor>().selected_index = 2;
+        assert!(app.world().resource::<crate::config::GameConfig>().video.dynamic_lighting_enabled);
+        assert!(app.world().resource::<crate::lighting::DynamicLightingConfig>().enabled);
+
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::Enter);
+        app.update();
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().reset_all();
+        assert!(!app.world().resource::<crate::config::GameConfig>().video.dynamic_lighting_enabled);
+        assert!(!app.world().resource::<crate::lighting::DynamicLightingConfig>().enabled);
+
+        // Toggle back on
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::Enter);
+        app.update();
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().reset_all();
+        assert!(app.world().resource::<crate::config::GameConfig>().video.dynamic_lighting_enabled);
+        assert!(app.world().resource::<crate::lighting::DynamicLightingConfig>().enabled);
+
+        // 4. Window Mode (index 3, default Windowed)
+        app.world_mut().resource_mut::<MenuCursor>().selected_index = 3;
+        assert_eq!(
+            app.world().resource::<crate::config::GameConfig>().video.window_mode,
+            crate::config::WindowModeSetting::Windowed
+        );
+
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::Enter);
+        app.update();
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().reset_all();
+        assert_eq!(
+            app.world().resource::<crate::config::GameConfig>().video.window_mode,
+            crate::config::WindowModeSetting::BorderlessFullscreen
+        );
+
+        // Toggle back to Windowed
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::ArrowLeft);
+        app.update();
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().reset_all();
+        assert_eq!(
+            app.world().resource::<crate::config::GameConfig>().video.window_mode,
+            crate::config::WindowModeSetting::Windowed
+        );
+
+        // 5. Escape returns to OptionsMenu
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::Escape);
+        app.update();
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().reset_all();
+        app.update();
+        assert_eq!(*app.world().resource::<State<GamePhase>>().get(), GamePhase::OptionsMenu);
+        assert_eq!(app.world().resource::<MenuCursor>().selected_index, 1);
+    }
 }
 

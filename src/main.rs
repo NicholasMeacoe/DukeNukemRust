@@ -63,6 +63,12 @@ fn find_grp_path() -> String {
 }
 
 fn main() {
+    let startup_config = config::GameConfig::load_or_default(config::GameConfig::default_config_path());
+    let initial_window_mode = match startup_config.video.window_mode {
+        config::WindowModeSetting::Windowed => bevy::window::WindowMode::Windowed,
+        config::WindowModeSetting::BorderlessFullscreen => bevy::window::WindowMode::BorderlessFullscreen,
+    };
+
     App::new()
         .insert_resource(ClearColor(Color::BLACK))
         .init_resource::<animation::EngineClock>()
@@ -73,7 +79,7 @@ fn main() {
                 position: WindowPosition::Centered(MonitorSelection::Primary),
                 focused: true,
                 visible: true,
-                mode: bevy::window::WindowMode::Windowed,
+                mode: initial_window_mode,
                 present_mode: bevy::window::PresentMode::AutoVsync,
                 ..default()
             }),

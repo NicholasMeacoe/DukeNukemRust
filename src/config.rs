@@ -312,6 +312,26 @@ impl GameConfig {
     }
 }
 
+pub fn sync_window_mode_system(
+    game_config: Option<Res<GameConfig>>,
+    mut windows: Query<&mut Window, With<bevy::window::PrimaryWindow>>,
+) {
+    let Some(config) = game_config else { return };
+    if !config.is_changed() {
+        return;
+    }
+    let Ok(mut window) = windows.get_single_mut() else {
+        return;
+    };
+    let target_mode = match config.video.window_mode {
+        WindowModeSetting::Windowed => bevy::window::WindowMode::Windowed,
+        WindowModeSetting::BorderlessFullscreen => bevy::window::WindowMode::BorderlessFullscreen,
+    };
+    if window.mode != target_mode {
+        window.mode = target_mode;
+    }
+}
+
 pub struct ConfigPlugin;
 
 impl Plugin for ConfigPlugin {
@@ -333,6 +353,8 @@ impl Plugin for ConfigPlugin {
 
         let duke_config = load_config_from_disk(&get_default_config_path());
         app.insert_resource(duke_config);
+
+        app.add_systems(Update, sync_window_mode_system);
     }
 }
 
@@ -442,6 +464,35 @@ mod tests {
 
         // Clean up
         let _ = std::fs::remove_file(&corrupt_file);
+    }
+
+    #[test]
+    fn test_sync_window_mode_system() {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins);
+        let mut game_config = GameConfig::default();
+        game_config.video.window_mode = WindowModeSetting::BorderlessFullscreen;
+        app.insert_resource(game_config);
+        app.world_mut().spawn((
+            Window {
+                mode: bevy::window::WindowMode::Windowed,
+                ..default()
+            },
+            bevy::window::PrimaryWindow,
+        ));
+        app.add_systems(Update, sync_window_mode_system);
+        app.update();
+
+        let mut window_query = app.world_mut().query_filtered::<&Window, With<bevy::window::PrimaryWindow>>();
+        let window = window_query.single(app.world());
+        assert_eq!(window.mode, bevy::window::WindowMode::BorderlessFullscreen);
+
+        // Mutate back to Windowed
+        app.world_mut().resource_mut::<GameConfig>().video.window_mode = WindowModeSetting::Windowed;
+        app.update();
+
+        let window = window_query.single(app.world());
+        assert_eq!(window.mode, bevy::window::WindowMode::Windowed);
     }
 }
 

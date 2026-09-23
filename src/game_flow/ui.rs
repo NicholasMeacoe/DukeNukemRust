@@ -408,6 +408,32 @@ pub fn update_menu_ui(
             } else {
                 text.sections[0].value = "".to_string();
             }
+        } else if current_phase == GamePhase::VideoSetup {
+            if idx < 4 {
+                let default_cfg = crate::config::GameConfig::default();
+                let video_cfg = game_config.as_ref().map(|c| &c.video).unwrap_or(&default_cfg.video);
+                let label = match idx {
+                    0 => format!("CRT SHADER:       {}", if video_cfg.crt_enabled { "ON" } else { "OFF" }),
+                    1 => format!("3D VOXEL MODELS:  {}", if video_cfg.voxels_enabled { "ON" } else { "OFF" }),
+                    2 => format!("DYNAMIC LIGHTS:   {}", if video_cfg.dynamic_lighting_enabled { "ON" } else { "OFF" }),
+                    3 => format!(
+                        "DISPLAY MODE:     {}",
+                        match video_cfg.window_mode {
+                            crate::config::WindowModeSetting::Windowed => "WINDOWED",
+                            crate::config::WindowModeSetting::BorderlessFullscreen => "BORDERLESS",
+                        }
+                    ),
+                    _ => "".to_string(),
+                };
+                text.sections[0].value = label;
+                if idx == cursor.selected_index {
+                    text.sections[0].style.color = DUKE_GOLD;
+                } else {
+                    text.sections[0].style.color = DUKE_GREY;
+                }
+            } else {
+                text.sections[0].value = "".to_string();
+            }
         } else {
             let item_labels: &[&str] = match current_phase {
                 GamePhase::MainMenu => &["NEW GAME", "OPTIONS", "LOAD GAME", "QUIT"],

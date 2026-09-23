@@ -36,19 +36,19 @@
   - [x] Verify volume changes take effect immediately in real-time
 
 ## Phase 4: Video & Display Setup Submenu (CRT, Voxels, Lights, Window)
-- [~] Task: Write Tests for Video Settings Toggles
-  - [ ] Unit test verifying CRT shader toggle mutates `CrtSettings.enabled`
-  - [ ] Unit test verifying 3D Voxel Models toggle mutates `VoxelConfig.enabled`
-  - [ ] Unit test verifying Dynamic Point Lights toggle mutates `DynamicLightingConfig.enabled`
-- [ ] Task: Implement Video Setup UI & Toggle Logic
-  - [ ] Add UI rendering for CRT shader, 3D voxels, dynamic lights, and window mode in `src/game_flow/ui.rs`
-  - [ ] Implement toggle handlers on Enter / Space / Left / Right
-  - [ ] Apply window mode changes via `bevy::window::Window` (Windowed vs BorderlessFullscreen)
-- [ ] Task: Phase 4 Verification & Checkpoint (Refer to workflow.md)
-  - [ ] Verify toggles immediately update active rendering features
+- [x] Task: Write Tests for Video Settings Toggles
+  - [x] Unit test verifying CRT shader toggle mutates `CrtSettings.enabled`
+  - [x] Unit test verifying 3D Voxel Models toggle mutates `VoxelConfig.enabled`
+  - [x] Unit test verifying Dynamic Point Lights toggle mutates `DynamicLightingConfig.enabled`
+- [x] Task: Implement Video Setup UI & Toggle Logic
+  - [x] Add UI rendering for CRT shader, 3D voxels, dynamic lights, and window mode in `src/game_flow/ui.rs`
+  - [x] Implement toggle handlers on Enter / Space / Left / Right
+  - [x] Apply window mode changes via `bevy::window::Window` (Windowed vs BorderlessFullscreen)
+- [x] Task: Phase 4 Verification & Checkpoint (Refer to workflow.md)
+  - [x] Verify toggles immediately update active rendering features
 
 ## Phase 5: Gameplay & Controls Setup Submenu (Sensitivity, Invert Y, Auto-switch)
-- [ ] Task: Write Tests for Controls Settings
+- [~] Task: Write Tests for Controls Settings
   - [ ] Unit test verifying mouse sensitivity scaling on camera pitch and yaw
   - [ ] Unit test verifying Invert Y flips mouse pitch delta
   - [ ] Unit test verifying auto-switch on empty weapon behavior

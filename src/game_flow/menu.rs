@@ -404,6 +404,50 @@ pub fn handle_menu_navigation(
                     let _ = cfg.save(crate::config::GameConfig::default_config_path());
                 }
                 next_state.set(GamePhase::OptionsMenu);
+            } else {
+                let is_toggle = keys.just_pressed(KeyCode::Enter)
+                    || keys.just_pressed(KeyCode::Space)
+                    || keys.just_pressed(KeyCode::ArrowLeft)
+                    || keys.just_pressed(KeyCode::ArrowRight)
+                    || keys.just_pressed(KeyCode::KeyA)
+                    || keys.just_pressed(KeyCode::KeyD);
+
+                if is_toggle {
+                    if let Some(ref mut cfg) = configs.game_config {
+                        match cursor.selected_index {
+                            0 => {
+                                cfg.video.crt_enabled = !cfg.video.crt_enabled;
+                                if let Some(ref mut crt) = configs.crt_config {
+                                    crt.enabled = cfg.video.crt_enabled;
+                                }
+                            }
+                            1 => {
+                                cfg.video.voxels_enabled = !cfg.video.voxels_enabled;
+                                if let Some(ref mut vox) = configs.voxel_config {
+                                    vox.enabled = cfg.video.voxels_enabled;
+                                }
+                            }
+                            2 => {
+                                cfg.video.dynamic_lighting_enabled = !cfg.video.dynamic_lighting_enabled;
+                                if let Some(ref mut light) = configs.lighting_config {
+                                    light.enabled = cfg.video.dynamic_lighting_enabled;
+                                }
+                            }
+                            3 => {
+                                cfg.video.window_mode = match cfg.video.window_mode {
+                                    crate::config::WindowModeSetting::Windowed => {
+                                        crate::config::WindowModeSetting::BorderlessFullscreen
+                                    }
+                                    crate::config::WindowModeSetting::BorderlessFullscreen => {
+                                        crate::config::WindowModeSetting::Windowed
+                                    }
+                                };
+                            }
+                            _ => {}
+                        }
+                        events.sound_events.send(PlaySoundEvent { sound_id: 2 });
+                    }
+                }
             }
         }
         GamePhase::ControlsSetup => {
