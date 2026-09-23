@@ -1,11 +1,13 @@
 pub mod actor;
 pub mod protocol;
+pub mod pvp;
 pub mod rng;
 pub mod scoreboard;
 pub mod splitscreen;
 
 pub use actor::*;
 pub use protocol::*;
+pub use pvp::*;
 pub use rng::*;
 pub use scoreboard::*;
 pub use splitscreen::*;
@@ -19,14 +21,27 @@ impl Plugin for NetPlugin {
         app.init_resource::<DukematchState>()
             .init_resource::<DeterministicRng>()
             .init_resource::<SplitscreenConfig>()
+            .add_event::<PvpDamageEvent>()
+            .add_event::<PlayerFragEvent>()
+            .add_systems(Startup, setup_scoreboard_ui)
             .add_systems(
                 Update,
                 (
                     toggle_scoreboard,
                     update_dukematch_timer,
                     update_splitscreen_viewports,
+                    update_scoreboard_overlay,
                 )
                     .in_set(crate::GameSet::Input),
+            )
+            .add_systems(
+                Update,
+                (
+                    apply_pvp_damage,
+                    update_spawn_invulnerability,
+                    handle_frag_events,
+                )
+                    .in_set(crate::GameSet::Combat),
             )
             .add_systems(
                 Update,

@@ -25,6 +25,7 @@ pub struct SpawnProjectileEvent {
     pub velocity: f32,
     pub damage: i32,
     pub is_player_source: bool,
+    pub source_player_id: Option<usize>,
 }
 
 #[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -33,6 +34,8 @@ pub struct Projectile {
     pub velocity: Vec3,
     pub damage: i32,
     pub is_player_source: bool,
+    #[serde(default)]
+    pub source_player_id: Option<usize>,
     pub lifetime: f32,
     pub bounces: u8,
 }
@@ -614,4 +617,5 @@ pub struct EntityDamageEvent {
     pub amount: i32,
     pub source: DamageSource,
     pub hit_origin: Vec3,
+    pub attacker_id: Option<usize>,
 }

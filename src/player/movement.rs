@@ -7,6 +7,7 @@ pub fn update_player_movement(
     keys: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
     mut query: Query<(
+        Entity,
         &mut Transform,
         &mut PlayerController,
         &mut KinematicCharacterController,
@@ -17,6 +18,8 @@ pub fn update_player_movement(
     )>,
     camera_query: Query<(&Transform, Option<&PlayerCamera>), (With<Camera>, Without<PlayerController>)>,
     effectors: Query<&crate::interactivity::SectorEffectorComponent>,
+    spawn_points: Query<&crate::net::MultiplayerSpawnPoint>,
+    net_state: Option<Res<crate::net::DukematchState>>,
     sector_map: Option<Res<crate::sector_map::SectorMap>>,
     mut sound_events: EventWriter<PlaySoundEvent>,
     mut tint: Option<ResMut<crate::hud::ScreenTintState>>,
@@ -24,7 +27,7 @@ pub fn update_player_movement(
 ) {
     let dt = time.delta_seconds();
 
-    for (mut trans, mut player, mut controller, output, current_sector, mut collider, opt_id) in query.iter_mut() {
+    for (player_entity, mut trans, mut player, mut controller, output, current_sector, mut collider, opt_id) in query.iter_mut() {
         let player_id = opt_id.map_or(0, |id| id.0);
         let camera_transform = camera_query
             .iter()
@@ -38,15 +41,24 @@ pub fn update_player_movement(
             player.death_timer -= dt;
             controller.translation = Some(Vec3::new(0.0, -9.81 * dt, 0.0));
             if player.death_timer <= 0.0 {
-                // Respawn at level spawn position
+                // Respawn at level spawn or multiplayer spawn point
                 player.health = player.max_health;
                 player.armor = 0;
-                trans.translation = player.spawn_position;
+                if !spawn_points.is_empty() {
+                    let mut points: Vec<&crate::net::MultiplayerSpawnPoint> = spawn_points.iter().collect();
+                    points.sort_by_key(|s| s.spawn_idx);
+                    let deaths = net_state.as_ref().map_or(0, |s| s.get_deaths(player_id));
+                    let spawn = points[(player_id + deaths as usize) % points.len()];
+                    trans.translation = spawn.position;
+                } else {
+                    trans.translation = player.spawn_position;
+                }
                 player.velocity_y = 0.0;
                 player.velocity_xz = Vec2::ZERO;
                 player.death_timer = 0.0;
                 player.current_weapon = WeaponType::Pistol;
                 player.pistol_mag = 12;
+                commands.entity(player_entity).insert(crate::net::SpawnInvulnerability::default());
             }
             continue;
         }

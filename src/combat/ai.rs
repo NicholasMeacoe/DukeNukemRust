@@ -475,6 +475,7 @@ pub fn update_con_actors(
                         velocity: 10.0,
                         damage: 1000,
                         is_player_source: false,
+                        source_player_id: None,
                     });
                 }
             }
@@ -494,6 +495,7 @@ pub fn update_con_actors(
                         velocity: 5.0,
                         damage: 5,
                         is_player_source: false,
+                        source_player_id: None,
                     });
                 }
             }
@@ -526,6 +528,7 @@ pub fn update_con_actors(
                         velocity: 35.0,
                         damage: 15,
                         is_player_source: false,
+                        source_player_id: None,
                     });
                     sound_events.send(crate::audio::PlaySoundEvent { sound_id: 110 });
                 }
@@ -556,6 +559,7 @@ pub fn update_con_actors(
                             velocity: 150.0,
                             damage: 9,
                             is_player_source: false,
+                            source_player_id: None,
                         });
                         sound_events.send(crate::audio::PlaySoundEvent { sound_id: 6 }); // CHAINGUN_FIRE
                     }
@@ -569,6 +573,7 @@ pub fn update_con_actors(
                         velocity: 30.0,
                         damage: 60,
                         is_player_source: false,
+                        source_player_id: None,
                     });
                     sound_events.send(crate::audio::PlaySoundEvent { sound_id: 112 }); // MORTAR
                 } else if enemy.attack_timer >= 3.5 {
@@ -604,6 +609,7 @@ pub fn update_con_actors(
                             velocity: 45.0,
                             damage: 70,
                             is_player_source: false,
+                            source_player_id: None,
                         });
 
                         // Left shoulder rocket
@@ -616,6 +622,7 @@ pub fn update_con_actors(
                             velocity: 45.0,
                             damage: 70,
                             is_player_source: false,
+                            source_player_id: None,
                         });
                         sound_events.send(crate::audio::PlaySoundEvent { sound_id: 7 }); // RPG_FIRE
                     }
@@ -635,6 +642,7 @@ pub fn update_con_actors(
                             velocity: 55.0,
                             damage: 15,
                             is_player_source: false,
+                            source_player_id: None,
                         });
                         sound_events.send(crate::audio::PlaySoundEvent { sound_id: 110 }); // SOMETHINGFROZE / BLASTER
                     }
@@ -672,6 +680,7 @@ pub fn update_con_actors(
                             velocity: 50.0,
                             damage: 25,
                             is_player_source: false,
+                            source_player_id: None,
                         });
                         sound_events.send(crate::audio::PlaySoundEvent { sound_id: 110 });
                     }
@@ -689,6 +698,7 @@ pub fn update_con_actors(
                             velocity: 45.0,
                             damage: 75,
                             is_player_source: false,
+                            source_player_id: None,
                         });
                         sound_events.send(crate::audio::PlaySoundEvent { sound_id: 7 }); // RPG_FIRE
                     }
@@ -707,6 +717,7 @@ pub fn update_con_actors(
                             origin: trans.translation,
                             radius: 15.0,
                             damage: 50,
+                            attacker_id: None,
                         });
                     }
                     sound_events.send(crate::audio::PlaySoundEvent { sound_id: 112 }); // Quake stomp
@@ -744,6 +755,7 @@ pub fn update_con_actors(
                             velocity: 60.0,
                             damage: 20,
                             is_player_source: false,
+                            source_player_id: None,
                         });
                         sound_events.send(crate::audio::PlaySoundEvent { sound_id: 110 });
                     }
@@ -763,6 +775,7 @@ pub fn update_con_actors(
                             velocity: 40.0,
                             damage: 30,
                             is_player_source: false,
+                            source_player_id: None,
                         });
                         sound_events.send(crate::audio::PlaySoundEvent { sound_id: 570 }); // OCTA_ATTACK / SPIT
                     }
@@ -781,6 +794,7 @@ pub fn update_con_actors(
                             origin: trans.translation + dir_to_player * 2.0,
                             radius: 8.0,
                             damage: 60,
+                            attacker_id: None,
                         });
                         sound_events.send(crate::audio::PlaySoundEvent { sound_id: 0 }); // KICK_HIT
                     }
@@ -813,6 +827,7 @@ pub fn update_con_actors(
                         velocity: vel,
                         damage: dmg,
                         is_player_source: false,
+                        source_player_id: None,
                     });
                 }
             } else {
@@ -823,6 +838,7 @@ pub fn update_con_actors(
                     velocity: vel,
                     damage: dmg,
                     is_player_source: false,
+                    source_player_id: None,
                 });
             }
         }
@@ -846,6 +862,7 @@ pub fn update_con_actors(
                 origin: trans.translation,
                 radius: radius as f32 / 1024.0,
                 damage: dmg,
+                attacker_id: None,
             });
         }
 

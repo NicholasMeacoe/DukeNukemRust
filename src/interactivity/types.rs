@@ -414,6 +414,7 @@ pub struct ExplosionDamageEvent {
     pub origin: Vec3,
     pub radius: f32,
     pub damage: i32,
+    pub attacker_id: Option<usize>,
 }
 
 #[derive(Event, Debug, Clone)]

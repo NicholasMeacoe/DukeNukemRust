@@ -27,18 +27,18 @@
   - [x] Verify player sprite rendered accurately with 8-directional views and custom shirt palettes
 
 ## Phase 3: Dukematch PvP Combat, Frag Attribution & Interactive Scoreboard
-- [ ] Task: Write Tests for PvP Damage Attribution, Frag Matrix & Scoreboard
-  - [ ] Unit tests for `EntityDamageEvent` and `ExplosionDamageEvent` with `attacker_id` propagation
-  - [ ] Unit test for frag scoring: killer kill count increment, victim death count increment, suicide penalty
-  - [ ] Unit test for match termination condition (kill limit or time limit reached)
-  - [ ] Unit test for F7 scoreboard UI rendering and player stats display
-- [ ] Task: Implement PvP Damage, Frag Tracking & Scoreboard HUD
-  - [ ] Update projectile impact and explosion systems to record attacking `PlayerId`
-  - [ ] Connect player lethal damage to `DukematchState::record_frag`
-  - [ ] Implement multi-spawn point selection and 3.0s spawn invulnerability
-  - [ ] Wire F7 interactive scoreboard overlay and in-game frag notifications
-- [ ] Task: Phase 3 Verification & Checkpoint (Refer to workflow.md)
-  - [ ] Verify player vs player damage, frag attribution, and F7 scoreboard display
+- [x] Task: Write Tests for PvP Damage Attribution, Frag Matrix & Scoreboard
+  - [x] Unit tests for `EntityDamageEvent` and `ExplosionDamageEvent` with `attacker_id` propagation
+  - [x] Unit test for frag scoring: killer kill count increment, victim death count increment, suicide penalty
+  - [x] Unit test for match termination condition (kill limit or time limit reached)
+  - [x] Unit test for F7 scoreboard UI rendering and player stats display
+- [x] Task: Implement PvP Damage, Frag Tracking & Scoreboard HUD
+  - [x] Update projectile impact and explosion systems to record attacking `PlayerId`
+  - [x] Connect player lethal damage to `DukematchState::record_frag`
+  - [x] Implement multi-spawn point selection and 3.0s spawn invulnerability
+  - [x] Wire F7 interactive scoreboard overlay and in-game frag notifications
+- [x] Task: Phase 3 Verification & Checkpoint (Refer to workflow.md)
+  - [x] Verify player vs player damage, frag attribution, and F7 scoreboard display
 
 ## Phase 4: Non-Blocking UDP Network Socket Transport
 - [ ] Task: Write Tests for Non-Blocking UDP Transport & State Synchronization

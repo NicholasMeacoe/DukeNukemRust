@@ -94,6 +94,7 @@ mod tests {
             velocity: Vec3::new(0.0, 0.0, -35.0),
             damage: 120,
             is_player_source: true,
+            source_player_id: None,
             lifetime: 4.0,
             bounces: 0,
         };
@@ -274,6 +275,7 @@ mod tests {
             velocity: Vec3::new(10.0, -5.0, 0.0),
             damage: 15,
             is_player_source: true,
+            source_player_id: None,
             lifetime: 3.0,
             bounces: 3,
         };
@@ -432,6 +434,7 @@ mod tests {
             velocity: Vec3::new(45.0, 0.0, 0.0),
             damage: 140,
             is_player_source: true,
+            source_player_id: None,
             lifetime: 4.0,
             bounces: 0,
         };
@@ -520,6 +523,7 @@ mod tests {
         app.add_event::<SpawnProjectileEvent>()
             .add_event::<EntityDamageEvent>()
             .add_event::<crate::interactivity::ExplosionDamageEvent>()
+            .add_event::<crate::net::PvpDamageEvent>()
             .add_event::<crate::audio::PlaySoundEvent>()
             .add_event::<crate::combat::decals::SpawnDecalEvent>()
             .add_event::<crate::interactivity::WallDamageEvent>()
@@ -535,6 +539,7 @@ mod tests {
             velocity: 15.0,
             damage: 150,
             is_player_source: true,
+            source_player_id: Some(0),
         });
 
         // Run schedule to process spawn
@@ -565,6 +570,7 @@ mod tests {
         app.add_event::<SpawnProjectileEvent>()
             .add_event::<EntityDamageEvent>()
             .add_event::<crate::interactivity::ExplosionDamageEvent>()
+            .add_event::<crate::net::PvpDamageEvent>()
             .add_event::<crate::audio::PlaySoundEvent>()
             .add_event::<crate::combat::decals::SpawnDecalEvent>()
             .add_event::<crate::interactivity::WallDamageEvent>()
@@ -587,6 +593,7 @@ mod tests {
                 lifetime: 2.0,
                 bounces: 0,
                 is_player_source: true,
+                source_player_id: Some(0),
             },
             TransformBundle::from_transform(Transform::from_xyz(0.0, 0.5, 0.0)),
         )).id();
@@ -615,6 +622,7 @@ mod tests {
         let mut app = App::new();
         app.add_event::<EntityDamageEvent>()
             .add_event::<GibEvent>()
+            .add_event::<crate::net::PlayerFragEvent>()
             .add_event::<crate::audio::PlaySoundEvent>()
             .add_event::<crate::audio::PlayDukeVoiceEvent>()
             .insert_resource(crate::net::DeterministicRng::new(42))
@@ -637,6 +645,7 @@ mod tests {
             amount: 15, // Normal boot kick damage
             source: DamageSource::PlayerWeapon(ProjectileType::MightyBoot),
             hit_origin: Vec3::new(2.0, 0.0, 2.0),
+            attacker_id: None,
         });
 
         app.update();
@@ -664,6 +673,7 @@ mod tests {
         let mut app = App::new();
         app.add_event::<EntityDamageEvent>()
             .add_event::<GibEvent>()
+            .add_event::<crate::net::PlayerFragEvent>()
             .add_event::<crate::audio::PlaySoundEvent>()
             .add_event::<crate::audio::PlayDukeVoiceEvent>()
             .insert_resource(crate::net::DeterministicRng::new(42))
@@ -687,6 +697,7 @@ mod tests {
             amount: 1,
             source: DamageSource::PlayerWeapon(ProjectileType::HitscanBullet),
             hit_origin: Vec3::new(1.0, 0.0, 1.0),
+            attacker_id: None,
         });
 
         app.update();
@@ -1239,6 +1250,7 @@ mod tests {
             .add_event::<crate::audio::PlayDukeVoiceEvent>()
             .add_event::<crate::interactivity::ExplosionDamageEvent>()
             .add_event::<crate::interactivity::wall_damage::WallDamageEvent>()
+            .add_event::<crate::net::PvpDamageEvent>()
             .add_event::<GibEvent>()
             .add_event::<crate::game_flow::LevelCompletedEvent>()
             .add_event::<SpawnProjectileEvent>()
@@ -1265,6 +1277,7 @@ mod tests {
                 velocity: Vec3::Z * 40.0,
                 damage: 0,
                 is_player_source: true,
+                source_player_id: None,
                 lifetime: 1.0,
                 bounces: 0,
             },
@@ -1288,6 +1301,7 @@ mod tests {
                 velocity: Vec3::Z * 40.0,
                 damage: 10,
                 is_player_source: true,
+                source_player_id: None,
                 lifetime: 1.0,
                 bounces: 0,
             },

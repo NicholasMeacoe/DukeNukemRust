@@ -697,6 +697,7 @@ fn update_weapon(
                                 origin: barrel_trans.translation,
                                 radius: 6.0,
                                 damage: 100,
+                                attacker_id: None,
                             });
                         }
                         commands.entity(entity).despawn_recursive();

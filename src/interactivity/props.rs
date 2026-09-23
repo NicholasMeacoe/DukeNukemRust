@@ -301,7 +301,7 @@ pub fn handle_explosions(
     mut fountains: Query<(&Transform, &mut WaterFountain)>,
     mut crack_walls: Query<(&Transform, &mut CrackWall)>,
     mut glass_windows: Query<(Entity, &Transform, &mut BreakableGlass)>,
-    mut players: Query<(&Transform, &mut crate::player::PlayerController)>,
+    mut players: Query<(&Transform, &mut crate::player::PlayerController, Option<&crate::player::types::PlayerId>)>,
     mut enemies: Query<(
         Entity,
         &Transform,
@@ -312,6 +312,7 @@ pub fn handle_explosions(
     mut sound_events: EventWriter<PlaySoundEvent>,
     mut gib_events: EventWriter<crate::combat::GibEvent>,
     mut light_events: EventWriter<crate::lighting::SpawnDynamicLightEvent>,
+    mut frag_events: EventWriter<crate::net::PlayerFragEvent>,
     mut tint: Option<ResMut<crate::hud::ScreenTintState>>,
     mut commands: Commands,
 ) {
@@ -330,7 +331,7 @@ pub fn handle_explosions(
         }
 
         // 1. Damage Player with 4-tier hitradius falloff and armor mitigation
-        for (p_trans, mut player) in players.iter_mut() {
+        for (p_trans, mut player, opt_id) in players.iter_mut() {
             let dist = p_trans.translation.distance(origin);
             if dist <= exp.radius && !player.god_mode && player.health > 0 {
                 let mut damage = calculate_hitradius_damage(dist, exp.radius, exp.damage);
@@ -340,11 +341,19 @@ pub fn handle_explosions(
                         player.armor -= absorbed;
                         damage -= absorbed;
                     }
+                    let was_alive = player.health > 0;
                     player.health = player.health.saturating_sub(damage);
-                    if player.health == 0 {
+                    if player.health == 0 && was_alive {
                         player.death_timer = 3.0;
                         sound_events.send(PlaySoundEvent { sound_id: 41 }); // DUKE_DEAD
-                    } else {
+                        let victim_id = opt_id.map_or(0, |id| id.0);
+                        let killer_id = exp.attacker_id.unwrap_or(victim_id);
+                        frag_events.send(crate::net::PlayerFragEvent {
+                            killer_id,
+                            victim_id,
+                            weapon_type: 4, // RPG/Explosive
+                        });
+                    } else if player.health > 0 {
                         sound_events.send(PlaySoundEvent { sound_id: 37 }); // DUKE_PAIN
                     }
                     if let Some(ref mut t) = tint {
@@ -485,6 +494,7 @@ pub fn handle_barrel_chain_explosions(
             origin: exp.origin,
             radius: exp.radius,
             damage: exp.damage,
+            attacker_id: None,
         });
     }
 }
@@ -577,6 +587,7 @@ mod tests {
             .add_event::<PlaySoundEvent>()
             .add_event::<crate::combat::GibEvent>()
             .add_event::<crate::lighting::SpawnDynamicLightEvent>()
+            .add_event::<crate::net::PlayerFragEvent>()
             .init_resource::<crate::hud::ScreenTintState>()
             .add_systems(Update, handle_explosions);
 
@@ -596,6 +607,7 @@ mod tests {
             origin: Vec3::new(0.0, 0.0, 0.0),
             radius: 5.0,
             damage: 50,
+            attacker_id: None,
         });
 
         app.update();
@@ -630,6 +642,7 @@ mod tests {
             .add_event::<PlaySoundEvent>()
             .add_event::<crate::combat::GibEvent>()
             .add_event::<crate::lighting::SpawnDynamicLightEvent>()
+            .add_event::<crate::net::PlayerFragEvent>()
             .init_resource::<crate::hud::ScreenTintState>()
             .add_systems(Update, handle_explosions);
 
@@ -666,6 +679,7 @@ mod tests {
             origin: Vec3::new(0.0, 0.0, 0.0),
             radius: 5.0,
             damage: 80,
+            attacker_id: None,
         });
 
         app.update();

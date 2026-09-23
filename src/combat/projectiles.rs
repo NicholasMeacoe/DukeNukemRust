@@ -69,6 +69,7 @@ pub fn spawn_projectiles(mut events: EventReader<SpawnProjectileEvent>, mut comm
                 velocity: vel,
                 damage: ev.damage,
                 is_player_source: ev.is_player_source,
+                source_player_id: ev.source_player_id,
                 lifetime,
                 bounces,
             },
@@ -87,10 +88,11 @@ pub fn update_projectiles(
     mut projectiles: Query<(Entity, &mut Transform, &mut Projectile)>,
     mut enemies: Query<(Entity, &Transform, &mut EnemyActor), Without<Projectile>>,
     players: Query<
-        (Entity, &Transform, &PlayerController),
+        (Entity, &Transform, &PlayerController, Option<&crate::player::types::PlayerId>),
         (Without<Projectile>, Without<EnemyActor>),
     >,
     mut damage_events: EventWriter<EntityDamageEvent>,
+    mut pvp_damage_events: EventWriter<crate::net::PvpDamageEvent>,
     mut explosion_events: EventWriter<ExplosionDamageEvent>,
     mut sound_events: EventWriter<crate::audio::PlaySoundEvent>,
     mut decal_events: EventWriter<crate::combat::decals::SpawnDecalEvent>,
@@ -102,7 +104,7 @@ pub fn update_projectiles(
     let dt = time.delta_seconds();
 
     // Fast squared distance walking squish on shrunk enemies by player
-    for (_, player_trans, _) in players.iter() {
+    for (_, player_trans, _, _) in players.iter() {
         let p_pos = player_trans.translation;
         for (e_entity, enemy_trans, mut enemy) in enemies.iter_mut() {
             if (enemy.is_shrunk || enemy.state == EnemyAiState::Shrunk)
@@ -126,6 +128,7 @@ pub fn update_projectiles(
                         amount: 1000,
                         source: DamageSource::PlayerWeapon(ProjectileType::MightyBoot),
                         hit_origin: enemy_trans.translation,
+                        attacker_id: None,
                     });
                 }
             }
@@ -158,7 +161,7 @@ pub fn update_projectiles(
                 let filter = if proj.is_player_source {
                     QueryFilter::new().groups(CollisionGroups::new(
                         Group::ALL,
-                        Group::GROUP_1 | Group::GROUP_2,
+                        Group::GROUP_1 | Group::GROUP_2 | Group::GROUP_3,
                     ))
                 } else {
                     QueryFilter::new().groups(CollisionGroups::new(
@@ -173,10 +176,13 @@ pub fn update_projectiles(
                         hit_enemy_entity = Some(hit_entity);
                         hit_point = intersection.point;
                         hit_normal = intersection.normal;
-                    } else if !proj.is_player_source && players.get(hit_entity).is_ok() {
-                        hit_player_entity = Some(hit_entity);
-                        hit_point = intersection.point;
-                        hit_normal = intersection.normal;
+                    } else if let Ok((_, _, _, opt_pid)) = players.get(hit_entity) {
+                        let hit_pid = opt_pid.map_or(0, |id| id.0);
+                        if !proj.is_player_source || proj.source_player_id != Some(hit_pid) {
+                            hit_player_entity = Some(hit_entity);
+                            hit_point = intersection.point;
+                            hit_normal = intersection.normal;
+                        }
                     } else {
                         hit_wall = true;
                         hit_wall_entity = Some(hit_entity);
@@ -214,6 +220,7 @@ pub fn update_projectiles(
                         origin: hit_point,
                         radius: 5.0,
                         damage: proj.damage,
+                        attacker_id: proj.source_player_id,
                     });
                     decal_events.send(crate::combat::decals::SpawnDecalEvent {
                         origin: hit_point,
@@ -273,6 +280,7 @@ pub fn update_projectiles(
                             origin: splash_pos,
                             radius: 4.0,
                             damage: proj.damage,
+                            attacker_id: proj.source_player_id,
                         });
                         proj.lifetime = 0.0;
                     } else {
@@ -319,6 +327,7 @@ pub fn update_projectiles(
                         amount: proj.damage,
                         source: DamageSource::PlayerWeapon(proj.projectile_type),
                         hit_origin: hit_point,
+                        attacker_id: proj.source_player_id,
                     });
 
                     decal_events.send(crate::combat::decals::SpawnDecalEvent {
@@ -334,6 +343,7 @@ pub fn update_projectiles(
                             origin: hit_point,
                             radius: 5.0,
                             damage: proj.damage,
+                            attacker_id: proj.source_player_id,
                         });
                     }
 
@@ -341,12 +351,48 @@ pub fn update_projectiles(
                 }
             }
         } else if let Some(p_entity) = hit_player_entity {
-            damage_events.send(EntityDamageEvent {
-                target: p_entity,
-                amount: proj.damage,
-                source: DamageSource::EnemyWeapon(proj.projectile_type),
-                hit_origin: hit_point,
-            });
+            if proj.is_player_source {
+                let attacker_id = proj.source_player_id.unwrap_or(0);
+                let target_id = players.get(p_entity).ok().and_then(|(_, _, _, pid)| pid).map_or(0, |id| id.0);
+                let weapon_code = match proj.projectile_type {
+                    ProjectileType::MightyBoot => 0,
+                    ProjectileType::HitscanBullet => 1,
+                    ProjectileType::ShotgunPellet => 2,
+                    ProjectileType::Rocket => 4,
+                    ProjectileType::Pipebomb => 5,
+                    ProjectileType::ShrinkRay => 6,
+                    ProjectileType::DevastatorMissile => 7,
+                    ProjectileType::FreezeShard => 8,
+                    ProjectileType::ExpanderRay => 9,
+                    _ => 1,
+                };
+                pvp_damage_events.send(crate::net::PvpDamageEvent {
+                    attacker_id,
+                    target_player_id: target_id,
+                    damage: proj.damage,
+                    weapon_type: weapon_code,
+                });
+            } else {
+                damage_events.send(EntityDamageEvent {
+                    target: p_entity,
+                    amount: proj.damage,
+                    source: DamageSource::EnemyWeapon(proj.projectile_type),
+                    hit_origin: hit_point,
+                    attacker_id: None,
+                });
+            }
+
+            if proj.projectile_type == ProjectileType::Rocket
+                || proj.projectile_type == ProjectileType::DevastatorMissile
+            {
+                explosion_events.send(ExplosionDamageEvent {
+                    origin: hit_point,
+                    radius: 5.0,
+                    damage: proj.damage,
+                    attacker_id: proj.source_player_id,
+                });
+            }
+
             proj.lifetime = 0.0;
         }
 
@@ -410,6 +456,7 @@ pub fn update_enemy_status_effects(
                     origin: trans.translation,
                     radius: 4.0,
                     damage: 80,
+                    attacker_id: None,
                 });
             }
         }
@@ -419,7 +466,8 @@ pub fn update_enemy_status_effects(
 pub fn apply_damage_events(
     mut damage_events: EventReader<EntityDamageEvent>,
     mut enemies: Query<(&Transform, &mut EnemyActor)>,
-    mut players: Query<&mut PlayerController>,
+    mut players: Query<(&mut PlayerController, Option<&crate::player::types::PlayerId>)>,
+    mut frag_events: EventWriter<crate::net::PlayerFragEvent>,
     mut gib_events: EventWriter<GibEvent>,
     mut sound_events: EventWriter<crate::audio::PlaySoundEvent>,
     mut duke_voice_events: EventWriter<crate::audio::PlayDukeVoiceEvent>,
@@ -507,7 +555,7 @@ pub fn apply_damage_events(
             }
         }
 
-        if let Ok(mut player) = players.get_mut(ev.target) {
+        if let Ok((mut player, opt_id)) = players.get_mut(ev.target) {
             if player.god_mode || player.health <= 0 {
                 continue;
             }
@@ -525,6 +573,30 @@ pub fn apply_damage_events(
             if player.health == 0 && was_alive {
                 player.death_timer = 3.0;
                 sound_events.send(crate::audio::PlaySoundEvent { sound_id: 41 }); // DUKE_DEAD
+                if let Some(attacker_id) = ev.attacker_id {
+                    let victim_id = opt_id.map_or(0, |id| id.0);
+                    let weapon_code = match ev.source {
+                        DamageSource::PlayerWeapon(pt) => match pt {
+                            ProjectileType::MightyBoot => 0,
+                            ProjectileType::HitscanBullet => 1,
+                            ProjectileType::ShotgunPellet => 2,
+                            ProjectileType::Rocket => 4,
+                            ProjectileType::Pipebomb => 5,
+                            ProjectileType::ShrinkRay => 6,
+                            ProjectileType::DevastatorMissile => 7,
+                            ProjectileType::FreezeShard => 8,
+                            ProjectileType::ExpanderRay => 9,
+                            _ => 1,
+                        },
+                        DamageSource::Explosion => 4,
+                        _ => 1,
+                    };
+                    frag_events.send(crate::net::PlayerFragEvent {
+                        killer_id: attacker_id,
+                        victim_id,
+                        weapon_type: weapon_code,
+                    });
+                }
             } else if player.health > 0 {
                 sound_events.send(crate::audio::PlaySoundEvent { sound_id: 37 }); // DUKE_PAIN
             }

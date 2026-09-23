@@ -121,6 +121,7 @@ pub fn handle_wall_damage(
                         origin: trans.translation,
                         radius: 4.0,
                         damage: 80,
+                        attacker_id: None,
                     });
                     gib_events.send(crate::combat::GibEvent {
                         origin: trans.translation,
@@ -147,6 +148,7 @@ pub fn handle_wall_damage(
                         origin: trans.translation,
                         radius: barrel.damage_radius,
                         damage: barrel.damage,
+                        attacker_id: None,
                     });
                     gib_events.send(crate::combat::GibEvent {
                         origin: trans.translation,

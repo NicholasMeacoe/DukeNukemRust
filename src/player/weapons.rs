@@ -200,6 +200,7 @@ pub fn handle_weapon_firing(
                 velocity: 15.0,
                 damage: kick_damage,
                 is_player_source: true,
+                source_player_id: Some(player_id),
             });
         }
 
@@ -237,13 +238,17 @@ pub fn handle_weapon_firing(
         if is_detonating {
         let mut detonated_any = false;
         for (entity, p_trans, proj) in pipebomb_query.iter() {
-            if proj.projectile_type == ProjectileType::Pipebomb && proj.is_player_source {
+            if proj.projectile_type == ProjectileType::Pipebomb
+                && proj.is_player_source
+                && (proj.source_player_id.is_none() || proj.source_player_id == Some(player_id))
+            {
                 detonated_any = true;
                 sound_events.send(PlaySoundEvent { sound_id: 14 }); // PIPEBOMB_EXPLODE
                 explosion_events.send(ExplosionDamageEvent {
                     origin: p_trans.translation,
                     radius: 7.0,
                     damage: 150,
+                    attacker_id: Some(player_id),
                 });
                 light_events.send(crate::lighting::SpawnDynamicLightEvent::explosion(
                     p_trans.translation,
@@ -285,6 +290,7 @@ pub fn handle_weapon_firing(
                     velocity: 15.0,
                     damage: kick_damage,
                     is_player_source: true,
+                    source_player_id: Some(player_id),
                 });
             }
             WeaponType::Pistol => {
@@ -311,6 +317,7 @@ pub fn handle_weapon_firing(
                         velocity: 150.0,
                         damage: 12,
                         is_player_source: true,
+                        source_player_id: Some(player_id),
                     });
 
                     // Auto-reload after 12 rounds
@@ -351,6 +358,7 @@ pub fn handle_weapon_firing(
                             velocity: 120.0,
                             damage: 9,
                             is_player_source: true,
+                            source_player_id: Some(player_id),
                         });
                     }
                 }
@@ -383,6 +391,7 @@ pub fn handle_weapon_firing(
                         velocity: 150.0,
                         damage: 10,
                         is_player_source: true,
+                        source_player_id: Some(player_id),
                     });
                 }
             }
@@ -403,6 +412,7 @@ pub fn handle_weapon_firing(
                         velocity: 35.0,
                         damage: 120,
                         is_player_source: true,
+                        source_player_id: Some(player_id),
                     });
                 }
             }
@@ -419,6 +429,7 @@ pub fn handle_weapon_firing(
                         velocity: 15.0,
                         damage: 150,
                         is_player_source: true,
+                        source_player_id: Some(player_id),
                     });
 
                     player.current_weapon = WeaponType::HandRemote;
@@ -441,6 +452,7 @@ pub fn handle_weapon_firing(
                         velocity: 30.0,
                         damage: 0, // Applies shrink status
                         is_player_source: true,
+                        source_player_id: Some(player_id),
                     });
                 }
             }
@@ -469,6 +481,7 @@ pub fn handle_weapon_firing(
                         velocity: 45.0,
                         damage: 40,
                         is_player_source: true,
+                        source_player_id: Some(player_id),
                     });
                 }
             }
@@ -557,7 +570,7 @@ pub fn handle_weapon_firing(
                                             -beam_length * 0.5,
                                         )),
                                         ..default()
-                                    },
+                                     },
                                     LaserTripwireBeam,
                                     crate::game_flow::LevelEntity,
                                 ));
@@ -602,6 +615,7 @@ pub fn handle_weapon_firing(
                         velocity: 25.0,
                         damage: 15, // Freezes on death
                         is_player_source: true,
+                        source_player_id: Some(player_id),
                     });
                 }
             }
@@ -622,19 +636,24 @@ pub fn handle_weapon_firing(
                         velocity: 30.0,
                         damage: 25,
                         is_player_source: true,
+                        source_player_id: Some(player_id),
                     });
                 }
             }
             WeaponType::HandRemote => {
                 let mut detonated = false;
                 for (entity, p_trans, proj) in pipebomb_query.iter() {
-                    if proj.projectile_type == ProjectileType::Pipebomb && proj.is_player_source {
+                    if proj.projectile_type == ProjectileType::Pipebomb
+                        && proj.is_player_source
+                        && (proj.source_player_id.is_none() || proj.source_player_id == Some(player_id))
+                    {
                         detonated = true;
                         sound_events.send(PlaySoundEvent { sound_id: 14 }); // PIPEBOMB_EXPLODE
                         explosion_events.send(ExplosionDamageEvent {
                             origin: p_trans.translation,
                             radius: 7.0,
                             damage: 150,
+                            attacker_id: Some(player_id),
                         });
                         light_events.send(crate::lighting::SpawnDynamicLightEvent::explosion(
                             p_trans.translation,
@@ -744,6 +763,7 @@ pub fn update_laser_tripbombs(
                 origin,
                 radius: bomb.damage_radius,
                 damage: bomb.damage,
+                attacker_id: None,
             });
             commands.entity(entity).despawn_recursive();
         }
@@ -923,6 +943,7 @@ pub fn detonate_player_pipebombs(
             origin: pos,
             radius: 7.0,
             damage: 150,
+            attacker_id: None,
         });
         commands.entity(entity).despawn_recursive();
     }
