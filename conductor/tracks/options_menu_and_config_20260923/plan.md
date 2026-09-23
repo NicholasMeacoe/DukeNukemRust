@@ -60,9 +60,9 @@
   - [x] Verify camera mouse response adheres strictly to sensitivity and Invert Y settings
 
 ## Phase 6: Full Verification, Warnings Audit & Review
-- [~] Task: Comprehensive Test Suite & Warning Audit
-  - [ ] Run `cargo check --tests` (ensure 0 compiler warnings)
-  - [ ] Run full test suite (ensure 100% pass rate across all tests)
-  - [ ] Review completed track with `conductor-review`
-- [ ] Task: Phase 6 Verification & Checkpoint (Refer to workflow.md)
-  - [ ] Final end-to-end verification and commit
+- [x] Task: Comprehensive Test Suite & Warning Audit
+  - [x] Run `cargo check --tests` (ensure 0 compiler warnings)
+  - [x] Run full test suite (ensure 100% pass rate across all tests)
+  - [x] Review completed track with `conductor-review`
+- [x] Task: Phase 6 Verification & Checkpoint (Refer to workflow.md)
+  - [x] Final end-to-end verification and commit
