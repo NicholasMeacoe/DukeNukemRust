@@ -118,6 +118,24 @@ mod tests {
         progress.is_boss_victory = true;
         assert!(progress.advance_to_next_level());
         assert_eq!(progress.current_level, 1);
+
+        // Episode 4: It's Impossible -> ... -> The Queen (L1..L10)
+        let mut progress = LevelProgress {
+            current_episode: 4,
+            current_level: 1,
+            ..default()
+        };
+        for l in 1..10 {
+            assert_eq!(progress.current_level, l);
+            assert!(!progress.advance_to_next_level());
+        }
+        assert_eq!(progress.current_level, 10);
+        assert_eq!(progress.current_map_filename(), "E4L10.MAP");
+
+        // Alien Queen defeated on E4L10 -> Episode 4 finished!
+        progress.is_boss_victory = true;
+        assert!(progress.advance_to_next_level());
+        assert_eq!(progress.current_level, 1);
     }
 
     #[test]
@@ -169,6 +187,22 @@ mod tests {
         assert!(!progress.advance_to_next_level());
         assert_eq!(progress.current_level, 6);
         assert_eq!(progress.current_map_filename(), "E3L6.MAP");
+
+        // Episode 4: E4L4 -> E4L11 (Secret Area 51) -> E4L5 (Canonical return Pigsty)
+        let mut progress = LevelProgress {
+            current_episode: 4,
+            current_level: 4,
+            ..default()
+        };
+        progress.is_secret_exit = true;
+        assert!(!progress.advance_to_next_level());
+        assert_eq!(progress.current_level, 11);
+        assert_eq!(progress.current_map_filename(), "E4L11.MAP");
+
+        // Complete secret level E4L11 -> returns to E4L5
+        assert!(!progress.advance_to_next_level());
+        assert_eq!(progress.current_level, 5);
+        assert_eq!(progress.current_map_filename(), "E4L5.MAP");
     }
 
     #[test]

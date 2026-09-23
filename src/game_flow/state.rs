@@ -130,7 +130,7 @@ impl LevelProgress {
                 (2, 11) => 9,  // E2L11 -> E2L9
                 (3, 10) => 6,  // E3L10 -> E3L6
                 (3, 11) => 9,  // E3L11 -> E3L9
-                (4, 11) => 6,  // E4L11 -> E4L6
+                (4, 11) => 5,  // E4L11 -> E4L5
                 _ => current_lvl + 1,
             };
             self.current_level = return_level;

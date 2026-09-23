@@ -23,16 +23,16 @@
   - [x] Verify beating the Queen on E4L10 cleanly advances to episode completion
 
 ## Phase 3: Episode 4 Campaign Map Traversal & Secret Level Routing
-- [ ] Task: Write Tests for Episode 4 Map Traversal & Secret Level Routing
-  - [ ] Unit test verifying `advance_to_next_level` navigates E4L1 through E4L10 sequentially
-  - [ ] Unit test verifying secret exit on E4L4 ("Babe Land") routes to E4L11 ("Area 51")
-  - [ ] Unit test verifying completing secret level E4L11 returns to canonical post-secret stage E4L5 ("Pigsty")
-  - [ ] Unit test verifying completing E4L10 resets level to 1 and returns `true` (campaign/episode complete)
-- [ ] Task: Implement Episode 4 Progression Logic & Secret Level Routing
-  - [ ] Verify `advance_to_next_level` handles `(4, 11) -> 5` canonical secret return
-  - [ ] Verify secret nuke switch triggers `is_secret_exit` on E4L4
-- [ ] Task: Phase 3 Verification & Checkpoint (Refer to workflow.md)
-  - [ ] Verify seamless map navigation from E4L1 through E4L10 and secret level warping
+- [x] Task: Write Tests for Episode 4 Map Traversal & Secret Level Routing
+  - [x] Unit test verifying `advance_to_next_level` navigates E4L1 through E4L10 sequentially
+  - [x] Unit test verifying secret exit on E4L4 ("Babe Land") routes to E4L11 ("Area 51")
+  - [x] Unit test verifying completing secret level E4L11 returns to canonical post-secret stage E4L5 ("Pigsty")
+  - [x] Unit test verifying completing E4L10 resets level to 1 and returns `true` (campaign/episode complete)
+- [x] Task: Implement Episode 4 Progression Logic & Secret Level Routing
+  - [x] Verify `advance_to_next_level` handles `(4, 11) -> 5` canonical secret return
+  - [x] Verify secret nuke switch triggers `is_secret_exit` on E4L4
+- [x] Task: Phase 3 Verification & Checkpoint (Refer to workflow.md)
+  - [x] Verify seamless map navigation from E4L1 through E4L10 and secret level warping
 
 ## Phase 4: Episode 4 Atmospheric Red Skybox & Menu Pipeline Integration
 - [ ] Task: Write Tests for Episode 4 Skybox & Menu Episode 4 Selection
