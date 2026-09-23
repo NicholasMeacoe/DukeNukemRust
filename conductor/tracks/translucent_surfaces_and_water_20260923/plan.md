@@ -25,14 +25,14 @@
   - [x] Verify water surface plane appears in E1L1 cinema pool and E1L2 water basins
 
 ## Phase 3: Water Animation & Caustics Cycling (`picanm`)
-- [ ] Task: Write Tests for Water Surface Tile Animation Tick
-  - [ ] Unit test verifying water tile frame progression based on picanm header
-  - [ ] Unit test verifying material texture handle swapping on water surfaces
-- [ ] Task: Connect Water Surfaces to Tile Animation System
-  - [ ] Tag water surface meshes with `AnimatedTileMaterial` (or dedicated water animator)
-  - [ ] Support animated slime (green) and lava/blood (red) surfaces based on sector picnum
-- [ ] Task: Phase 3 Verification & Checkpoint (Refer to workflow.md)
-  - [ ] Verify water ripples and frame animation cycle continuously in real-time
+- [x] Task: Write Tests for Water Surface Tile Animation Tick
+  - [x] Unit test verifying water tile frame progression based on picanm header
+  - [x] Unit test verifying material texture handle swapping on water surfaces
+- [x] Task: Connect Water Surfaces to Tile Animation System
+  - [x] Tag water surface meshes with `AnimatedTileMaterial` (or dedicated water animator)
+  - [x] Support animated slime (green) and lava/blood (red) surfaces based on sector picnum
+- [x] Task: Phase 3 Verification & Checkpoint (Refer to workflow.md)
+  - [x] Verify water ripples and frame animation cycle continuously in real-time
 
 ## Phase 4: Water Surface Boundary Transitions, Screen Tint & FX
 - [ ] Task: Write Tests for Water Boundary Crossing & Sound Dispatch

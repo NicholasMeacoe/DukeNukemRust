@@ -267,9 +267,19 @@ impl<'a> MapMeshBuilder<'a> {
                 };
                 let mut floor_tint = Palette::authentic_shade_to_tint(sector.floorshade);
                 if is_water {
-                    floor_tint[0] *= 0.8;
-                    floor_tint[1] *= 0.95;
-                    floor_tint[2] *= 1.1;
+                    if sector.floorpicnum == FLOORSLIME || sector.floorpicnum == GREENSLIME {
+                        floor_tint[0] *= 0.6;
+                        floor_tint[1] *= 1.3;
+                        floor_tint[2] *= 0.6;
+                    } else if sector.floorpicnum == PURPLELAVA {
+                        floor_tint[0] *= 1.3;
+                        floor_tint[1] *= 0.6;
+                        floor_tint[2] *= 1.1;
+                    } else {
+                        floor_tint[0] *= 0.8;
+                        floor_tint[1] *= 0.95;
+                        floor_tint[2] *= 1.1;
+                    }
                     floor_tint[3] = 0.60;
                 }
                 let floor_colors: Vec<[f32; 4]> = vec![floor_tint; floor_vertices.len()];
@@ -328,15 +338,29 @@ impl<'a> MapMeshBuilder<'a> {
                     }
 
                     // Check for tile animation on floor
-                    if let Some(&picanm) = self.picanm_map.get(&sector.floorpicnum) {
-                        if picanm.num_frames > 0 && picanm.anim_type > 0 {
-                            entity_cmds.insert(AnimatedTileMaterial {
-                                base_picnum: sector.floorpicnum,
-                                picanm,
-                                current_offset: 0,
-                                material_handle: floor_mat,
-                            });
-                        }
+                    let floor_picanm_opt = self.picanm_map.get(&sector.floorpicnum).copied()
+                        .filter(|p| p.num_frames > 0 && p.anim_type > 0)
+                        .or_else(|| {
+                            if is_water || sector.floorpicnum == WATERTILE2 || sector.floorpicnum == WATERTILE || sector.floorpicnum == FLOORSLIME || sector.floorpicnum == PURPLELAVA {
+                                Some(PicAnm {
+                                    num_frames: 3,
+                                    anim_type: 2, // Forward loop
+                                    x_offset: 0,
+                                    y_offset: 0,
+                                    speed: 3,
+                                })
+                            } else {
+                                None
+                            }
+                        });
+
+                    if let Some(picanm) = floor_picanm_opt {
+                        entity_cmds.insert(AnimatedTileMaterial {
+                            base_picnum: sector.floorpicnum,
+                            picanm,
+                            current_offset: 0,
+                            material_handle: floor_mat,
+                        });
                     }
                 }
             }
@@ -393,9 +417,19 @@ impl<'a> MapMeshBuilder<'a> {
                 };
                 let mut ceil_tint = Palette::authentic_shade_to_tint(sector.ceilingshade);
                 if is_water {
-                    ceil_tint[0] *= 0.8;
-                    ceil_tint[1] *= 0.95;
-                    ceil_tint[2] *= 1.1;
+                    if sector.ceilingpicnum == FLOORSLIME || sector.ceilingpicnum == GREENSLIME {
+                        ceil_tint[0] *= 0.6;
+                        ceil_tint[1] *= 1.3;
+                        ceil_tint[2] *= 0.6;
+                    } else if sector.ceilingpicnum == PURPLELAVA {
+                        ceil_tint[0] *= 1.3;
+                        ceil_tint[1] *= 0.6;
+                        ceil_tint[2] *= 1.1;
+                    } else {
+                        ceil_tint[0] *= 0.8;
+                        ceil_tint[1] *= 0.95;
+                        ceil_tint[2] *= 1.1;
+                    }
                     ceil_tint[3] = 0.60;
                 }
                 let ceil_colors: Vec<[f32; 4]> = vec![ceil_tint; ceil_vertices.len()];
@@ -461,15 +495,29 @@ impl<'a> MapMeshBuilder<'a> {
                     }
 
                     // Check for tile animation on ceiling
-                    if let Some(&picanm) = self.picanm_map.get(&sector.ceilingpicnum) {
-                        if picanm.num_frames > 0 && picanm.anim_type > 0 {
-                            entity_cmds.insert(AnimatedTileMaterial {
-                                base_picnum: sector.ceilingpicnum,
-                                picanm,
-                                current_offset: 0,
-                                material_handle: ceil_mat,
-                            });
-                        }
+                    let ceil_picanm_opt = self.picanm_map.get(&sector.ceilingpicnum).copied()
+                        .filter(|p| p.num_frames > 0 && p.anim_type > 0)
+                        .or_else(|| {
+                            if is_water || sector.ceilingpicnum == WATERTILE2 || sector.ceilingpicnum == WATERTILE || sector.ceilingpicnum == FLOORSLIME || sector.ceilingpicnum == PURPLELAVA {
+                                Some(PicAnm {
+                                    num_frames: 3,
+                                    anim_type: 2, // Forward loop
+                                    x_offset: 0,
+                                    y_offset: 0,
+                                    speed: 3,
+                                })
+                            } else {
+                                None
+                            }
+                        });
+
+                    if let Some(picanm) = ceil_picanm_opt {
+                        entity_cmds.insert(AnimatedTileMaterial {
+                            base_picnum: sector.ceilingpicnum,
+                            picanm,
+                            current_offset: 0,
+                            material_handle: ceil_mat,
+                        });
                     }
                 }
             }
@@ -2038,6 +2086,174 @@ mod tests {
         let sec1_water = water_surfaces.iter().find(|(ws, _)| ws.sector_index == 1).expect("Sector 1 water surface");
         assert_eq!(sec1_water.1.part, crate::interactivity::SectorMeshPart::Ceiling);
         assert!((sec1_water.0.elevation - 0.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_slime_and_lava_surface_tinting_and_animation() {
+        let mut app = App::new();
+
+        let make_wall = |x: i32, y: i32, point2: i16| Wall {
+            x,
+            y,
+            point2,
+            nextwall: -1,
+            nextsector: -1,
+            cstat: 0,
+            picnum: 100,
+            overpicnum: 0,
+            shade: 0,
+            pal: 0,
+            xrepeat: 8,
+            yrepeat: 8,
+            xpanning: 0,
+            ypanning: 0,
+            lotag: 0,
+            hitag: 0,
+            extra: 0,
+        };
+
+        // Slime pool (lotag 1)
+        let sec_slime = crate::map::Sector {
+            wallptr: 0,
+            wallnum: 4,
+            ceilingz: -16384,
+            floorz: 0,
+            ceilingstat: 0,
+            floorstat: 0,
+            ceilingpicnum: 100,
+            ceilingheinum: 0,
+            ceilingshade: 0,
+            ceilingpal: 0,
+            ceilingxpanning: 0,
+            ceilingypanning: 0,
+            floorpicnum: FLOORSLIME,
+            floorheinum: 0,
+            floorshade: 0,
+            floorpal: 0,
+            floorxpanning: 0,
+            floorypanning: 0,
+            visibility: 0,
+            _filler: 0,
+            lotag: 1,
+            hitag: 0,
+            extra: -1,
+        };
+
+        // Lava pool (lotag 1)
+        let sec_lava = crate::map::Sector {
+            wallptr: 4,
+            wallnum: 4,
+            ceilingz: -16384,
+            floorz: 0,
+            ceilingstat: 0,
+            floorstat: 0,
+            ceilingpicnum: 100,
+            ceilingheinum: 0,
+            ceilingshade: 0,
+            ceilingpal: 0,
+            ceilingxpanning: 0,
+            ceilingypanning: 0,
+            floorpicnum: PURPLELAVA,
+            floorheinum: 0,
+            floorshade: 0,
+            floorpal: 0,
+            floorxpanning: 0,
+            floorypanning: 0,
+            visibility: 0,
+            _filler: 0,
+            lotag: 1,
+            hitag: 0,
+            extra: -1,
+        };
+
+        let walls = vec![
+            make_wall(0, 0, 1),
+            make_wall(1024, 0, 2),
+            make_wall(1024, 1024, 3),
+            make_wall(0, 1024, 0),
+            make_wall(0, 0, 5),
+            make_wall(1024, 0, 6),
+            make_wall(1024, 1024, 7),
+            make_wall(0, 1024, 4),
+        ];
+
+        let map = Map {
+            version: 7,
+            posx: 0,
+            posy: 0,
+            posz: 0,
+            ang: 0,
+            cursectnum: 0,
+            sectors: vec![sec_slime, sec_lava],
+            walls,
+            sprites: Vec::new(),
+        };
+
+        let mut tile_textures = HashMap::new();
+        let mut images = Assets::<Image>::default();
+        let img = images.add(Image::default());
+        tile_textures.insert(FLOORSLIME, img.clone());
+        tile_textures.insert(PURPLELAVA, img.clone());
+        tile_textures.insert(100, img);
+        let mut tile_sizes = HashMap::new();
+        tile_sizes.insert(FLOORSLIME, (64, 64));
+        tile_sizes.insert(PURPLELAVA, (64, 64));
+        tile_sizes.insert(100, (64, 64));
+        let picanm_map = HashMap::new();
+
+        let mut materials: Assets<StandardMaterial> = Assets::default();
+        let default_material = materials.add(StandardMaterial::default());
+        let mut meshes: Assets<Mesh> = Assets::default();
+
+        let builder = MapMeshBuilder::new(
+            &map,
+            &tile_textures,
+            &tile_sizes,
+            &picanm_map,
+            default_material,
+        );
+
+        let mut commands = app.world_mut().commands();
+        builder.build(
+            &mut commands,
+            &mut meshes,
+            &mut materials,
+            1,
+            None,
+            None,
+        );
+        app.update();
+
+        let mut anim_query = app
+            .world_mut()
+            .query::<(
+                &crate::interactivity::WaterSurface,
+                &crate::interactivity::DynamicSectorMesh,
+                &AnimatedTileMaterial,
+                &Handle<Mesh>,
+            )>();
+
+        for (ws, dsm, anim, mesh_h) in anim_query.iter(app.world()) {
+            if ws.sector_index == 0 && dsm.part == crate::interactivity::SectorMeshPart::Floor {
+                assert_eq!(anim.base_picnum, FLOORSLIME);
+                assert_eq!(anim.picanm.num_frames, 3);
+                let mesh = meshes.get(mesh_h).unwrap();
+                if let Some(bevy::render::mesh::VertexAttributeValues::Float32x4(colors)) = mesh.attribute(Mesh::ATTRIBUTE_COLOR) {
+                    let col = colors[0];
+                    assert!(col[1] > col[0], "Slime green channel must exceed red channel: {:?}", col);
+                    assert!((col[3] - 0.60).abs() < 0.01, "Slime alpha must be 60%");
+                }
+            } else if ws.sector_index == 1 && dsm.part == crate::interactivity::SectorMeshPart::Floor {
+                assert_eq!(anim.base_picnum, PURPLELAVA);
+                assert_eq!(anim.picanm.num_frames, 3);
+                let mesh = meshes.get(mesh_h).unwrap();
+                if let Some(bevy::render::mesh::VertexAttributeValues::Float32x4(colors)) = mesh.attribute(Mesh::ATTRIBUTE_COLOR) {
+                    let col = colors[0];
+                    assert!(col[0] > col[1], "Lava red channel must exceed green channel: {:?}", col);
+                    assert!((col[3] - 0.60).abs() < 0.01, "Lava alpha must be 60%");
+                }
+            }
+        }
     }
 
     #[test]
