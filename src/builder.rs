@@ -696,17 +696,7 @@ impl<'a> MapMeshBuilder<'a> {
         let colors = vec![tint; 4];
         let indices = vec![0u32, 1, 2, 0, 2, 3];
 
-        let wall_alpha = if is_masked {
-            if (wall.cstat & 512) != 0 {
-                MaterialAlphaMode::Blend(66)
-            } else if (wall.cstat & 128) != 0 {
-                MaterialAlphaMode::Blend(33)
-            } else {
-                MaterialAlphaMode::Mask
-            }
-        } else {
-            MaterialAlphaMode::Opaque
-        };
+        let wall_alpha = wall.alpha_mode(is_masked);
 
         let mat = self.get_material(picnum, wall_alpha, materials);
 
@@ -926,13 +916,7 @@ impl<'a> MapMeshBuilder<'a> {
                     }
                     (voxel_mesh_opt.unwrap(), voxel_mat_opt.unwrap(), t)
                 } else {
-                    let sprite_alpha = if (sprite.cstat & 512) != 0 {
-                        MaterialAlphaMode::Blend(66)
-                    } else if (sprite.cstat & 2) != 0 || sprite.picnum == GLASS || sprite.picnum == GLASS2 {
-                        MaterialAlphaMode::Blend(40)
-                    } else {
-                        MaterialAlphaMode::Mask
-                    };
+                    let sprite_alpha = sprite.alpha_mode();
                     let sprite_mat = self.get_material(sprite.picnum, sprite_alpha, materials);
 
                     let mut t = Transform::from_translation(pos);
@@ -1862,18 +1846,77 @@ mod tests {
         assert_eq!(MaterialAlphaMode::Blend(66), MaterialAlphaMode::Blend(66));
 
         let eval_wall_alpha = |cstat: i16| -> MaterialAlphaMode {
-            if (cstat & 512) != 0 {
-                MaterialAlphaMode::Blend(66)
-            } else if (cstat & 128) != 0 {
-                MaterialAlphaMode::Blend(33)
-            } else {
-                MaterialAlphaMode::Mask
-            }
+            let wall = crate::map::Wall {
+                x: 0,
+                y: 0,
+                point2: 1,
+                nextwall: -1,
+                nextsector: -1,
+                cstat,
+                picnum: 100,
+                overpicnum: 0,
+                shade: 0,
+                pal: 0,
+                xrepeat: 8,
+                yrepeat: 8,
+                xpanning: 0,
+                ypanning: 0,
+                lotag: 0,
+                hitag: 0,
+                extra: 0,
+            };
+            wall.alpha_mode(true)
         };
 
         assert_eq!(eval_wall_alpha(0), MaterialAlphaMode::Mask);
         assert_eq!(eval_wall_alpha(128), MaterialAlphaMode::Blend(33));
         assert_eq!(eval_wall_alpha(512), MaterialAlphaMode::Blend(66));
+    }
+
+    #[test]
+    fn test_builder_translucent_material_generation() {
+        let mut materials = Assets::<StandardMaterial>::default();
+        let default_mat = materials.add(StandardMaterial::default());
+        let map = crate::map::Map {
+            version: 7,
+            posx: 0,
+            posy: 0,
+            posz: 0,
+            ang: 0,
+            cursectnum: 0,
+            sectors: Vec::new(),
+            walls: Vec::new(),
+            sprites: Vec::new(),
+        };
+        let mut tile_textures = std::collections::HashMap::new();
+        let mut images = Assets::<Image>::default();
+        let img_handle = images.add(Image::default());
+        tile_textures.insert(100, img_handle);
+        let tile_sizes = std::collections::HashMap::new();
+        let picanm_map = std::collections::HashMap::new();
+
+        let builder = MapMeshBuilder::new(
+            &map,
+            &tile_textures,
+            &tile_sizes,
+            &picanm_map,
+            default_mat,
+        );
+
+        let blend_33_handle = builder.get_material(100, MaterialAlphaMode::Blend(33), &mut materials);
+        let mat_33 = materials.get(&blend_33_handle).expect("Material 33 should exist");
+        assert_eq!(mat_33.alpha_mode, AlphaMode::Blend);
+        assert!((mat_33.base_color.to_srgba().alpha - 0.33).abs() < 0.01);
+        assert!(mat_33.double_sided);
+
+        let blend_66_handle = builder.get_material(100, MaterialAlphaMode::Blend(66), &mut materials);
+        let mat_66 = materials.get(&blend_66_handle).expect("Material 66 should exist");
+        assert_eq!(mat_66.alpha_mode, AlphaMode::Blend);
+        assert!((mat_66.base_color.to_srgba().alpha - 0.66).abs() < 0.01);
+
+        let mask_handle = builder.get_material(100, MaterialAlphaMode::Mask, &mut materials);
+        let mat_mask = materials.get(&mask_handle).expect("Material mask should exist");
+        assert_eq!(mat_mask.alpha_mode, AlphaMode::Mask(0.5));
     }
 
     #[test]

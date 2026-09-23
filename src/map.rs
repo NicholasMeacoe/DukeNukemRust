@@ -352,11 +352,47 @@ impl Wall {
     }
 
     pub fn is_translucent(&self) -> bool {
-        (self.cstat & 128) != 0
+        (self.cstat & 128) != 0 || (self.cstat & 4) != 0
+    }
+
+    pub fn is_translucent_reversed(&self) -> bool {
+        (self.cstat & 512) != 0
     }
 
     pub fn is_y_flipped(&self) -> bool {
         (self.cstat & 256) != 0
+    }
+
+    pub fn alpha_mode(&self, is_masked: bool) -> crate::builder::MaterialAlphaMode {
+        if self.is_translucent_reversed() {
+            crate::builder::MaterialAlphaMode::Blend(66)
+        } else if self.is_translucent() {
+            crate::builder::MaterialAlphaMode::Blend(33)
+        } else if is_masked {
+            crate::builder::MaterialAlphaMode::Mask
+        } else {
+            crate::builder::MaterialAlphaMode::Opaque
+        }
+    }
+}
+
+impl Sprite {
+    pub fn is_translucent(&self) -> bool {
+        (self.cstat & 2) != 0 || (self.cstat & 4) != 0
+    }
+
+    pub fn is_translucent_reversed(&self) -> bool {
+        (self.cstat & 512) != 0
+    }
+
+    pub fn alpha_mode(&self) -> crate::builder::MaterialAlphaMode {
+        if self.is_translucent_reversed() {
+            crate::builder::MaterialAlphaMode::Blend(66)
+        } else if self.is_translucent() || self.picnum == crate::names::GLASS || self.picnum == crate::names::GLASS2 {
+            crate::builder::MaterialAlphaMode::Blend(33)
+        } else {
+            crate::builder::MaterialAlphaMode::Mask
+        }
     }
 }
 
@@ -647,5 +683,94 @@ mod tests {
         assert!(portal_wall.is_portal());
         assert!(portal_wall.is_masked());
         assert!(portal_wall.align_bottom());
+    }
+
+    #[test]
+    fn test_cstat_translucency_detection_and_alpha_assignment() {
+        let make_wall = |cstat: i16| Wall {
+            x: 0,
+            y: 0,
+            point2: 1,
+            nextwall: -1,
+            nextsector: -1,
+            cstat,
+            picnum: 100,
+            overpicnum: 0,
+            shade: 0,
+            pal: 0,
+            xrepeat: 8,
+            yrepeat: 8,
+            xpanning: 0,
+            ypanning: 0,
+            lotag: 0,
+            hitag: 0,
+            extra: 0,
+        };
+
+        // Standard wall
+        let opaque_wall = make_wall(0);
+        assert!(!opaque_wall.is_translucent());
+        assert!(!opaque_wall.is_translucent_reversed());
+        assert_eq!(opaque_wall.alpha_mode(false), crate::builder::MaterialAlphaMode::Opaque);
+        assert_eq!(opaque_wall.alpha_mode(true), crate::builder::MaterialAlphaMode::Mask);
+
+        // Standard translucency (128 or 4)
+        let trans_wall_128 = make_wall(128);
+        assert!(trans_wall_128.is_translucent());
+        assert_eq!(trans_wall_128.alpha_mode(false), crate::builder::MaterialAlphaMode::Blend(33));
+        assert_eq!(trans_wall_128.alpha_mode(true), crate::builder::MaterialAlphaMode::Blend(33));
+
+        let trans_wall_4 = make_wall(4);
+        assert!(trans_wall_4.is_translucent());
+        assert_eq!(trans_wall_4.alpha_mode(false), crate::builder::MaterialAlphaMode::Blend(33));
+
+        // High / reverse translucency (512)
+        let trans_rev_wall = make_wall(512);
+        assert!(trans_rev_wall.is_translucent_reversed());
+        assert_eq!(trans_rev_wall.alpha_mode(false), crate::builder::MaterialAlphaMode::Blend(66));
+        assert_eq!(trans_rev_wall.alpha_mode(true), crate::builder::MaterialAlphaMode::Blend(66));
+
+        // Sprites
+        let make_sprite = |cstat: i16, picnum: i16| Sprite {
+            x: 0,
+            y: 0,
+            z: 0,
+            cstat,
+            picnum,
+            shade: 0,
+            pal: 0,
+            clipdist: 0,
+            _filler: 0,
+            xrepeat: 1,
+            yrepeat: 1,
+            xoffset: 0,
+            yoffset: 0,
+            sectnum: 0,
+            statnum: 0,
+            ang: 0,
+            owner: 0,
+            xvel: 0,
+            yvel: 0,
+            zvel: 0,
+            lotag: 0,
+            hitag: 0,
+            extra: 0,
+        };
+
+        let normal_sprite = make_sprite(0, 100);
+        assert!(!normal_sprite.is_translucent());
+        assert_eq!(normal_sprite.alpha_mode(), crate::builder::MaterialAlphaMode::Mask);
+
+        let trans_sprite = make_sprite(2, 100);
+        assert!(trans_sprite.is_translucent());
+        assert_eq!(trans_sprite.alpha_mode(), crate::builder::MaterialAlphaMode::Blend(33));
+
+        let high_trans_sprite = make_sprite(512, 100);
+        assert!(high_trans_sprite.is_translucent_reversed());
+        assert_eq!(high_trans_sprite.alpha_mode(), crate::builder::MaterialAlphaMode::Blend(66));
+
+        // Glass sprite defaults to 33% translucency even with cstat 0
+        let glass_sprite = make_sprite(0, crate::names::GLASS);
+        assert_eq!(glass_sprite.alpha_mode(), crate::builder::MaterialAlphaMode::Blend(33));
     }
 }

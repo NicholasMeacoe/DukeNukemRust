@@ -514,9 +514,17 @@ fn update_directional_sprites(
             let display_picnum = con_actor.picnum + offset;
 
             if let Some(tex) = game_assets.tile_textures.get(&display_picnum) {
+                let (alpha_mode, base_color) = if (con_actor.cstat & 512) != 0 {
+                    (AlphaMode::Blend, Color::srgba(1.0, 1.0, 1.0, 0.66))
+                } else if (con_actor.cstat & 2) != 0 || (con_actor.cstat & 4) != 0 {
+                    (AlphaMode::Blend, Color::srgba(1.0, 1.0, 1.0, 0.33))
+                } else {
+                    (AlphaMode::Mask(0.5), Color::WHITE)
+                };
                 *material_handle = materials.add(StandardMaterial {
                     base_color_texture: Some(tex.clone()),
-                    alpha_mode: AlphaMode::Mask(0.5),
+                    base_color,
+                    alpha_mode,
                     unlit: true,
                     ..default()
                 });
