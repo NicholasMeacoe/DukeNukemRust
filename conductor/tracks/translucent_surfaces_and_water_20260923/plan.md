@@ -13,16 +13,16 @@
   - [x] Verify glass windows and translucent walls render with alpha blending in E1L1
 
 ## Phase 2: Procedural Water Surface Mesh Generation (Lotag 1 & 2)
-- [ ] Task: Write Tests for Water Surface Plane Tessellation
-  - [ ] Unit test identifying sectors with lotag 1 and 2
-  - [ ] Unit test calculating water plane elevation and bounding polygon triangulation
-  - [ ] Unit test verifying two-sided mesh normal and UV coordinate generation
-- [ ] Task: Implement Water Surface Mesh Spawning in `src/builder.rs` / `src/sector_map/`
-  - [ ] Generate horizontal polygon mesh for water sectors at water surface boundary
-  - [ ] Tag water surface entity with `WaterSurface { sector_index, elevation }`
-  - [ ] Apply `AlphaMode::Blend` material with water tile texture and 60% alpha
-- [ ] Task: Phase 2 Verification & Checkpoint (Refer to workflow.md)
-  - [ ] Verify water surface plane appears in E1L1 cinema pool and E1L2 water basins
+- [x] Task: Write Tests for Water Surface Plane Tessellation
+  - [x] Unit test identifying sectors with lotag 1 and 2
+  - [x] Unit test calculating water plane elevation and bounding polygon triangulation
+  - [x] Unit test verifying two-sided mesh normal and UV coordinate generation
+- [x] Task: Implement Water Surface Mesh Spawning in `src/builder.rs` / `src/sector_map/`
+  - [x] Generate horizontal polygon mesh for water sectors at water surface boundary
+  - [x] Tag water surface entity with `WaterSurface { sector_index, elevation }`
+  - [x] Apply `AlphaMode::Blend` material with water tile texture and 60% alpha
+- [x] Task: Phase 2 Verification & Checkpoint (Refer to workflow.md)
+  - [x] Verify water surface plane appears in E1L1 cinema pool and E1L2 water basins
 
 ## Phase 3: Water Animation & Caustics Cycling (`picanm`)
 - [ ] Task: Write Tests for Water Surface Tile Animation Tick

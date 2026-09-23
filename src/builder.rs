@@ -261,7 +261,7 @@ impl<'a> MapMeshBuilder<'a> {
 
                 let is_water = is_water_surface(sector.lotag, crate::interactivity::SectorMeshPart::Floor);
                 let floor_alpha = if is_water {
-                    MaterialAlphaMode::Blend(66)
+                    MaterialAlphaMode::Blend(60)
                 } else {
                     MaterialAlphaMode::Opaque
                 };
@@ -270,7 +270,7 @@ impl<'a> MapMeshBuilder<'a> {
                     floor_tint[0] *= 0.8;
                     floor_tint[1] *= 0.95;
                     floor_tint[2] *= 1.1;
-                    floor_tint[3] = 0.66;
+                    floor_tint[3] = 0.60;
                 }
                 let floor_colors: Vec<[f32; 4]> = vec![floor_tint; floor_vertices.len()];
 
@@ -312,6 +312,14 @@ impl<'a> MapMeshBuilder<'a> {
                     ));
 
                     if is_water {
+                        let water_elevation = floor_vertices
+                            .first()
+                            .map(|v| v[1])
+                            .unwrap_or_else(|| -(sector.floorz as f32) / 16384.0);
+                        entity_cmds.insert(crate::interactivity::WaterSurface {
+                            sector_index: sec_idx,
+                            elevation: water_elevation,
+                        });
                         entity_cmds.insert(Collider::trimesh(floor_collider_vertices, floor_collider_indices));
                         entity_cmds.insert(Sensor);
                     } else {
@@ -379,7 +387,7 @@ impl<'a> MapMeshBuilder<'a> {
 
                 let is_water = is_water_surface(sector.lotag, crate::interactivity::SectorMeshPart::Ceiling);
                 let ceil_alpha = if is_water {
-                    MaterialAlphaMode::Blend(66)
+                    MaterialAlphaMode::Blend(60)
                 } else {
                     MaterialAlphaMode::Opaque
                 };
@@ -388,7 +396,7 @@ impl<'a> MapMeshBuilder<'a> {
                     ceil_tint[0] *= 0.8;
                     ceil_tint[1] *= 0.95;
                     ceil_tint[2] *= 1.1;
-                    ceil_tint[3] = 0.66;
+                    ceil_tint[3] = 0.60;
                 }
                 let ceil_colors: Vec<[f32; 4]> = vec![ceil_tint; ceil_vertices.len()];
 
@@ -437,6 +445,14 @@ impl<'a> MapMeshBuilder<'a> {
                     ));
 
                     if is_water {
+                        let water_elevation = ceil_vertices
+                            .first()
+                            .map(|v| v[1])
+                            .unwrap_or_else(|| -(sector.ceilingz as f32) / 16384.0);
+                        entity_cmds.insert(crate::interactivity::WaterSurface {
+                            sector_index: sec_idx,
+                            elevation: water_elevation,
+                        });
                         entity_cmds.insert(Collider::trimesh(ceil_collider_vertices, ceil_collider_indices));
                         entity_cmds.insert(Sensor);
                     } else {
@@ -1837,6 +1853,191 @@ mod tests {
             !is_water_surface(2, crate::interactivity::SectorMeshPart::Floor),
             "Lotag 2 Floor is the pool floor/bed, not water surface"
         );
+    }
+
+    #[test]
+    fn test_water_surface_mesh_generation_and_properties() {
+        let mut app = App::new();
+
+        let make_wall = |x: i32, y: i32, point2: i16| Wall {
+            x,
+            y,
+            point2,
+            nextwall: -1,
+            nextsector: -1,
+            cstat: 0,
+            picnum: 336, // W_WATER
+            overpicnum: 0,
+            shade: 0,
+            pal: 0,
+            xrepeat: 8,
+            yrepeat: 8,
+            xpanning: 0,
+            ypanning: 0,
+            lotag: 0,
+            hitag: 0,
+            extra: 0,
+        };
+
+        // Sector 0: Above water pool (lotag 1)
+        // Floor at Z=0 (Y=0.0) -> water surface!
+        // Ceiling at Z=-16384 (Y=1.0)
+        let sec0 = crate::map::Sector {
+            wallptr: 0,
+            wallnum: 4,
+            ceilingz: -16384,
+            floorz: 0,
+            ceilingstat: 0,
+            floorstat: 0,
+            ceilingpicnum: 100,
+            ceilingheinum: 0,
+            ceilingshade: 0,
+            ceilingpal: 0,
+            ceilingxpanning: 0,
+            ceilingypanning: 0,
+            floorpicnum: 336,
+            floorheinum: 0,
+            floorshade: 0,
+            floorpal: 0,
+            floorxpanning: 0,
+            floorypanning: 0,
+            visibility: 0,
+            _filler: 0,
+            lotag: 1,
+            hitag: 0,
+            extra: -1,
+        };
+
+        // Sector 1: Underwater basin (lotag 2)
+        // Floor at Z=16384 (Y=-1.0) -> pool bed
+        // Ceiling at Z=0 (Y=0.0) -> water surface!
+        let sec1 = crate::map::Sector {
+            wallptr: 4,
+            wallnum: 4,
+            ceilingz: 0,
+            floorz: 16384,
+            ceilingstat: 0,
+            floorstat: 0,
+            ceilingpicnum: 336,
+            ceilingheinum: 0,
+            ceilingshade: 0,
+            ceilingpal: 0,
+            ceilingxpanning: 0,
+            ceilingypanning: 0,
+            floorpicnum: 100,
+            floorheinum: 0,
+            floorshade: 0,
+            floorpal: 0,
+            floorxpanning: 0,
+            floorypanning: 0,
+            visibility: 0,
+            _filler: 0,
+            lotag: 2,
+            hitag: 0,
+            extra: -1,
+        };
+
+        let walls = vec![
+            // Sector 0 loop
+            make_wall(0, 0, 1),
+            make_wall(1024, 0, 2),
+            make_wall(1024, 1024, 3),
+            make_wall(0, 1024, 0),
+            // Sector 1 loop
+            make_wall(0, 0, 5),
+            make_wall(1024, 0, 6),
+            make_wall(1024, 1024, 7),
+            make_wall(0, 1024, 4),
+        ];
+
+        let map = Map {
+            version: 7,
+            posx: 0,
+            posy: 0,
+            posz: 0,
+            ang: 0,
+            cursectnum: 0,
+            sectors: vec![sec0, sec1],
+            walls,
+            sprites: Vec::new(),
+        };
+
+        let mut tile_textures = HashMap::new();
+        let mut images = Assets::<Image>::default();
+        let img = images.add(Image::default());
+        tile_textures.insert(336, img.clone());
+        tile_textures.insert(100, img);
+        let mut tile_sizes = HashMap::new();
+        tile_sizes.insert(336, (64, 64));
+        tile_sizes.insert(100, (64, 64));
+        let picanm_map = HashMap::new();
+
+        let mut materials: Assets<StandardMaterial> = Assets::default();
+        let default_material = materials.add(StandardMaterial::default());
+        let mut meshes: Assets<Mesh> = Assets::default();
+
+        let builder = MapMeshBuilder::new(
+            &map,
+            &tile_textures,
+            &tile_sizes,
+            &picanm_map,
+            default_material,
+        );
+
+        let mut commands = app.world_mut().commands();
+        builder.build(
+            &mut commands,
+            &mut meshes,
+            &mut materials,
+            1,
+            None,
+            None,
+        );
+        app.update();
+
+        // Query WaterSurface entities
+        let mut water_query = app
+            .world_mut()
+            .query::<(
+                &crate::interactivity::WaterSurface,
+                &crate::interactivity::DynamicSectorMesh,
+                &Handle<StandardMaterial>,
+                &Handle<Mesh>,
+                &Sensor,
+            )>();
+
+        let mut water_surfaces: Vec<(crate::interactivity::WaterSurface, crate::interactivity::DynamicSectorMesh)> = Vec::new();
+        for (ws, dsm, mat_h, mesh_h, _sensor) in water_query.iter(app.world()) {
+            water_surfaces.push((*ws, dsm.clone()));
+
+            let mat = materials.get(mat_h).expect("Material must exist");
+            assert_eq!(mat.alpha_mode, AlphaMode::Blend);
+            assert!(mat.double_sided, "Water surface material must be two-sided");
+            assert!(
+                (mat.base_color.to_srgba().alpha - 0.60).abs() < 0.01,
+                "Water material alpha must be 60%"
+            );
+
+            let mesh = meshes.get(mesh_h).expect("Mesh must exist");
+            let pos_attr = mesh.attribute(Mesh::ATTRIBUTE_POSITION).expect("Mesh positions must exist");
+            let uv_attr = mesh.attribute(Mesh::ATTRIBUTE_UV_0).expect("Mesh UVs must exist");
+            let normal_attr = mesh.attribute(Mesh::ATTRIBUTE_NORMAL).expect("Mesh normals must exist");
+            let color_attr = mesh.attribute(Mesh::ATTRIBUTE_COLOR).expect("Mesh colors must exist");
+
+            assert_eq!(pos_attr.len(), uv_attr.len());
+            assert_eq!(pos_attr.len(), normal_attr.len());
+            assert_eq!(pos_attr.len(), color_attr.len());
+        }
+
+        assert_eq!(water_surfaces.len(), 2, "Must spawn exactly 2 water surface entities (1 per water sector)");
+        
+        let sec0_water = water_surfaces.iter().find(|(ws, _)| ws.sector_index == 0).expect("Sector 0 water surface");
+        assert_eq!(sec0_water.1.part, crate::interactivity::SectorMeshPart::Floor);
+        assert!((sec0_water.0.elevation - 0.0).abs() < 0.001);
+
+        let sec1_water = water_surfaces.iter().find(|(ws, _)| ws.sector_index == 1).expect("Sector 1 water surface");
+        assert_eq!(sec1_water.1.part, crate::interactivity::SectorMeshPart::Ceiling);
+        assert!((sec1_water.0.elevation - 0.0).abs() < 0.001);
     }
 
     #[test]

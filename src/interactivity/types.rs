@@ -169,6 +169,12 @@ impl DynamicSectorMesh {
     }
 }
 
+#[derive(Component, Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct WaterSurface {
+    pub sector_index: usize,
+    pub elevation: f32,
+}
+
 #[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SectorEffectorComponent {
     pub sector_idx: usize,
