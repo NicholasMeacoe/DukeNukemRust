@@ -1,8 +1,10 @@
+pub mod actor;
 pub mod protocol;
 pub mod rng;
 pub mod scoreboard;
 pub mod splitscreen;
 
+pub use actor::*;
 pub use protocol::*;
 pub use rng::*;
 pub use scoreboard::*;
@@ -25,6 +27,15 @@ impl Plugin for NetPlugin {
                     update_splitscreen_viewports,
                 )
                     .in_set(crate::GameSet::Input),
+            )
+            .add_systems(
+                Update,
+                (
+                    update_remote_player_animations,
+                    update_actor_billboard_transforms,
+                    update_player_billboard_sprites,
+                )
+                    .in_set(crate::GameSet::Animation),
             );
     }
 }

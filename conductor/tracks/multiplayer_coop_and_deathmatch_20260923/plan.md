@@ -14,17 +14,17 @@
   - [x] Verify independent player movement and split viewports in running engine
 
 ## Phase 2: Duke Player Actor Rendering, Palette Swaps & Animations
-- [ ] Task: Write Tests for APLAYER 8-Directional Viewing & Palette Swapping
-  - [ ] Unit test for 8-directional viewing angle calculation relative to camera forward vector
-  - [ ] Unit test for palette lookup index translation (0..15 color swap mappings)
-  - [ ] Unit test for animation state machine transitions (Idle, Run, Shoot, Crouch, Gib)
-- [ ] Task: Implement Player Actor Sprite Rendering in `src/net/` and `src/render/`
-  - [ ] Create Duke player actor billboard rendering with tile `APLAYER` (#1405)
-  - [ ] Implement 8-directional sprite frame selection based on delta yaw between player orientation and camera look-at angle
-  - [ ] Implement palette swap tinting for multiplayer player colors
-  - [ ] Implement death collapse vs explosive gib spawn sequence for players
-- [ ] Task: Phase 2 Verification & Checkpoint (Refer to workflow.md)
-  - [ ] Verify player sprite rendered accurately with 8-directional views and custom shirt palettes
+- [x] Task: Write Tests for APLAYER 8-Directional Viewing & Palette Swapping
+  - [x] Unit test for 8-directional viewing angle calculation relative to camera forward vector
+  - [x] Unit test for palette lookup index translation (0..15 color swap mappings)
+  - [x] Unit test for animation state machine transitions (Idle, Run, Shoot, Crouch, Gib)
+- [x] Task: Implement Player Actor Sprite Rendering in `src/net/` and `src/render/`
+  - [x] Create Duke player actor billboard rendering with tile `APLAYER` (#1405)
+  - [x] Implement 8-directional sprite frame selection based on delta yaw between player orientation and camera look-at angle
+  - [x] Implement palette swap tinting for multiplayer player colors
+  - [x] Implement death collapse vs explosive gib spawn sequence for players
+- [x] Task: Phase 2 Verification & Checkpoint (Refer to workflow.md)
+  - [x] Verify player sprite rendered accurately with 8-directional views and custom shirt palettes
 
 ## Phase 3: Dukematch PvP Combat, Frag Attribution & Interactive Scoreboard
 - [ ] Task: Write Tests for PvP Damage Attribution, Frag Matrix & Scoreboard

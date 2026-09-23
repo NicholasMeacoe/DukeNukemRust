@@ -474,7 +474,7 @@ fn update_directional_sprites(
     game_assets: Res<crate::GameAssets>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    if let Ok(camera_transform) = camera_query.get_single() {
+    if let Some(camera_transform) = camera_query.iter().next() {
         let cam_pos = camera_transform.translation.xz();
 
         for (mut material_handle, con_actor, trans) in query.iter_mut() {
