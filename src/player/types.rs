@@ -1,5 +1,17 @@
 use bevy::prelude::*;
 
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
+pub struct PlayerId(pub usize);
+
+impl Default for PlayerId {
+    fn default() -> Self {
+        Self(0)
+    }
+}
+
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct PlayerCamera(pub usize);
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum WeaponType {
     Knee = 0,

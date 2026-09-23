@@ -13,20 +13,27 @@ pub fn update_player_movement(
         Option<&KinematicCharacterControllerOutput>,
         Option<&crate::sector_map::CurrentSector>,
         Option<&mut Collider>,
+        Option<&PlayerId>,
     )>,
-    camera_query: Query<&Transform, (With<Camera>, Without<PlayerController>)>,
+    camera_query: Query<(&Transform, Option<&PlayerCamera>), (With<Camera>, Without<PlayerController>)>,
     effectors: Query<&crate::interactivity::SectorEffectorComponent>,
     sector_map: Option<Res<crate::sector_map::SectorMap>>,
     mut sound_events: EventWriter<PlaySoundEvent>,
     mut tint: Option<ResMut<crate::hud::ScreenTintState>>,
     mut commands: Commands,
 ) {
-    let Ok(camera_transform) = camera_query.get_single() else {
-        return;
-    };
     let dt = time.delta_seconds();
 
-    for (mut trans, mut player, mut controller, output, current_sector, mut collider) in query.iter_mut() {
+    for (mut trans, mut player, mut controller, output, current_sector, mut collider, opt_id) in query.iter_mut() {
+        let player_id = opt_id.map_or(0, |id| id.0);
+        let camera_transform = camera_query
+            .iter()
+            .find(|(_, cam_id)| cam_id.map_or(0, |c| c.0) == player_id)
+            .map(|(t, _)| t)
+            .or_else(|| camera_query.iter().next().map(|(t, _)| t));
+        let Some(camera_transform) = camera_transform else {
+            continue;
+        };
         if player.health <= 0 {
             player.death_timer -= dt;
             controller.translation = Some(Vec3::new(0.0, -9.81 * dt, 0.0));
@@ -69,16 +76,18 @@ pub fn update_player_movement(
         let forward = camera_transform.forward().with_y(0.0).normalize_or_zero();
         let right = camera_transform.right().with_y(0.0).normalize_or_zero();
 
-        if keys.pressed(KeyCode::KeyW) {
+        let input_cfg = crate::net::splitscreen::get_player_input_config(player_id);
+
+        if keys.pressed(input_cfg.forward) {
             direction += forward;
         }
-        if keys.pressed(KeyCode::KeyS) {
+        if keys.pressed(input_cfg.backward) {
             direction -= forward;
         }
-        if keys.pressed(KeyCode::KeyA) {
+        if keys.pressed(input_cfg.strafe_left) {
             direction -= right;
         }
-        if keys.pressed(KeyCode::KeyD) {
+        if keys.pressed(input_cfg.strafe_right) {
             direction += right;
         }
 
@@ -119,7 +128,7 @@ pub fn update_player_movement(
         };
         let feet_y = trans.translation.y - 0.5;
         let headroom = ceiling_y - feet_y;
-        let wants_crouch = keys.pressed(KeyCode::KeyC);
+        let wants_crouch = keys.pressed(input_cfg.crouch);
         // Prevent standing up if headroom is too low (< 1.6m)
         let force_crouch = player.movement_mode == PlayerMovementMode::Crouching && headroom < 1.6;
 
@@ -248,18 +257,18 @@ pub fn update_player_movement(
 
         if player.inventory.jetpack_active {
             // Jetpack vertical control
-            if keys.pressed(KeyCode::Space) {
+            if keys.pressed(input_cfg.jump) {
                 player.velocity_y = 5.0;
-            } else if keys.pressed(KeyCode::KeyC) {
+            } else if keys.pressed(input_cfg.crouch) {
                 player.velocity_y = -5.0;
             } else {
                 player.velocity_y = 0.0; // Hover in place
             }
         } else if is_swimming {
             // Swimming / Diving buoyancy controls
-            if keys.pressed(KeyCode::Space) {
+            if keys.pressed(input_cfg.jump) {
                 player.velocity_y = 3.5;
-            } else if keys.pressed(KeyCode::KeyC) {
+            } else if keys.pressed(input_cfg.crouch) {
                 player.velocity_y = -3.5;
             } else {
                 player.velocity_y = -0.3; // Gentle sinking buoyancy
@@ -309,7 +318,7 @@ pub fn update_player_movement(
             } else if player.velocity_y < 0.0 {
                 player.velocity_y = -0.2; // Gentle slope adherence
             }
-            if keys.just_pressed(KeyCode::Space)
+            if keys.just_pressed(input_cfg.jump)
                 && player.movement_mode != PlayerMovementMode::Crouching
             {
                 player.velocity_y = jump_speed;
@@ -333,32 +342,32 @@ pub fn update_hazard_sectors(
     mut tint: Option<ResMut<crate::hud::ScreenTintState>>,
     mut last_hurt_sound: Local<f32>,
 ) {
-    let Ok((p_trans, mut player)) = player_query.get_single_mut() else {
-        return;
-    };
-    if player.god_mode || player.health <= 0 {
-        return;
-    }
-
     *last_hurt_sound += time.delta_seconds();
     let dt = time.delta_seconds();
-    let p_pos = p_trans.translation;
 
-    for (h_trans, hazard) in hazards.iter() {
-        let dist_xz = Vec2::new(h_trans.translation.x - p_pos.x, h_trans.translation.z - p_pos.z).length();
-        let dist_y = (h_trans.translation.y - p_pos.y).abs();
-        if dist_xz <= 1.5 && dist_y <= 1.2 {
-            // Boots protect from toxic floor slime / acid / flame until depleted
-            if player.inventory.boots_amount > 0 {
-                player.inventory.boots_amount = player.inventory.boots_amount.saturating_sub(1);
-            } else {
-                let dmg = (hazard.damage_per_sec * dt).max(1.0) as i32;
-                player.health = player.health.saturating_sub(dmg);
-                if *last_hurt_sound >= 0.8 {
-                    *last_hurt_sound = 0.0;
-                    sound_events.send(PlaySoundEvent { sound_id: 37 }); // DUKE_PAIN
-                    if let Some(ref mut t) = tint {
-                        t.target_color = Color::srgba(0.8, 0.4, 0.0, 0.4);
+    for (p_trans, mut player) in player_query.iter_mut() {
+        if player.god_mode || player.health <= 0 {
+            continue;
+        }
+
+        let p_pos = p_trans.translation;
+
+        for (h_trans, hazard) in hazards.iter() {
+            let dist_xz = Vec2::new(h_trans.translation.x - p_pos.x, h_trans.translation.z - p_pos.z).length();
+            let dist_y = (h_trans.translation.y - p_pos.y).abs();
+            if dist_xz <= 1.5 && dist_y <= 1.2 {
+                // Boots protect from toxic floor slime / acid / flame until depleted
+                if player.inventory.boots_amount > 0 {
+                    player.inventory.boots_amount = player.inventory.boots_amount.saturating_sub(1);
+                } else {
+                    let dmg = (hazard.damage_per_sec * dt).max(1.0) as i32;
+                    player.health = player.health.saturating_sub(dmg);
+                    if *last_hurt_sound >= 0.8 {
+                        *last_hurt_sound = 0.0;
+                        sound_events.send(PlaySoundEvent { sound_id: 37 }); // DUKE_PAIN
+                        if let Some(ref mut t) = tint {
+                            t.target_color = Color::srgba(0.8, 0.4, 0.0, 0.4);
+                        }
                     }
                 }
             }

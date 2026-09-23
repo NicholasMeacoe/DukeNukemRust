@@ -9,63 +9,61 @@ pub fn handle_inventory_input(
     mut commands: Commands,
     holoduke_query: Query<Entity, With<HoloDukeDecoy>>,
 ) {
-    let Ok((trans, mut player)) = query.get_single_mut() else {
-        return;
-    };
-
-    // 1. Steroids (Key 'U')
-    if keys.just_pressed(KeyCode::KeyU) && player.inventory.steroids_amount > 0 {
-        player.inventory.steroids_active = true;
-        // Instant unshrink if shrunk!
-        player.shrink_timer = 0.0;
-        sound_events.send(PlaySoundEvent { sound_id: 723 }); // DUKE_TAKEPILLS
-    }
-
-    // 2. Medkit (Key 'M')
-    if keys.just_pressed(KeyCode::KeyM)
-        && player.inventory.medkit_amount > 0
-        && player.health < player.max_health
-    {
-        let needed = player.max_health - player.health;
-        let use_amount = needed.min(player.inventory.medkit_amount);
-        player.health += use_amount;
-        player.inventory.medkit_amount -= use_amount;
-        sound_events.send(PlaySoundEvent { sound_id: 722 }); // DUKE_USEMEDKIT
-    }
-
-    // 3. Nightvision (Key 'N')
-    if keys.just_pressed(KeyCode::KeyN) && player.inventory.nightvision_amount > 0 {
-        player.inventory.nightvision_active = !player.inventory.nightvision_active;
-        sound_events.send(PlaySoundEvent { sound_id: 649 }); // NITEVISION_ONOFF
-    }
-
-    // 4. Jetpack (Key 'J')
-    if keys.just_pressed(KeyCode::KeyJ) && player.inventory.jetpack_amount > 0 {
-        player.inventory.jetpack_active = !player.inventory.jetpack_active;
-        if player.inventory.jetpack_active {
-            sound_events.send(PlaySoundEvent { sound_id: 49 }); // DUKE_JETPACK_ON
-        } else {
-            sound_events.send(PlaySoundEvent { sound_id: 51 }); // DUKE_JETPACK_OFF
+    for (trans, mut player) in query.iter_mut() {
+        // 1. Steroids (Key 'U')
+        if keys.just_pressed(KeyCode::KeyU) && player.inventory.steroids_amount > 0 {
+            player.inventory.steroids_active = true;
+            // Instant unshrink if shrunk!
+            player.shrink_timer = 0.0;
+            sound_events.send(PlaySoundEvent { sound_id: 723 }); // DUKE_TAKEPILLS
         }
-    }
 
-    // 5. Holoduke (Key 'H')
-    if keys.just_pressed(KeyCode::KeyH) && player.inventory.holoduke_amount > 0 {
-        player.inventory.holoduke_active = !player.inventory.holoduke_active;
-        sound_events.send(PlaySoundEvent { sound_id: 70 }); // TELEPORT
-        if player.inventory.holoduke_active {
-            // Spawn HoloDukeDecoy entity
-            commands.spawn((
-                SpatialBundle {
-                    transform: Transform::from_translation(trans.translation),
-                    ..default()
-                },
-                HoloDukeDecoy { lifetime: 30.0 },
-                crate::game_flow::LevelEntity,
-            ));
-        } else {
-            for entity in holoduke_query.iter() {
-                commands.entity(entity).despawn_recursive();
+        // 2. Medkit (Key 'M')
+        if keys.just_pressed(KeyCode::KeyM)
+            && player.inventory.medkit_amount > 0
+            && player.health < player.max_health
+        {
+            let needed = player.max_health - player.health;
+            let use_amount = needed.min(player.inventory.medkit_amount);
+            player.health += use_amount;
+            player.inventory.medkit_amount -= use_amount;
+            sound_events.send(PlaySoundEvent { sound_id: 722 }); // DUKE_USEMEDKIT
+        }
+
+        // 3. Nightvision (Key 'N')
+        if keys.just_pressed(KeyCode::KeyN) && player.inventory.nightvision_amount > 0 {
+            player.inventory.nightvision_active = !player.inventory.nightvision_active;
+            sound_events.send(PlaySoundEvent { sound_id: 649 }); // NITEVISION_ONOFF
+        }
+
+        // 4. Jetpack (Key 'J')
+        if keys.just_pressed(KeyCode::KeyJ) && player.inventory.jetpack_amount > 0 {
+            player.inventory.jetpack_active = !player.inventory.jetpack_active;
+            if player.inventory.jetpack_active {
+                sound_events.send(PlaySoundEvent { sound_id: 49 }); // DUKE_JETPACK_ON
+            } else {
+                sound_events.send(PlaySoundEvent { sound_id: 51 }); // DUKE_JETPACK_OFF
+            }
+        }
+
+        // 5. Holoduke (Key 'H')
+        if keys.just_pressed(KeyCode::KeyH) && player.inventory.holoduke_amount > 0 {
+            player.inventory.holoduke_active = !player.inventory.holoduke_active;
+            sound_events.send(PlaySoundEvent { sound_id: 70 }); // TELEPORT
+            if player.inventory.holoduke_active {
+                // Spawn HoloDukeDecoy entity
+                commands.spawn((
+                    SpatialBundle {
+                        transform: Transform::from_translation(trans.translation),
+                        ..default()
+                    },
+                    HoloDukeDecoy { lifetime: 30.0 },
+                    crate::game_flow::LevelEntity,
+                ));
+            } else {
+                for entity in holoduke_query.iter() {
+                    commands.entity(entity).despawn_recursive();
+                }
             }
         }
     }
@@ -79,9 +77,7 @@ pub fn update_inventory_timers(
     holoduke_query: Query<Entity, With<HoloDukeDecoy>>,
 ) {
     let dt = time.delta_seconds();
-    let Ok(mut player) = query.get_single_mut() else {
-        return;
-    };
+    for mut player in query.iter_mut() {
 
     player.inventory.inventory_accumulator += dt;
     let tick_interval = 0.1; // Tick 10 times per second
@@ -176,6 +172,7 @@ pub fn update_inventory_timers(
     if player.freeze_timer > 0.0 {
         player.freeze_timer -= dt;
     }
+    }
 }
 
 pub fn update_player_pickups(
@@ -198,10 +195,9 @@ pub fn update_player_pickups(
     mut tint: Option<ResMut<crate::hud::ScreenTintState>>,
     mut rng: ResMut<crate::net::DeterministicRng>,
 ) {
-    let Ok((p_trans, mut player)) = player_query.get_single_mut() else {
-        return;
-    };
     let mut sbar = sbar_query.get_single_mut().ok();
+
+    for (p_trans, mut player) in player_query.iter_mut() {
 
     for (pickup_entity, item_trans, item) in pickup_query.iter() {
         if p_trans.translation.distance_squared(item_trans.translation) < 4.0 {
@@ -525,6 +521,7 @@ pub fn update_player_pickups(
             }
             commands.entity(k_entity).despawn_recursive();
         }
+    }
     }
 }
 

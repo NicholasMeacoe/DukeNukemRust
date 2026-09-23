@@ -1,17 +1,17 @@
 # Implementation Plan: Cooperative and Deathmatch Multiplayer (Networking / Splitscreen)
 
 ## Phase 1: Local Splitscreen Multi-Viewport & Player Controllers
-- [ ] Task: Write Tests for Splitscreen Viewport Layout & Multi-Player Input Mapping
-  - [ ] Unit test for 1, 2, 3, and 4-player viewport physical rect calculations (horizontal split, quadrant split)
-  - [ ] Unit test for `PlayerId` component and multi-player controller input assignment (Player 1 vs Player 2 keyboard & gamepad mapping)
-  - [ ] Unit test verifying camera and controller association without `get_single()` panics
-- [ ] Task: Implement Multi-Player Controllers & Viewport Slicing in `src/player/` & `src/render/`
-  - [ ] Add `PlayerId(pub usize)` and `PlayerCamera(pub usize)` components
-  - [ ] Refactor `update_player_movement`, `handle_weapon_firing`, and `handle_weapon_selection` to support multiple players
-  - [ ] Implement `setup_splitscreen_viewports` and `update_splitscreen_viewports` using Bevy `Camera.viewport`
-  - [ ] Implement secondary keyboard controls (Arrow keys, RCtrl, RShift, Keypad) and gamepad support for Player 2..4
-- [ ] Task: Phase 1 Verification & Checkpoint (Refer to workflow.md)
-  - [ ] Verify independent player movement and split viewports in running engine
+- [x] Task: Write Tests for Splitscreen Viewport Layout & Multi-Player Input Mapping
+  - [x] Unit test for 1, 2, 3, and 4-player viewport physical rect calculations (horizontal split, quadrant split)
+  - [x] Unit test for `PlayerId` component and multi-player controller input assignment (Player 1 vs Player 2 keyboard & gamepad mapping)
+  - [x] Unit test verifying camera and controller association without `get_single()` panics
+- [x] Task: Implement Multi-Player Controllers & Viewport Slicing in `src/player/` & `src/render/`
+  - [x] Add `PlayerId(pub usize)` and `PlayerCamera(pub usize)` components
+  - [x] Refactor `update_player_movement`, `handle_weapon_firing`, and `handle_weapon_selection` to support multiple players
+  - [x] Implement `setup_splitscreen_viewports` and `update_splitscreen_viewports` using Bevy `Camera.viewport`
+  - [x] Implement secondary keyboard controls (Arrow keys, RCtrl, RShift, Keypad) and gamepad support for Player 2..4
+- [x] Task: Phase 1 Verification & Checkpoint (Refer to workflow.md)
+  - [x] Verify independent player movement and split viewports in running engine
 
 ## Phase 2: Duke Player Actor Rendering, Palette Swaps & Animations
 - [ ] Task: Write Tests for APLAYER 8-Directional Viewing & Palette Swapping

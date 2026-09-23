@@ -1,10 +1,12 @@
 pub mod protocol;
 pub mod rng;
 pub mod scoreboard;
+pub mod splitscreen;
 
 pub use protocol::*;
 pub use rng::*;
 pub use scoreboard::*;
+pub use splitscreen::*;
 
 use bevy::prelude::*;
 
@@ -14,9 +16,15 @@ impl Plugin for NetPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<DukematchState>()
             .init_resource::<DeterministicRng>()
+            .init_resource::<SplitscreenConfig>()
             .add_systems(
                 Update,
-                (toggle_scoreboard, update_dukematch_timer).in_set(crate::GameSet::Input),
+                (
+                    toggle_scoreboard,
+                    update_dukematch_timer,
+                    update_splitscreen_viewports,
+                )
+                    .in_set(crate::GameSet::Input),
             );
     }
 }

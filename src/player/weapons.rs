@@ -7,49 +7,94 @@ use bevy_rapier3d::prelude::*;
 
 pub fn handle_weapon_selection(
     keys: Res<ButtonInput<KeyCode>>,
-    mut query: Query<&mut PlayerController>,
+    mut query: Query<(&mut PlayerController, Option<&PlayerId>)>,
     mut sound_events: EventWriter<PlaySoundEvent>,
 ) {
-    let Ok(mut player) = query.get_single_mut() else {
-        return;
-    };
+    for (mut player, opt_id) in query.iter_mut() {
+        let player_id = opt_id.map_or(0, |id| id.0);
+        let input_cfg = crate::net::splitscreen::get_player_input_config(player_id);
 
-    let selected = if keys.just_pressed(KeyCode::Digit1) {
-        Some(WeaponType::Knee)
-    } else if keys.just_pressed(KeyCode::Digit2) {
-        Some(WeaponType::Pistol)
-    } else if keys.just_pressed(KeyCode::Digit3) {
-        Some(WeaponType::Shotgun)
-    } else if keys.just_pressed(KeyCode::Digit4) {
-        Some(WeaponType::Chaingun)
-    } else if keys.just_pressed(KeyCode::Digit5) {
-        Some(WeaponType::Rpg)
-    } else if keys.just_pressed(KeyCode::Digit6) {
-        Some(WeaponType::Pipebomb)
-    } else if keys.just_pressed(KeyCode::Digit7) {
-        if player.current_weapon == WeaponType::Shrinker
-            && player.weapons[WeaponType::Expander as usize].is_unlocked
-        {
-            Some(WeaponType::Expander)
-        } else {
-            Some(WeaponType::Shrinker)
+        let mut selected = None;
+        if player_id == 0 {
+            if keys.just_pressed(KeyCode::Digit1) {
+                selected = Some(WeaponType::Knee);
+            } else if keys.just_pressed(KeyCode::Digit2) {
+                selected = Some(WeaponType::Pistol);
+            } else if keys.just_pressed(KeyCode::Digit3) {
+                selected = Some(WeaponType::Shotgun);
+            } else if keys.just_pressed(KeyCode::Digit4) {
+                selected = Some(WeaponType::Chaingun);
+            } else if keys.just_pressed(KeyCode::Digit5) {
+                selected = Some(WeaponType::Rpg);
+            } else if keys.just_pressed(KeyCode::Digit6) {
+                selected = Some(WeaponType::Pipebomb);
+            } else if keys.just_pressed(KeyCode::Digit7) {
+                if player.current_weapon == WeaponType::Shrinker
+                    && player.weapons[WeaponType::Expander as usize].is_unlocked
+                {
+                    selected = Some(WeaponType::Expander);
+                } else {
+                    selected = Some(WeaponType::Shrinker);
+                }
+            } else if keys.just_pressed(KeyCode::Digit8) {
+                selected = Some(WeaponType::Devastator);
+            } else if keys.just_pressed(KeyCode::Digit9) {
+                selected = Some(WeaponType::Tripbomb);
+            } else if keys.just_pressed(KeyCode::Digit0) {
+                selected = Some(WeaponType::Freezethrower);
+            }
         }
-    } else if keys.just_pressed(KeyCode::Digit8) {
-        Some(WeaponType::Devastator)
-    } else if keys.just_pressed(KeyCode::Digit9) {
-        Some(WeaponType::Tripbomb)
-    } else if keys.just_pressed(KeyCode::Digit0) {
-        Some(WeaponType::Freezethrower)
-    } else {
-        None
-    };
 
-    if let Some(weapon_type) = selected {
-        let idx = weapon_type as usize;
-        if idx < player.weapons.len() && player.weapons[idx].is_unlocked {
-            player.current_weapon = weapon_type;
-            sound_events.send(PlaySoundEvent { sound_id: 118 }); // SELECT_WEAPON
+        // Weapon cycle controls (supported for all players)
+        if keys.just_pressed(input_cfg.next_weapon) {
+            let cur = player.current_weapon as usize;
+            for offset in 1..12 {
+                let candidate = (cur + offset) % 12;
+                if candidate < player.weapons.len() && player.weapons[candidate].is_unlocked {
+                    if let Some(w) = match_weapon_idx(candidate) {
+                        selected = Some(w);
+                        break;
+                    }
+                }
+            }
+        } else if keys.just_pressed(input_cfg.prev_weapon) {
+            let cur = player.current_weapon as usize;
+            for offset in 1..12 {
+                let candidate = (cur + 12 - offset) % 12;
+                if candidate < player.weapons.len() && player.weapons[candidate].is_unlocked {
+                    if let Some(w) = match_weapon_idx(candidate) {
+                        selected = Some(w);
+                        break;
+                    }
+                }
+            }
         }
+
+        if let Some(weapon_type) = selected {
+            let idx = weapon_type as usize;
+            if idx < player.weapons.len() && player.weapons[idx].is_unlocked {
+                player.current_weapon = weapon_type;
+                sound_events.send(PlaySoundEvent { sound_id: 118 }); // SELECT_WEAPON
+            }
+        }
+    }
+}
+
+pub fn match_weapon_idx(idx: usize) -> Option<WeaponType> {
+    match idx {
+        0 => Some(WeaponType::Knee),
+        1 => Some(WeaponType::Pistol),
+        2 => Some(WeaponType::Shotgun),
+        3 => Some(WeaponType::Chaingun),
+        4 => Some(WeaponType::Rpg),
+        5 => Some(WeaponType::Pipebomb),
+        6 => Some(WeaponType::Shrinker),
+        7 => Some(WeaponType::Devastator),
+        8 => Some(WeaponType::Tripbomb),
+        9 => Some(WeaponType::Freezethrower),
+        10 => Some(WeaponType::HandRemote),
+        11 => Some(WeaponType::Expander),
+        _ => None,
     }
 }
 
@@ -82,8 +127,8 @@ pub fn handle_weapon_firing(
     keys: Res<ButtonInput<KeyCode>>,
     btn: Res<ButtonInput<MouseButton>>,
     time: Res<Time>,
-    mut query: Query<(&Transform, &mut PlayerController), Without<Projectile>>,
-    camera_query: Query<&Transform, (With<Camera>, Without<PlayerController>, Without<Projectile>)>,
+    mut query: Query<(&Transform, &mut PlayerController, Option<&PlayerId>), Without<Projectile>>,
+    camera_query: Query<(&Transform, Option<&PlayerCamera>), (With<Camera>, Without<PlayerController>, Without<Projectile>)>,
     (
         mut projectile_events,
         mut explosion_events,
@@ -105,70 +150,91 @@ pub fn handle_weapon_firing(
     mut materials: Option<ResMut<Assets<StandardMaterial>>>,
     game_config: Option<Res<crate::config::GameConfig>>,
 ) {
-    let Ok(cam_trans) = camera_query.get_single() else {
-        return;
-    };
-    let Ok((player_trans, mut player)) = query.get_single_mut() else {
-        return;
-    };
     let dt = time.delta_seconds();
 
-    for weapon in player.weapons.iter_mut() {
-        if weapon.fire_timer > 0.0 {
-            weapon.fire_timer -= dt;
-        }
-        if weapon.reload_timer > 0.0 {
-            weapon.reload_timer -= dt;
-            if weapon.reload_timer <= 0.0 {
-                sound_events.send(PlaySoundEvent { sound_id: 5 }); // INSERT_CLIP
+    for (player_trans, mut player, opt_id) in query.iter_mut() {
+        let player_id = opt_id.map_or(0, |id| id.0);
+        let cam_trans = camera_query
+            .iter()
+            .find(|(_, cam_id)| cam_id.map_or(0, |c| c.0) == player_id)
+            .map(|(t, _)| t)
+            .or_else(|| camera_query.iter().next().map(|(t, _)| t));
+        let Some(cam_trans) = cam_trans else {
+            continue;
+        };
+
+        for weapon in player.weapons.iter_mut() {
+            if weapon.fire_timer > 0.0 {
+                weapon.fire_timer -= dt;
+            }
+            if weapon.reload_timer > 0.0 {
+                weapon.reload_timer -= dt;
+                if weapon.reload_timer <= 0.0 {
+                    sound_events.send(PlaySoundEvent { sound_id: 5 }); // INSERT_CLIP
+                }
             }
         }
-    }
 
-    if player.quick_kick_timer > 0.0 {
-        player.quick_kick_timer -= dt;
-    }
+        if player.quick_kick_timer > 0.0 {
+            player.quick_kick_timer -= dt;
+        }
 
-    let fwd_vec = *cam_trans.forward();
-    let right_vec = *cam_trans.right();
-    let up_vec = *cam_trans.up();
+        let fwd_vec = *cam_trans.forward();
+        let right_vec = *cam_trans.right();
+        let up_vec = *cam_trans.up();
+        let input_cfg = crate::net::splitscreen::get_player_input_config(player_id);
 
-    // Quick kick check (Key 'Q')
-    if keys.just_pressed(KeyCode::KeyQ) && player.quick_kick_timer <= 0.0 {
-        player.quick_kick_timer = 0.5;
-        sound_events.send(PlaySoundEvent { sound_id: 0 }); // KICK_HIT
-        let kick_damage = if player.inventory.steroids_active {
-            40
+        // Quick kick check (Key 'Q' for Player 0)
+        if player_id == 0 && keys.just_pressed(KeyCode::KeyQ) && player.quick_kick_timer <= 0.0 {
+            player.quick_kick_timer = 0.5;
+            sound_events.send(PlaySoundEvent { sound_id: 0 }); // KICK_HIT
+            let kick_damage = if player.inventory.steroids_active {
+                40
+            } else {
+                15
+            };
+            projectile_events.send(SpawnProjectileEvent {
+                projectile_type: ProjectileType::MightyBoot,
+                origin: player_trans.translation + Vec3::Y * 0.2,
+                direction: fwd_vec,
+                velocity: 15.0,
+                damage: kick_damage,
+                is_player_source: true,
+            });
+        }
+
+        let cur_idx = player.current_weapon as usize;
+        if cur_idx >= player.weapons.len() {
+            continue;
+        }
+
+        let is_continuous = player.current_weapon == WeaponType::Chaingun
+            || player.current_weapon == WeaponType::Freezethrower;
+
+        let is_firing = if is_continuous {
+            if player_id == 0 {
+                btn.pressed(MouseButton::Left) || keys.pressed(input_cfg.fire)
+            } else {
+                keys.pressed(input_cfg.fire)
+            }
         } else {
-            15
+            if player_id == 0 {
+                btn.just_pressed(MouseButton::Left) || keys.just_pressed(input_cfg.fire)
+            } else {
+                keys.just_pressed(input_cfg.fire)
+            }
         };
-        projectile_events.send(SpawnProjectileEvent {
-            projectile_type: ProjectileType::MightyBoot,
-            origin: player_trans.translation + Vec3::Y * 0.2,
-            direction: fwd_vec,
-            velocity: 15.0,
-            damage: kick_damage,
-            is_player_source: true,
-        });
-    }
 
-    let cur_idx = player.current_weapon as usize;
-    if cur_idx >= player.weapons.len() {
-        return;
-    }
+        // Detonator Trigger on Right Click or HandRemote weapon
+        let is_detonating = if player_id == 0 {
+            btn.just_pressed(MouseButton::Right)
+                || (player.current_weapon == WeaponType::HandRemote
+                    && (btn.just_pressed(MouseButton::Left) || keys.just_pressed(input_cfg.fire)))
+        } else {
+            player.current_weapon == WeaponType::HandRemote && keys.just_pressed(input_cfg.fire)
+        };
 
-    let is_firing = if player.current_weapon == WeaponType::Chaingun
-        || player.current_weapon == WeaponType::Freezethrower
-    {
-        btn.pressed(MouseButton::Left)
-    } else {
-        btn.just_pressed(MouseButton::Left)
-    };
-
-    // Detonator Trigger on Right Click or HandRemote weapon
-    if btn.just_pressed(MouseButton::Right)
-        || (player.current_weapon == WeaponType::HandRemote && btn.just_pressed(MouseButton::Left))
-    {
+        if is_detonating {
         let mut detonated_any = false;
         for (entity, p_trans, proj) in pipebomb_query.iter() {
             if proj.projectile_type == ProjectileType::Pipebomb && proj.is_player_source {
@@ -599,6 +665,7 @@ pub fn handle_weapon_firing(
             }
         }
     }
+    }
 }
 
 pub fn update_laser_tripbombs(
@@ -730,25 +797,25 @@ impl Default for FirstPersonViewModel {
 
 pub fn update_first_person_viewmodel(
     time: Res<Time>,
-    player_query: Query<&PlayerController>,
-    mut vm_query: Query<&mut FirstPersonViewModel>,
+    player_query: Query<(&PlayerController, Option<&PlayerId>)>,
+    mut vm_query: Query<(&mut FirstPersonViewModel, Option<&PlayerId>)>,
     game_config: Option<Res<crate::config::GameConfig>>,
 ) {
     let dt = time.delta_seconds();
-    let Ok(player) = player_query.get_single() else {
-        return;
-    };
-    let Ok(mut vm) = vm_query.get_single_mut() else {
-        return;
-    };
+    for (player, p_id) in player_query.iter() {
+        let pid = p_id.map_or(0, |id| id.0);
+        for (mut vm, vm_id) in vm_query.iter_mut() {
+            if vm_id.map_or(0, |id| id.0) != pid {
+                continue;
+            }
 
-    if player.quick_kick_timer > 0.0 {
-        let kick_progress = 1.0 - (player.quick_kick_timer / 0.5);
-        let frame = (kick_progress * 3.0) as i16;
-        vm.current_tile = 2521 + frame.clamp(0, 2);
-        vm.is_firing = true;
-        return;
-    }
+            if player.quick_kick_timer > 0.0 {
+                let kick_progress = 1.0 - (player.quick_kick_timer / 0.5);
+                let frame = (kick_progress * 3.0) as i16;
+                vm.current_tile = 2521 + frame.clamp(0, 2);
+                vm.is_firing = true;
+                continue;
+            }
 
     let cur_idx = player.current_weapon as usize;
     if cur_idx < player.weapons.len() {
@@ -820,6 +887,8 @@ pub fn update_first_person_viewmodel(
         if view_bobbing && player.speed > 0.1 {
             vm.bob_phase += dt * 8.0;
         }
+    }
+    }
     }
 }
 
