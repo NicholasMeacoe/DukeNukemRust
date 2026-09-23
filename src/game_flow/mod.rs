@@ -1063,5 +1063,116 @@ mod tests {
         assert_eq!(*app.world().resource::<State<GamePhase>>().get(), GamePhase::OptionsMenu);
         assert_eq!(app.world().resource::<MenuCursor>().selected_index, 1);
     }
+
+    #[test]
+    fn test_controls_setup_menu_navigation_and_toggles() {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins);
+        app.add_plugins(bevy::state::app::StatesPlugin);
+        app.init_state::<GamePhase>();
+        app.init_resource::<ButtonInput<KeyCode>>();
+        app.init_resource::<MenuCursor>();
+        app.init_resource::<LevelProgress>();
+        app.init_resource::<OptionsOrigin>();
+        app.insert_resource(crate::config::GameConfig::default());
+        app.add_event::<crate::audio::PlaySoundEvent>();
+        app.add_event::<LoadLevelEvent>();
+        app.add_event::<crate::save::SaveGameEvent>();
+        app.add_event::<crate::save::LoadGameEvent>();
+        app.add_event::<bevy::app::AppExit>();
+        app.add_systems(Update, handle_menu_navigation);
+
+        app.world_mut().resource_mut::<NextState<GamePhase>>().set(GamePhase::ControlsSetup);
+        app.update();
+        app.update();
+        assert_eq!(*app.world().resource::<State<GamePhase>>().get(), GamePhase::ControlsSetup);
+
+        // 1. Mouse Sensitivity (index 0, default 1.0)
+        app.world_mut().resource_mut::<MenuCursor>().selected_index = 0;
+        assert_eq!(app.world().resource::<crate::config::GameConfig>().controls.mouse_sensitivity, 1.0);
+
+        // Press Right -> increments by 0.25 to 1.25
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::ArrowRight);
+        app.update();
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().reset_all();
+        assert_eq!(app.world().resource::<crate::config::GameConfig>().controls.mouse_sensitivity, 1.25);
+
+        // Press Left twice -> decrements by 0.5 to 0.75
+        for _ in 0..2 {
+            app.world_mut().resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::ArrowLeft);
+            app.update();
+            app.world_mut().resource_mut::<ButtonInput<KeyCode>>().reset_all();
+        }
+        assert_eq!(app.world().resource::<crate::config::GameConfig>().controls.mouse_sensitivity, 0.75);
+
+        // Press Left 10 times -> clamps at 0.5
+        for _ in 0..10 {
+            app.world_mut().resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::KeyA);
+            app.update();
+            app.world_mut().resource_mut::<ButtonInput<KeyCode>>().reset_all();
+        }
+        assert_eq!(app.world().resource::<crate::config::GameConfig>().controls.mouse_sensitivity, 0.5);
+
+        // Press Right 20 times -> clamps at 3.0
+        for _ in 0..20 {
+            app.world_mut().resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::KeyD);
+            app.update();
+            app.world_mut().resource_mut::<ButtonInput<KeyCode>>().reset_all();
+        }
+        assert_eq!(app.world().resource::<crate::config::GameConfig>().controls.mouse_sensitivity, 3.0);
+
+        // 2. Invert Mouse Y (index 1, default false)
+        app.world_mut().resource_mut::<MenuCursor>().selected_index = 1;
+        assert!(!app.world().resource::<crate::config::GameConfig>().controls.invert_mouse_y);
+
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::Enter);
+        app.update();
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().reset_all();
+        assert!(app.world().resource::<crate::config::GameConfig>().controls.invert_mouse_y);
+
+        // Toggle back off
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::Space);
+        app.update();
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().reset_all();
+        assert!(!app.world().resource::<crate::config::GameConfig>().controls.invert_mouse_y);
+
+        // 3. Auto-Switch Weapon (index 2, default true)
+        app.world_mut().resource_mut::<MenuCursor>().selected_index = 2;
+        assert!(app.world().resource::<crate::config::GameConfig>().controls.auto_switch_weapon);
+
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::Enter);
+        app.update();
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().reset_all();
+        assert!(!app.world().resource::<crate::config::GameConfig>().controls.auto_switch_weapon);
+
+        // Toggle back on
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::ArrowRight);
+        app.update();
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().reset_all();
+        assert!(app.world().resource::<crate::config::GameConfig>().controls.auto_switch_weapon);
+
+        // 4. View Bobbing (index 3, default true)
+        app.world_mut().resource_mut::<MenuCursor>().selected_index = 3;
+        assert!(app.world().resource::<crate::config::GameConfig>().controls.view_bobbing);
+
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::Enter);
+        app.update();
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().reset_all();
+        assert!(!app.world().resource::<crate::config::GameConfig>().controls.view_bobbing);
+
+        // Toggle back on
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::Space);
+        app.update();
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().reset_all();
+        assert!(app.world().resource::<crate::config::GameConfig>().controls.view_bobbing);
+
+        // 5. Escape returns to OptionsMenu
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::Escape);
+        app.update();
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().reset_all();
+        app.update();
+        assert_eq!(*app.world().resource::<State<GamePhase>>().get(), GamePhase::OptionsMenu);
+        assert_eq!(app.world().resource::<MenuCursor>().selected_index, 2);
+    }
 }
 

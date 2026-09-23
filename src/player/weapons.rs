@@ -103,6 +103,7 @@ pub fn handle_weapon_firing(
     rapier_context: Option<Res<RapierContext>>,
     mut meshes: Option<ResMut<Assets<Mesh>>>,
     mut materials: Option<ResMut<Assets<StandardMaterial>>>,
+    game_config: Option<Res<crate::config::GameConfig>>,
 ) {
     let Ok(cam_trans) = camera_query.get_single() else {
         return;
@@ -589,7 +590,8 @@ pub fn handle_weapon_firing(
         }
 
         // Priority auto-switch if out of ammo
-        if player.weapons[cur_idx].ammo == 0 && cur_idx != WeaponType::Knee as usize {
+        let auto_switch = game_config.as_ref().map_or(true, |c| c.controls.auto_switch_weapon);
+        if auto_switch && player.weapons[cur_idx].ammo == 0 && cur_idx != WeaponType::Knee as usize {
             let next_wpn = get_highest_priority_available_weapon(&player);
             if next_wpn != player.current_weapon {
                 player.current_weapon = next_wpn;
@@ -730,6 +732,7 @@ pub fn update_first_person_viewmodel(
     time: Res<Time>,
     player_query: Query<&PlayerController>,
     mut vm_query: Query<&mut FirstPersonViewModel>,
+    game_config: Option<Res<crate::config::GameConfig>>,
 ) {
     let dt = time.delta_seconds();
     let Ok(player) = player_query.get_single() else {
@@ -813,7 +816,8 @@ pub fn update_first_person_viewmodel(
         }
 
         // Bobbing phase from walking speed
-        if player.speed > 0.1 {
+        let view_bobbing = game_config.as_ref().map_or(true, |c| c.controls.view_bobbing);
+        if view_bobbing && player.speed > 0.1 {
             vm.bob_phase += dt * 8.0;
         }
     }
@@ -934,5 +938,96 @@ mod tests {
             }
         }
         assert_eq!(player.current_weapon, WeaponType::Shotgun);
+    }
+
+    #[test]
+    fn test_auto_switch_weapon_toggle() {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins);
+        app.init_resource::<ButtonInput<KeyCode>>();
+        app.init_resource::<ButtonInput<MouseButton>>();
+        app.insert_resource(crate::net::DeterministicRng::new(123));
+        app.add_event::<SpawnProjectileEvent>();
+        app.add_event::<ExplosionDamageEvent>();
+        app.add_event::<PlaySoundEvent>();
+        app.add_event::<crate::combat::gore::SpawnCasingEvent>();
+        app.add_event::<crate::lighting::SpawnDynamicLightEvent>();
+
+        // Spawn player with Shotgun, ammo = 1
+        let mut player = PlayerController::default();
+        player.current_weapon = WeaponType::Shotgun;
+        player.weapons[WeaponType::Shotgun as usize].ammo = 1;
+        player.weapons[WeaponType::Shotgun as usize].is_unlocked = true;
+        player.weapons[WeaponType::Pistol as usize].ammo = 50;
+        player.weapons[WeaponType::Pistol as usize].is_unlocked = true;
+
+        let player_entity = app.world_mut().spawn((Transform::default(), player)).id();
+        app.world_mut().spawn(Camera3dBundle::default());
+
+        let mut config = crate::config::GameConfig::default();
+        // 1. auto_switch_weapon = false
+        config.controls.auto_switch_weapon = false;
+        app.insert_resource(config);
+
+        app.add_systems(Update, handle_weapon_firing);
+
+        // Click Left mouse to fire shotgun (ammo becomes 0)
+        app.world_mut().resource_mut::<ButtonInput<MouseButton>>().press(MouseButton::Left);
+        app.update();
+
+        let pl = app.world().entity(player_entity).get::<PlayerController>().unwrap();
+        assert_eq!(pl.weapons[WeaponType::Shotgun as usize].ammo, 0);
+        assert_eq!(pl.current_weapon, WeaponType::Shotgun);
+
+        // 2. auto_switch_weapon = true
+        app.world_mut().resource_mut::<crate::config::GameConfig>().controls.auto_switch_weapon = true;
+
+        {
+            let mut p = app.world_mut().entity_mut(player_entity);
+            let mut pl = p.get_mut::<PlayerController>().unwrap();
+            pl.weapons[WeaponType::Shotgun as usize].ammo = 1;
+            pl.weapons[WeaponType::Shotgun as usize].fire_timer = 0.0;
+        }
+
+        app.world_mut().resource_mut::<ButtonInput<MouseButton>>().reset_all();
+        app.world_mut().resource_mut::<ButtonInput<MouseButton>>().press(MouseButton::Left);
+        app.update();
+
+        let pl = app.world().entity(player_entity).get::<PlayerController>().unwrap();
+        assert_eq!(pl.weapons[WeaponType::Shotgun as usize].ammo, 0);
+        assert_eq!(pl.current_weapon, WeaponType::Pistol);
+    }
+
+    #[test]
+    fn test_view_bobbing_toggle() {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins);
+
+        let mut player = PlayerController::default();
+        player.speed = 10.0;
+        app.world_mut().spawn(player);
+
+        let vm_entity = app.world_mut().spawn(FirstPersonViewModel::new(WeaponType::Pistol)).id();
+
+        let mut config = crate::config::GameConfig::default();
+        config.controls.view_bobbing = false;
+        app.insert_resource(config);
+
+        app.add_systems(Update, update_first_person_viewmodel);
+
+        // Advance time
+        app.world_mut().resource_mut::<Time>().advance_by(std::time::Duration::from_millis(100));
+        app.update();
+
+        let vm = app.world().entity(vm_entity).get::<FirstPersonViewModel>().unwrap();
+        assert_eq!(vm.bob_phase, 0.0);
+
+        // Enable view_bobbing
+        app.world_mut().resource_mut::<crate::config::GameConfig>().controls.view_bobbing = true;
+        app.world_mut().resource_mut::<Time>().advance_by(std::time::Duration::from_millis(100));
+        app.update();
+
+        let vm = app.world().entity(vm_entity).get::<FirstPersonViewModel>().unwrap();
+        assert!(vm.bob_phase > 0.0);
     }
 }

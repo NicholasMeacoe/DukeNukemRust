@@ -530,6 +530,7 @@ fn player_look(
     mut query: Query<&mut Player>,
     mut camera_query: Query<&mut Transform, (With<Camera>, Without<FirstPersonWeapon>)>,
     window_query: Query<&Window, With<PrimaryWindow>>,
+    game_config: Option<Res<config::GameConfig>>,
 ) {
     let Ok(window) = window_query.get_single() else {
         return;
@@ -551,9 +552,17 @@ fn player_look(
         return;
     };
 
+    let (sens, invert_y) = if let Some(ref cfg) = game_config {
+        (cfg.controls.mouse_sensitivity, cfg.controls.invert_mouse_y)
+    } else {
+        (1.0, false)
+    };
+
+    let pitch_mult = if invert_y { -0.002 } else { 0.002 };
+
     for mut player in query.iter_mut() {
-        player.yaw -= delta.x * 0.002;
-        player.pitch -= delta.y * 0.002;
+        player.yaw -= delta.x * 0.002 * sens;
+        player.pitch -= delta.y * pitch_mult * sens;
         player.pitch = player.pitch.clamp(-1.54, 1.54);
 
         camera_transform.rotation = Quat::from_axis_angle(Vec3::Y, player.yaw)
@@ -607,6 +616,7 @@ fn update_weapon(
     mut commands: Commands,
     rapier_context: Res<RapierContext>,
     assets: Res<GameAssets>,
+    game_config: Option<Res<config::GameConfig>>,
 ) {
     let is_moving = if let Ok(output) = player_query.get_single() {
         output.effective_translation.xz().length_squared() > 0.001
@@ -618,9 +628,11 @@ fn update_weapon(
         return;
     };
 
+    let view_bobbing = game_config.as_ref().map_or(true, |c| c.controls.view_bobbing);
+
     for (mut style, mut weapon) in query.iter_mut() {
         // Simple View Bobbing
-        if is_moving {
+        if view_bobbing && is_moving {
             weapon.bob_timer += time.delta_seconds() * 10.0;
         } else {
             weapon.bob_timer = weapon.bob_timer.lerp(0.0, time.delta_seconds() * 5.0);
@@ -629,7 +641,11 @@ fn update_weapon(
             }
         }
 
-        let bob_offset = (weapon.bob_timer.sin() * 20.0).abs() * -1.0;
+        let bob_offset = if view_bobbing {
+            (weapon.bob_timer.sin() * 20.0).abs() * -1.0
+        } else {
+            0.0
+        };
 
         // Shooting
         if weapon.fire_timer > 0.0 {
@@ -789,5 +805,68 @@ mod main_tests {
         let win = app.world().entity(window_entity).get::<Window>().unwrap();
         assert_eq!(win.cursor.grab_mode, CursorGrabMode::Locked);
         assert!(!win.cursor.visible);
+    }
+
+    #[test]
+    fn test_player_look_sensitivity_and_invert_y() {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins);
+        app.add_event::<MouseMotion>();
+
+        app.world_mut().spawn((
+            Window {
+                cursor: bevy::window::Cursor {
+                    grab_mode: CursorGrabMode::Locked,
+                    visible: false,
+                    ..default()
+                },
+                ..default()
+            },
+            PrimaryWindow,
+        ));
+
+        let player_entity = app.world_mut().spawn(Player::default()).id();
+        app.world_mut().spawn(Camera3dBundle::default());
+
+        let mut config = config::GameConfig::default();
+        config.controls.mouse_sensitivity = 1.0;
+        config.controls.invert_mouse_y = false;
+        app.insert_resource(config);
+
+        app.add_systems(Update, player_look);
+
+        // Delta (10.0, 20.0) with sens 1.0 and invert_y false
+        app.world_mut().send_event(MouseMotion {
+            delta: Vec2::new(10.0, 20.0),
+        });
+        app.update();
+
+        let player = app.world().entity(player_entity).get::<Player>().unwrap();
+        assert!((player.yaw - (-0.02)).abs() < 1e-4);
+        assert!((player.pitch - (-0.04)).abs() < 1e-4);
+
+        // Reset player yaw and pitch
+        {
+            let mut p = app.world_mut().entity_mut(player_entity);
+            let mut pl = p.get_mut::<Player>().unwrap();
+            pl.yaw = 0.0;
+            pl.pitch = 0.0;
+        }
+
+        // Test with sensitivity 2.0 and invert_y: true
+        {
+            let mut cfg = app.world_mut().resource_mut::<config::GameConfig>();
+            cfg.controls.mouse_sensitivity = 2.0;
+            cfg.controls.invert_mouse_y = true;
+        }
+
+        app.world_mut().send_event(MouseMotion {
+            delta: Vec2::new(10.0, 20.0),
+        });
+        app.update();
+
+        let player = app.world().entity(player_entity).get::<Player>().unwrap();
+        assert!((player.yaw - (-0.04)).abs() < 1e-4);
+        assert!((player.pitch - 0.08).abs() < 1e-4);
     }
 }

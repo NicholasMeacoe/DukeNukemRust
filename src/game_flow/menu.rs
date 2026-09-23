@@ -460,6 +460,47 @@ pub fn handle_menu_navigation(
                     let _ = cfg.save(crate::config::GameConfig::default_config_path());
                 }
                 next_state.set(GamePhase::OptionsMenu);
+            } else if cursor.selected_index == 0 {
+                let delta = if keys.just_pressed(KeyCode::ArrowLeft) || keys.just_pressed(KeyCode::KeyA) {
+                    Some(-0.25)
+                } else if keys.just_pressed(KeyCode::ArrowRight) || keys.just_pressed(KeyCode::KeyD) {
+                    Some(0.25)
+                } else {
+                    None
+                };
+
+                if let Some(d) = delta {
+                    if let Some(ref mut cfg) = configs.game_config {
+                        cfg.controls.mouse_sensitivity =
+                            ((cfg.controls.mouse_sensitivity + d).clamp(0.5, 3.0) * 100.0).round() / 100.0;
+                        events.sound_events.send(PlaySoundEvent { sound_id: 0 });
+                    }
+                }
+            } else {
+                let is_toggle = keys.just_pressed(KeyCode::Enter)
+                    || keys.just_pressed(KeyCode::Space)
+                    || keys.just_pressed(KeyCode::ArrowLeft)
+                    || keys.just_pressed(KeyCode::ArrowRight)
+                    || keys.just_pressed(KeyCode::KeyA)
+                    || keys.just_pressed(KeyCode::KeyD);
+
+                if is_toggle {
+                    if let Some(ref mut cfg) = configs.game_config {
+                        match cursor.selected_index {
+                            1 => {
+                                cfg.controls.invert_mouse_y = !cfg.controls.invert_mouse_y;
+                            }
+                            2 => {
+                                cfg.controls.auto_switch_weapon = !cfg.controls.auto_switch_weapon;
+                            }
+                            3 => {
+                                cfg.controls.view_bobbing = !cfg.controls.view_bobbing;
+                            }
+                            _ => {}
+                        }
+                        events.sound_events.send(PlaySoundEvent { sound_id: 2 });
+                    }
+                }
             }
         }
         _ => {}

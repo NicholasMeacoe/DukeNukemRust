@@ -434,6 +434,26 @@ pub fn update_menu_ui(
             } else {
                 text.sections[0].value = "".to_string();
             }
+        } else if current_phase == GamePhase::ControlsSetup {
+            if idx < 4 {
+                let default_cfg = crate::config::GameConfig::default();
+                let controls_cfg = game_config.as_ref().map(|c| &c.controls).unwrap_or(&default_cfg.controls);
+                let label = match idx {
+                    0 => format!("MOUSE SENSITIVITY: {:.2}x", controls_cfg.mouse_sensitivity),
+                    1 => format!("INVERT MOUSE Y:    {}", if controls_cfg.invert_mouse_y { "ON" } else { "OFF" }),
+                    2 => format!("AUTO-SWITCH WEAPON: {}", if controls_cfg.auto_switch_weapon { "ON" } else { "OFF" }),
+                    3 => format!("VIEW BOBBING:      {}", if controls_cfg.view_bobbing { "ON" } else { "OFF" }),
+                    _ => "".to_string(),
+                };
+                text.sections[0].value = label;
+                if idx == cursor.selected_index {
+                    text.sections[0].style.color = DUKE_GOLD;
+                } else {
+                    text.sections[0].style.color = DUKE_GREY;
+                }
+            } else {
+                text.sections[0].value = "".to_string();
+            }
         } else {
             let item_labels: &[&str] = match current_phase {
                 GamePhase::MainMenu => &["NEW GAME", "OPTIONS", "LOAD GAME", "QUIT"],

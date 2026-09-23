@@ -48,19 +48,19 @@
   - [x] Verify toggles immediately update active rendering features
 
 ## Phase 5: Gameplay & Controls Setup Submenu (Sensitivity, Invert Y, Auto-switch)
-- [~] Task: Write Tests for Controls Settings
-  - [ ] Unit test verifying mouse sensitivity scaling on camera pitch and yaw
-  - [ ] Unit test verifying Invert Y flips mouse pitch delta
-  - [ ] Unit test verifying auto-switch on empty weapon behavior
-- [ ] Task: Implement Gameplay & Controls Setup UI
-  - [ ] Add UI rendering for Mouse Sensitivity, Invert Mouse Y, and Auto-Switch in `src/game_flow/ui.rs`
-  - [ ] Connect mouse sensitivity and invert Y to camera rotation in `src/player/camera.rs` / `src/player/mod.rs`
-  - [ ] Connect auto-switch setting to weapon management in `src/player/weapons.rs`
-- [ ] Task: Phase 5 Verification & Checkpoint (Refer to workflow.md)
-  - [ ] Verify camera mouse response adheres strictly to sensitivity and Invert Y settings
+- [x] Task: Write Tests for Controls Settings
+  - [x] Unit test verifying mouse sensitivity scaling on camera pitch and yaw
+  - [x] Unit test verifying Invert Y flips mouse pitch delta
+  - [x] Unit test verifying auto-switch on empty weapon behavior
+- [x] Task: Implement Gameplay & Controls Setup UI
+  - [x] Add UI rendering for Mouse Sensitivity, Invert Mouse Y, and Auto-Switch in `src/game_flow/ui.rs`
+  - [x] Connect mouse sensitivity and invert Y to camera rotation in `src/player/camera.rs` / `src/player/mod.rs`
+  - [x] Connect auto-switch setting to weapon management in `src/player/weapons.rs`
+- [x] Task: Phase 5 Verification & Checkpoint (Refer to workflow.md)
+  - [x] Verify camera mouse response adheres strictly to sensitivity and Invert Y settings
 
 ## Phase 6: Full Verification, Warnings Audit & Review
-- [ ] Task: Comprehensive Test Suite & Warning Audit
+- [~] Task: Comprehensive Test Suite & Warning Audit
   - [ ] Run `cargo check --tests` (ensure 0 compiler warnings)
   - [ ] Run full test suite (ensure 100% pass rate across all tests)
   - [ ] Review completed track with `conductor-review`
