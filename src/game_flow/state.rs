@@ -11,6 +11,10 @@ pub enum GamePhase {
     Paused,
     SaveMenu,
     LoadMenu,
+    OptionsMenu,
+    SoundSetup,
+    VideoSetup,
+    ControlsSetup,
 }
 
 #[derive(Resource, Debug, Clone, Copy, PartialEq, Eq)]
@@ -19,6 +23,15 @@ pub struct SaveLoadOrigin(pub GamePhase);
 impl Default for SaveLoadOrigin {
     fn default() -> Self {
         Self(GamePhase::Paused)
+    }
+}
+
+#[derive(Resource, Debug, Clone, Copy, PartialEq, Eq)]
+pub struct OptionsOrigin(pub GamePhase);
+
+impl Default for OptionsOrigin {
+    fn default() -> Self {
+        Self(GamePhase::MainMenu)
     }
 }
 

@@ -13,16 +13,16 @@
   - [x] Verify `config.json` reads and writes reliably with correct types and paths
 
 ## Phase 2: Game Flow State Machine & Navigation Infrastructure
-- [ ] Task: Write Tests for Options States & Submenu Navigation
-  - [ ] Unit test verifying navigation between MainMenu/Paused and OptionsMenu
-  - [ ] Unit test verifying navigation between OptionsMenu and Sound/Video/Controls submenus
-  - [ ] Unit test verifying cursor wrapping and Escape key returning to proper parent origin
-- [ ] Task: Implement Options Menu Phases & Cursor Handlers
-  - [ ] Add `OptionsMenu`, `SoundSetup`, `VideoSetup`, `ControlsSetup` to `GamePhase` in `src/game_flow/state.rs`
-  - [ ] Update `MenuCursor` navigation and Escape back-stack in `src/game_flow/menu.rs`
-  - [ ] Wire `OPTIONS` entry from Main Menu and Pause Menu
-- [ ] Task: Phase 2 Verification & Checkpoint (Refer to workflow.md)
-  - [ ] Verify keyboard navigation, cursor wrapping, and sub-menu transitions without state locks
+- [x] Task: Write Tests for Options States & Submenu Navigation
+  - [x] Unit test verifying navigation between MainMenu/Paused and OptionsMenu
+  - [x] Unit test verifying navigation between OptionsMenu and Sound/Video/Controls submenus
+  - [x] Unit test verifying cursor wrapping and Escape key returning to proper parent origin
+- [x] Task: Implement Options Menu Phases & Cursor Handlers
+  - [x] Add `OptionsMenu`, `SoundSetup`, `VideoSetup`, `ControlsSetup` to `GamePhase` in `src/game_flow/state.rs`
+  - [x] Update `MenuCursor` navigation and Escape back-stack in `src/game_flow/menu.rs`
+  - [x] Wire `OPTIONS` entry from Main Menu and Pause Menu
+- [x] Task: Phase 2 Verification & Checkpoint (Refer to workflow.md)
+  - [x] Verify keyboard navigation, cursor wrapping, and sub-menu transitions without state locks
 
 ## Phase 3: Sound Setup Submenu & Live Audio Volume Modulation
 - [ ] Task: Write Tests for Audio Settings & Slider Adjustments

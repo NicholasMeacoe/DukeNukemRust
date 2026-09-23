@@ -26,6 +26,7 @@ impl Plugin for GameFlowPlugin {
             .init_resource::<MenuCursor>()
             .init_resource::<CursorAnimTimer>()
             .init_resource::<SaveLoadOrigin>()
+            .init_resource::<OptionsOrigin>()
             .add_event::<LevelCompletedEvent>()
             .add_event::<LoadLevelEvent>()
             .add_systems(Startup, setup_menu_ui)
@@ -566,10 +567,10 @@ mod tests {
             app.world_mut().resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::Escape);
             app.update();
 
-            // Cursor reset to 0, max_items set to 5
+            // Cursor reset to 0, max_items set to 6
             let cursor = app.world().resource::<MenuCursor>();
             assert_eq!(cursor.selected_index, 0);
-            assert_eq!(cursor.max_items, 5);
+            assert_eq!(cursor.max_items, 6);
 
             // Transitions to Paused
             app.world_mut().resource_mut::<ButtonInput<KeyCode>>().reset_all();
@@ -618,4 +619,237 @@ mod tests {
             assert_eq!(*app.world().resource::<State<GamePhase>>().get(), GamePhase::MainMenu);
         }
     }
+
+    #[test]
+    fn test_navigation_between_main_menu_paused_and_options_menu() {
+        // MainMenu -> OptionsMenu -> MainMenu
+        {
+            let mut app = App::new();
+            app.add_plugins(MinimalPlugins);
+            app.add_plugins(bevy::state::app::StatesPlugin);
+            app.init_state::<GamePhase>();
+            app.init_resource::<ButtonInput<KeyCode>>();
+            app.init_resource::<MenuCursor>();
+            app.init_resource::<LevelProgress>();
+            app.init_resource::<SaveLoadOrigin>();
+            app.init_resource::<OptionsOrigin>();
+            app.init_resource::<crate::config::GameConfig>();
+            app.add_event::<crate::audio::PlaySoundEvent>();
+            app.add_event::<LoadLevelEvent>();
+            app.add_event::<crate::save::SaveGameEvent>();
+            app.add_event::<crate::save::LoadGameEvent>();
+            app.add_event::<bevy::app::AppExit>();
+            app.add_systems(Update, handle_menu_navigation);
+
+            app.update();
+            assert_eq!(*app.world().resource::<State<GamePhase>>().get(), GamePhase::MainMenu);
+
+            // Select index 1 (OPTIONS) and press Enter
+            app.world_mut().resource_mut::<MenuCursor>().selected_index = 1;
+            app.world_mut().resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::Enter);
+            app.update();
+            app.world_mut().resource_mut::<ButtonInput<KeyCode>>().reset_all();
+            app.update();
+
+            // Next state is OptionsMenu, origin is MainMenu
+            assert_eq!(*app.world().resource::<State<GamePhase>>().get(), GamePhase::OptionsMenu);
+            let origin = app.world().resource::<OptionsOrigin>();
+            assert_eq!(origin.0, GamePhase::MainMenu);
+            let cursor = app.world().resource::<MenuCursor>();
+            assert_eq!(cursor.selected_index, 0);
+            assert_eq!(cursor.max_items, 4);
+
+            // In OptionsMenu, press Escape -> back to MainMenu with cursor at index 1
+            app.world_mut().resource_mut::<ButtonInput<KeyCode>>().reset_all();
+            app.world_mut().resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::Escape);
+            app.update();
+            app.world_mut().resource_mut::<ButtonInput<KeyCode>>().reset_all();
+            app.update();
+
+            assert_eq!(*app.world().resource::<State<GamePhase>>().get(), GamePhase::MainMenu);
+            let cursor = app.world().resource::<MenuCursor>();
+            assert_eq!(cursor.selected_index, 1);
+            assert_eq!(cursor.max_items, 4);
+        }
+
+        // Paused -> OptionsMenu -> Paused
+        {
+            let mut app = App::new();
+            app.add_plugins(MinimalPlugins);
+            app.add_plugins(bevy::state::app::StatesPlugin);
+            app.init_state::<GamePhase>();
+            app.init_resource::<ButtonInput<KeyCode>>();
+            app.init_resource::<MenuCursor>();
+            app.init_resource::<LevelProgress>();
+            app.init_resource::<SaveLoadOrigin>();
+            app.init_resource::<OptionsOrigin>();
+            app.init_resource::<crate::config::GameConfig>();
+            app.add_event::<crate::audio::PlaySoundEvent>();
+            app.add_event::<LoadLevelEvent>();
+            app.add_event::<crate::save::SaveGameEvent>();
+            app.add_event::<crate::save::LoadGameEvent>();
+            app.add_event::<bevy::app::AppExit>();
+            app.add_systems(Update, handle_menu_navigation);
+
+            app.world_mut().resource_mut::<NextState<GamePhase>>().set(GamePhase::Paused);
+            app.update();
+            app.update();
+            assert_eq!(*app.world().resource::<State<GamePhase>>().get(), GamePhase::Paused);
+
+            // Select index 1 (OPTIONS in Paused) and press Space
+            app.world_mut().resource_mut::<MenuCursor>().selected_index = 1;
+            app.world_mut().resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::Space);
+            app.update();
+            app.world_mut().resource_mut::<ButtonInput<KeyCode>>().reset_all();
+            app.update();
+
+            assert_eq!(*app.world().resource::<State<GamePhase>>().get(), GamePhase::OptionsMenu);
+            let origin = app.world().resource::<OptionsOrigin>();
+            assert_eq!(origin.0, GamePhase::Paused);
+            let cursor = app.world().resource::<MenuCursor>();
+            assert_eq!(cursor.selected_index, 0);
+            assert_eq!(cursor.max_items, 4);
+
+            // In OptionsMenu, press Escape -> back to Paused with cursor at index 1, max_items = 6
+            app.world_mut().resource_mut::<ButtonInput<KeyCode>>().reset_all();
+            app.world_mut().resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::Escape);
+            app.update();
+            app.world_mut().resource_mut::<ButtonInput<KeyCode>>().reset_all();
+            app.update();
+
+            assert_eq!(*app.world().resource::<State<GamePhase>>().get(), GamePhase::Paused);
+            let cursor = app.world().resource::<MenuCursor>();
+            assert_eq!(cursor.selected_index, 1);
+            assert_eq!(cursor.max_items, 6);
+        }
+    }
+
+    #[test]
+    fn test_navigation_between_options_menu_and_submenus() {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins);
+        app.add_plugins(bevy::state::app::StatesPlugin);
+        app.init_state::<GamePhase>();
+        app.init_resource::<ButtonInput<KeyCode>>();
+        app.init_resource::<MenuCursor>();
+        app.init_resource::<LevelProgress>();
+        app.init_resource::<SaveLoadOrigin>();
+        app.init_resource::<OptionsOrigin>();
+        app.init_resource::<crate::config::GameConfig>();
+        app.add_event::<crate::audio::PlaySoundEvent>();
+        app.add_event::<LoadLevelEvent>();
+        app.add_event::<crate::save::SaveGameEvent>();
+        app.add_event::<crate::save::LoadGameEvent>();
+        app.add_event::<bevy::app::AppExit>();
+        app.add_systems(Update, handle_menu_navigation);
+
+        app.world_mut().resource_mut::<NextState<GamePhase>>().set(GamePhase::OptionsMenu);
+        app.update();
+        app.update();
+        assert_eq!(*app.world().resource::<State<GamePhase>>().get(), GamePhase::OptionsMenu);
+
+        // Submenu 0: Sound Setup
+        app.world_mut().resource_mut::<MenuCursor>().selected_index = 0;
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::Enter);
+        app.update();
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().reset_all();
+        app.update();
+        assert_eq!(*app.world().resource::<State<GamePhase>>().get(), GamePhase::SoundSetup);
+        assert_eq!(app.world().resource::<MenuCursor>().max_items, 4);
+
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().reset_all();
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::Escape);
+        app.update();
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().reset_all();
+        app.update();
+        assert_eq!(*app.world().resource::<State<GamePhase>>().get(), GamePhase::OptionsMenu);
+        assert_eq!(app.world().resource::<MenuCursor>().selected_index, 0);
+
+        // Submenu 1: Video & Display
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().reset_all();
+        app.world_mut().resource_mut::<MenuCursor>().selected_index = 1;
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::Enter);
+        app.update();
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().reset_all();
+        app.update();
+        assert_eq!(*app.world().resource::<State<GamePhase>>().get(), GamePhase::VideoSetup);
+        assert_eq!(app.world().resource::<MenuCursor>().max_items, 4);
+
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().reset_all();
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::Escape);
+        app.update();
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().reset_all();
+        app.update();
+        assert_eq!(*app.world().resource::<State<GamePhase>>().get(), GamePhase::OptionsMenu);
+        assert_eq!(app.world().resource::<MenuCursor>().selected_index, 1);
+
+        // Submenu 2: Controls Setup
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().reset_all();
+        app.world_mut().resource_mut::<MenuCursor>().selected_index = 2;
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::Enter);
+        app.update();
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().reset_all();
+        app.update();
+        assert_eq!(*app.world().resource::<State<GamePhase>>().get(), GamePhase::ControlsSetup);
+        assert_eq!(app.world().resource::<MenuCursor>().max_items, 4);
+
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().reset_all();
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::Escape);
+        app.update();
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().reset_all();
+        app.update();
+        assert_eq!(*app.world().resource::<State<GamePhase>>().get(), GamePhase::OptionsMenu);
+        assert_eq!(app.world().resource::<MenuCursor>().selected_index, 2);
+    }
+
+    #[test]
+    fn test_options_menu_cursor_wrapping_and_restore_defaults() {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins);
+        app.add_plugins(bevy::state::app::StatesPlugin);
+        app.init_state::<GamePhase>();
+        app.init_resource::<ButtonInput<KeyCode>>();
+        app.init_resource::<MenuCursor>();
+        app.init_resource::<LevelProgress>();
+        app.init_resource::<SaveLoadOrigin>();
+        app.init_resource::<OptionsOrigin>();
+        let mut initial_config = crate::config::GameConfig::default();
+        initial_config.sound.master_volume = 0.2;
+        initial_config.video.crt_enabled = true;
+        app.insert_resource(initial_config);
+        app.add_event::<crate::audio::PlaySoundEvent>();
+        app.add_event::<LoadLevelEvent>();
+        app.add_event::<crate::save::SaveGameEvent>();
+        app.add_event::<crate::save::LoadGameEvent>();
+        app.add_event::<bevy::app::AppExit>();
+        app.add_systems(Update, handle_menu_navigation);
+
+        app.world_mut().resource_mut::<NextState<GamePhase>>().set(GamePhase::OptionsMenu);
+        app.update();
+
+        // Wrapping up from 0 to 3
+        app.world_mut().resource_mut::<MenuCursor>().selected_index = 0;
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::ArrowUp);
+        app.update();
+        assert_eq!(app.world().resource::<MenuCursor>().selected_index, 3);
+
+        // Wrapping down from 3 to 0
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().reset_all();
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::ArrowDown);
+        app.update();
+        assert_eq!(app.world().resource::<MenuCursor>().selected_index, 0);
+
+        // Select index 3 (RESTORE DEFAULTS) and press Enter
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().reset_all();
+        app.world_mut().resource_mut::<MenuCursor>().selected_index = 3;
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::Enter);
+        app.update();
+
+        let cfg = app.world().resource::<crate::config::GameConfig>();
+        assert_eq!(cfg.sound.master_volume, 1.0);
+        assert!(!cfg.video.crt_enabled);
+
+        let _ = std::fs::remove_file(crate::config::GameConfig::default_config_path());
+    }
 }
+

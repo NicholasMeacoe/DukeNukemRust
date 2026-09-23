@@ -155,6 +155,8 @@ pub fn update_menu_ui(
     progress: Res<LevelProgress>,
     anim_state: Res<crate::game_flow::intermission::IntermissionAnimationState>,
     save_mgr: Option<Res<crate::save::SaveManager>>,
+    options_origin: Option<Res<OptionsOrigin>>,
+    _game_config: Option<Res<crate::config::GameConfig>>,
     mut root_query: Query<(&mut Style, &mut BackgroundColor), With<MenuUiRoot>>,
     mut row_query: Query<(&mut Style, &MenuItemRow), Without<MenuUiRoot>>,
     mut header_query: Query<
@@ -221,11 +223,20 @@ pub fn update_menu_ui(
     root_style.display = Display::Flex;
 
     // Semi-transparent backdrop for pause/intermission/save/load vs dark for main menu
-    if current_phase == GamePhase::Paused
+    let is_paused_backdrop = current_phase == GamePhase::Paused
         || current_phase == GamePhase::SaveMenu
         || current_phase == GamePhase::LoadMenu
         || current_phase == GamePhase::Intermission
-    {
+        || (options_origin.as_ref().map_or(false, |o| o.0 == GamePhase::Paused)
+            && matches!(
+                current_phase,
+                GamePhase::OptionsMenu
+                    | GamePhase::SoundSetup
+                    | GamePhase::VideoSetup
+                    | GamePhase::ControlsSetup
+            ));
+
+    if is_paused_backdrop {
         root_bg.0 = Color::srgba(0.02, 0.02, 0.04, 0.82);
     } else {
         root_bg.0 = Color::srgba(0.04, 0.04, 0.07, 0.95);
@@ -251,6 +262,10 @@ pub fn update_menu_ui(
             GamePhase::Paused => "OPTIONS & STATUS".to_string(),
             GamePhase::SaveMenu => "SAVE GAME".to_string(),
             GamePhase::LoadMenu => "LOAD GAME".to_string(),
+            GamePhase::OptionsMenu => "OPTIONS".to_string(),
+            GamePhase::SoundSetup => "SOUND SETUP".to_string(),
+            GamePhase::VideoSetup => "VIDEO & DISPLAY".to_string(),
+            GamePhase::ControlsSetup => "GAMEPLAY & CONTROLS".to_string(),
             GamePhase::Intermission => "MISSION STATISTICS".to_string(),
             _ => "".to_string(),
         };
@@ -263,6 +278,10 @@ pub fn update_menu_ui(
             GamePhase::MainMenu => "USE ARROWS / W/S TO MOVE • ENTER TO SELECT".to_string(),
             GamePhase::SaveMenu | GamePhase::LoadMenu => {
                 "ENTER: CONFIRM • ESC: BACK • UP/DOWN: SELECT SLOT".to_string()
+            }
+            GamePhase::OptionsMenu => "USE ARROWS / W/S TO MOVE • ENTER TO SELECT • ESC TO BACK".to_string(),
+            GamePhase::SoundSetup | GamePhase::VideoSetup | GamePhase::ControlsSetup => {
+                "ARROWS TO NAVIGATE / ADJUST • ENTER TO TOGGLE • ESC TO BACK".to_string()
             }
             _ => "USE ARROWS / W/S TO MOVE • ENTER TO SELECT • ESC TO GO BACK".to_string(),
         };
@@ -372,10 +391,17 @@ pub fn update_menu_ui(
                 ],
                 GamePhase::Paused => &[
                     "RESUME GAME",
+                    "OPTIONS",
                     "SAVE GAME",
                     "LOAD GAME",
                     "MAIN MENU",
                     "QUIT TO DESKTOP",
+                ],
+                GamePhase::OptionsMenu => &[
+                    "SOUND SETUP",
+                    "VIDEO & DISPLAY",
+                    "GAMEPLAY & CONTROLS",
+                    "RESTORE DEFAULTS",
                 ],
                 _ => &[],
             };

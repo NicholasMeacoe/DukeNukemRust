@@ -40,6 +40,23 @@ pub fn update_cursor_animation(time: Res<Time>, mut anim: ResMut<CursorAnimTimer
     }
 }
 
+#[derive(bevy::ecs::system::SystemParam)]
+pub struct MenuEvents<'w> {
+    pub sound_events: EventWriter<'w, PlaySoundEvent>,
+    pub load_level_events: EventWriter<'w, LoadLevelEvent>,
+    pub save_game_events: EventWriter<'w, crate::save::SaveGameEvent>,
+    pub load_game_events: EventWriter<'w, crate::save::LoadGameEvent>,
+    pub app_exit: EventWriter<'w, AppExit>,
+}
+
+#[derive(bevy::ecs::system::SystemParam)]
+pub struct MenuEngineConfigs<'w> {
+    pub game_config: Option<ResMut<'w, crate::config::GameConfig>>,
+    pub crt_config: Option<ResMut<'w, crate::palette::CrtPostProcessConfig>>,
+    pub voxel_config: Option<ResMut<'w, crate::voxel::registry::VoxelConfig>>,
+    pub lighting_config: Option<ResMut<'w, crate::lighting::DynamicLightingConfig>>,
+}
+
 pub fn handle_menu_navigation(
     keys: Res<ButtonInput<KeyCode>>,
     mut next_state: ResMut<NextState<GamePhase>>,
@@ -47,12 +64,10 @@ pub fn handle_menu_navigation(
     mut cursor: ResMut<MenuCursor>,
     mut progress: ResMut<LevelProgress>,
     mut save_load_origin: Option<ResMut<SaveLoadOrigin>>,
-    mut sound_events: EventWriter<PlaySoundEvent>,
-    mut load_level_events: EventWriter<LoadLevelEvent>,
-    mut save_game_events: EventWriter<crate::save::SaveGameEvent>,
-    mut load_game_events: EventWriter<crate::save::LoadGameEvent>,
-    mut app_exit: EventWriter<AppExit>,
+    mut options_origin: Option<ResMut<OptionsOrigin>>,
+    mut events: MenuEvents,
     mut save_mgr: Option<ResMut<crate::save::SaveManager>>,
+    mut configs: MenuEngineConfigs,
 ) {
     let current_phase = *state.get();
 
@@ -60,8 +75,8 @@ pub fn handle_menu_navigation(
     if current_phase == GamePhase::Playing {
         if keys.just_pressed(KeyCode::Escape) {
             cursor.selected_index = 0;
-            cursor.max_items = 5;
-            sound_events.send(PlaySoundEvent { sound_id: 2 });
+            cursor.max_items = 6;
+            events.sound_events.send(PlaySoundEvent { sound_id: 2 });
             next_state.set(GamePhase::Paused);
         }
         return;
@@ -76,7 +91,13 @@ pub fn handle_menu_navigation(
             cursor.max_items = 4;
         }
         GamePhase::Paused => {
-            cursor.max_items = 5;
+            cursor.max_items = 6;
+        }
+        GamePhase::OptionsMenu
+        | GamePhase::SoundSetup
+        | GamePhase::VideoSetup
+        | GamePhase::ControlsSetup => {
+            cursor.max_items = 4;
         }
         GamePhase::SaveMenu | GamePhase::LoadMenu => {
             cursor.max_items = 10;
@@ -105,18 +126,26 @@ pub fn handle_menu_navigation(
     }
 
     if moved {
-        sound_events.send(PlaySoundEvent { sound_id: 0 });
+        events.sound_events.send(PlaySoundEvent { sound_id: 0 });
     }
 
     match current_phase {
         GamePhase::MainMenu => {
             cursor.max_items = 4; // 0: New Game, 1: Options, 2: Load Game, 3: Quit
             if keys.just_pressed(KeyCode::Enter) || keys.just_pressed(KeyCode::Space) {
-                sound_events.send(PlaySoundEvent { sound_id: 2 });
+                events.sound_events.send(PlaySoundEvent { sound_id: 2 });
                 match cursor.selected_index {
                     0 => {
                         cursor.selected_index = 0;
                         next_state.set(GamePhase::EpisodeSelect);
+                    }
+                    1 => {
+                        cursor.selected_index = 0;
+                        cursor.max_items = 4;
+                        if let Some(ref mut o) = options_origin {
+                            o.0 = GamePhase::MainMenu;
+                        }
+                        next_state.set(GamePhase::OptionsMenu);
                     }
                     2 => {
                         cursor.selected_index = 0;
@@ -127,7 +156,7 @@ pub fn handle_menu_navigation(
                         next_state.set(GamePhase::LoadMenu);
                     }
                     3 => {
-                        app_exit.send(AppExit::Success);
+                        events.app_exit.send(AppExit::Success);
                     }
                     _ => {}
                 }
@@ -137,10 +166,10 @@ pub fn handle_menu_navigation(
             cursor.max_items = 4; // E1, E2, E3, E4
             if keys.just_pressed(KeyCode::Escape) {
                 cursor.selected_index = 0;
-                sound_events.send(PlaySoundEvent { sound_id: 0 });
+                events.sound_events.send(PlaySoundEvent { sound_id: 0 });
                 next_state.set(GamePhase::MainMenu);
             } else if keys.just_pressed(KeyCode::Enter) || keys.just_pressed(KeyCode::Space) {
-                sound_events.send(PlaySoundEvent { sound_id: 2 });
+                events.sound_events.send(PlaySoundEvent { sound_id: 2 });
                 progress.current_episode = cursor.selected_index + 1;
                 cursor.selected_index = 1; // Default to "Let's Rock"
                 next_state.set(GamePhase::SkillSelect);
@@ -150,10 +179,10 @@ pub fn handle_menu_navigation(
             cursor.max_items = 4; // Piece of Cake, Let's Rock, Come Get Some, Damn I'm Good
             if keys.just_pressed(KeyCode::Escape) {
                 cursor.selected_index = 0;
-                sound_events.send(PlaySoundEvent { sound_id: 0 });
+                events.sound_events.send(PlaySoundEvent { sound_id: 0 });
                 next_state.set(GamePhase::EpisodeSelect);
             } else if keys.just_pressed(KeyCode::Enter) || keys.just_pressed(KeyCode::Space) {
-                sound_events.send(PlaySoundEvent { sound_id: 2 });
+                events.sound_events.send(PlaySoundEvent { sound_id: 2 });
                 progress.skill = match cursor.selected_index {
                     0 => SkillLevel::PieceOfCake,
                     1 => SkillLevel::LetsRock,
@@ -161,7 +190,7 @@ pub fn handle_menu_navigation(
                     _ => SkillLevel::DamnImGood,
                 };
                 progress.current_level = 1;
-                load_level_events.send(LoadLevelEvent {
+                events.load_level_events.send(LoadLevelEvent {
                     episode: progress.current_episode,
                     level: 1,
                 });
@@ -169,23 +198,23 @@ pub fn handle_menu_navigation(
             }
         }
         GamePhase::Paused => {
-            cursor.max_items = 5; // 0: Resume, 1: Save Game, 2: Load Game, 3: Main Menu, 4: Quit
+            cursor.max_items = 6; // 0: Resume, 1: Options, 2: Save Game, 3: Load Game, 4: Main Menu, 5: Quit
             if keys.just_pressed(KeyCode::Escape) {
-                sound_events.send(PlaySoundEvent { sound_id: 2 });
+                events.sound_events.send(PlaySoundEvent { sound_id: 2 });
                 next_state.set(GamePhase::Playing);
             } else if keys.just_pressed(KeyCode::Enter) || keys.just_pressed(KeyCode::Space) {
-                sound_events.send(PlaySoundEvent { sound_id: 2 });
+                events.sound_events.send(PlaySoundEvent { sound_id: 2 });
                 match cursor.selected_index {
                     0 => {
                         next_state.set(GamePhase::Playing);
                     }
                     1 => {
                         cursor.selected_index = 0;
-                        cursor.max_items = 10;
-                        if let Some(ref mut o) = save_load_origin {
+                        cursor.max_items = 4;
+                        if let Some(ref mut o) = options_origin {
                             o.0 = GamePhase::Paused;
                         }
-                        next_state.set(GamePhase::SaveMenu);
+                        next_state.set(GamePhase::OptionsMenu);
                     }
                     2 => {
                         cursor.selected_index = 0;
@@ -193,15 +222,23 @@ pub fn handle_menu_navigation(
                         if let Some(ref mut o) = save_load_origin {
                             o.0 = GamePhase::Paused;
                         }
-                        next_state.set(GamePhase::LoadMenu);
+                        next_state.set(GamePhase::SaveMenu);
                     }
                     3 => {
+                        cursor.selected_index = 0;
+                        cursor.max_items = 10;
+                        if let Some(ref mut o) = save_load_origin {
+                            o.0 = GamePhase::Paused;
+                        }
+                        next_state.set(GamePhase::LoadMenu);
+                    }
+                    4 => {
                         cursor.selected_index = 0;
                         cursor.max_items = 4;
                         next_state.set(GamePhase::MainMenu);
                     }
-                    4 => {
-                        app_exit.send(AppExit::Success);
+                    5 => {
+                        events.app_exit.send(AppExit::Success);
                     }
                     _ => {}
                 }
@@ -211,14 +248,14 @@ pub fn handle_menu_navigation(
             cursor.max_items = 10;
             let origin_phase = save_load_origin.as_ref().map_or(GamePhase::Paused, |o| o.0);
             if keys.just_pressed(KeyCode::Escape) {
-                sound_events.send(PlaySoundEvent { sound_id: 0 });
+                events.sound_events.send(PlaySoundEvent { sound_id: 0 });
                 cursor.selected_index = 0;
-                cursor.max_items = if origin_phase == GamePhase::MainMenu { 4 } else { 5 };
+                cursor.max_items = if origin_phase == GamePhase::MainMenu { 4 } else { 6 };
                 next_state.set(origin_phase);
             } else if keys.just_pressed(KeyCode::Enter) || keys.just_pressed(KeyCode::Space) {
                 let slot = cursor.selected_index;
                 if slot < 10 {
-                    sound_events.send(PlaySoundEvent { sound_id: 2 });
+                    events.sound_events.send(PlaySoundEvent { sound_id: 2 });
                     let min = (progress.level_time_seconds / 60.0) as i32;
                     let sec = (progress.level_time_seconds % 60.0) as i32;
                     let title = format!(
@@ -231,7 +268,7 @@ pub fn handle_menu_navigation(
                             sm.save_slots_info[slot] = Some(title.clone());
                         }
                     }
-                    save_game_events.send(crate::save::SaveGameEvent {
+                    events.save_game_events.send(crate::save::SaveGameEvent {
                         slot: Some(slot),
                         title,
                     });
@@ -243,9 +280,9 @@ pub fn handle_menu_navigation(
             cursor.max_items = 10;
             let origin_phase = save_load_origin.as_ref().map_or(GamePhase::Paused, |o| o.0);
             if keys.just_pressed(KeyCode::Escape) {
-                sound_events.send(PlaySoundEvent { sound_id: 0 });
+                events.sound_events.send(PlaySoundEvent { sound_id: 0 });
                 cursor.selected_index = 0;
-                cursor.max_items = if origin_phase == GamePhase::MainMenu { 4 } else { 5 };
+                cursor.max_items = if origin_phase == GamePhase::MainMenu { 4 } else { 6 };
                 next_state.set(origin_phase);
             } else if keys.just_pressed(KeyCode::Enter) || keys.just_pressed(KeyCode::Space) {
                 let slot = cursor.selected_index;
@@ -255,13 +292,97 @@ pub fn handle_menu_navigation(
                             .as_ref()
                             .map_or(false, |m| m.save_slots_info[slot].is_some());
                     if has_save {
-                        sound_events.send(PlaySoundEvent { sound_id: 2 });
-                        load_game_events.send(crate::save::LoadGameEvent {
+                        events.sound_events.send(PlaySoundEvent { sound_id: 2 });
+                        events.load_game_events.send(crate::save::LoadGameEvent {
                             slot: Some(slot),
                         });
                         next_state.set(GamePhase::Playing);
                     }
                 }
+            }
+        }
+        GamePhase::OptionsMenu => {
+            cursor.max_items = 4; // 0: Sound Setup, 1: Video & Display, 2: Gameplay & Controls, 3: Restore Defaults
+            let origin_phase = options_origin.as_ref().map_or(GamePhase::MainMenu, |o| o.0);
+            if keys.just_pressed(KeyCode::Escape) {
+                events.sound_events.send(PlaySoundEvent { sound_id: 0 });
+                cursor.selected_index = 1; // Back to OPTIONS on parent menu
+                cursor.max_items = if origin_phase == GamePhase::MainMenu { 4 } else { 6 };
+                if let Some(ref cfg) = configs.game_config {
+                    let _ = cfg.save(crate::config::GameConfig::default_config_path());
+                }
+                next_state.set(origin_phase);
+            } else if keys.just_pressed(KeyCode::Enter) || keys.just_pressed(KeyCode::Space) {
+                events.sound_events.send(PlaySoundEvent { sound_id: 2 });
+                match cursor.selected_index {
+                    0 => {
+                        cursor.selected_index = 0;
+                        cursor.max_items = 4;
+                        next_state.set(GamePhase::SoundSetup);
+                    }
+                    1 => {
+                        cursor.selected_index = 0;
+                        cursor.max_items = 4;
+                        next_state.set(GamePhase::VideoSetup);
+                    }
+                    2 => {
+                        cursor.selected_index = 0;
+                        cursor.max_items = 4;
+                        next_state.set(GamePhase::ControlsSetup);
+                    }
+                    3 => {
+                        if let Some(ref mut cfg) = configs.game_config {
+                            **cfg = crate::config::GameConfig::default();
+                            let _ = cfg.save(crate::config::GameConfig::default_config_path());
+                        }
+                        if let Some(ref mut crt) = configs.crt_config {
+                            crt.enabled = false;
+                        }
+                        if let Some(ref mut vox) = configs.voxel_config {
+                            vox.enabled = true;
+                        }
+                        if let Some(ref mut light) = configs.lighting_config {
+                            light.enabled = true;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+        GamePhase::SoundSetup => {
+            cursor.max_items = 4;
+            if keys.just_pressed(KeyCode::Escape) {
+                events.sound_events.send(PlaySoundEvent { sound_id: 0 });
+                cursor.selected_index = 0;
+                cursor.max_items = 4;
+                if let Some(ref cfg) = configs.game_config {
+                    let _ = cfg.save(crate::config::GameConfig::default_config_path());
+                }
+                next_state.set(GamePhase::OptionsMenu);
+            }
+        }
+        GamePhase::VideoSetup => {
+            cursor.max_items = 4;
+            if keys.just_pressed(KeyCode::Escape) {
+                events.sound_events.send(PlaySoundEvent { sound_id: 0 });
+                cursor.selected_index = 1;
+                cursor.max_items = 4;
+                if let Some(ref cfg) = configs.game_config {
+                    let _ = cfg.save(crate::config::GameConfig::default_config_path());
+                }
+                next_state.set(GamePhase::OptionsMenu);
+            }
+        }
+        GamePhase::ControlsSetup => {
+            cursor.max_items = 4;
+            if keys.just_pressed(KeyCode::Escape) {
+                events.sound_events.send(PlaySoundEvent { sound_id: 0 });
+                cursor.selected_index = 2;
+                cursor.max_items = 4;
+                if let Some(ref cfg) = configs.game_config {
+                    let _ = cfg.save(crate::config::GameConfig::default_config_path());
+                }
+                next_state.set(GamePhase::OptionsMenu);
             }
         }
         _ => {}
