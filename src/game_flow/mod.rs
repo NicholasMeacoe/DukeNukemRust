@@ -1406,5 +1406,53 @@ mod tests {
         let events: Vec<_> = reader.read(sound_events).collect();
         assert!(events.iter().any(|e| e.sound_id == crate::audio::sound_defs::BONUS_SPEECH1));
     }
+
+    #[test]
+    fn test_episode_4_selection_in_menu_and_launch() {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins);
+        app.add_plugins(bevy::state::app::StatesPlugin);
+        app.init_state::<GamePhase>();
+        app.init_resource::<ButtonInput<KeyCode>>();
+        app.init_resource::<MenuCursor>();
+        app.init_resource::<LevelProgress>();
+        app.add_event::<crate::audio::PlaySoundEvent>();
+        app.add_event::<LoadLevelEvent>();
+        app.add_event::<crate::save::SaveGameEvent>();
+        app.add_event::<crate::save::LoadGameEvent>();
+        app.add_event::<bevy::app::AppExit>();
+        app.add_systems(Update, handle_menu_navigation);
+
+        // 1. Transition to EpisodeSelect
+        app.world_mut().resource_mut::<NextState<GamePhase>>().set(GamePhase::EpisodeSelect);
+        app.update();
+
+        // 2. Select Episode 4: "4: THE PLUTONIUM PAK" (index 3)
+        app.world_mut().resource_mut::<MenuCursor>().selected_index = 3;
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::Enter);
+        app.update();
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().reset_all();
+        app.update();
+
+        // Verify state changed to SkillSelect and progress episode is 4
+        assert_eq!(app.world().resource::<LevelProgress>().current_episode, 4);
+        assert_eq!(*app.world().resource::<State<GamePhase>>().get(), GamePhase::SkillSelect);
+
+        // 3. Confirm skill level (Let's Rock) to launch game
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::Enter);
+        app.update();
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().reset_all();
+        app.update();
+
+        assert_eq!(*app.world().resource::<State<GamePhase>>().get(), GamePhase::Playing);
+        assert_eq!(app.world().resource::<LevelProgress>().current_level, 1);
+
+        let load_events = app.world().resource::<Events<LoadLevelEvent>>();
+        let mut reader = load_events.get_reader();
+        let events: Vec<_> = reader.read(load_events).cloned().collect();
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].episode, 4);
+        assert_eq!(events[0].level, 1);
+    }
 }
 

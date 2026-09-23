@@ -18,12 +18,14 @@ pub fn calculate_sky_tile_repeats(tile_width: u32) -> f32 {
 /// - Episode 1 ("L.A. Meltdown"): LA_SKY (#89)
 /// - Episode 2 ("Lunar Apocalypse"): MOONSKY1 (#80)
 /// - Episode 3 ("Shrapnel City"): CITY_SKY / BIGORBIT1 (#84)
-/// - Episode 4 / Default: LA_SKY (#89)
+/// - Episode 4 ("The Birth" / Plutonium Pak): REDSKY1 (#98)
+/// - Default: LA_SKY (#89)
 pub fn sky_tile_for_episode(episode: usize) -> i16 {
     match episode {
         1 => crate::names::LA_SKY,
         2 => crate::names::MOONSKY1,
         3 => crate::names::CITY_SKY,
+        4 => crate::names::REDSKY1,
         _ => crate::names::LA_SKY,
     }
 }
@@ -144,7 +146,7 @@ mod tests {
         assert_eq!(sky_tile_for_episode(1), crate::names::LA_SKY);
         assert_eq!(sky_tile_for_episode(2), crate::names::MOONSKY1);
         assert_eq!(sky_tile_for_episode(3), crate::names::CITY_SKY);
-        assert_eq!(sky_tile_for_episode(4), crate::names::LA_SKY);
+        assert_eq!(sky_tile_for_episode(4), crate::names::REDSKY1);
         assert_eq!(sky_tile_for_episode(99), crate::names::LA_SKY);
     }
 }

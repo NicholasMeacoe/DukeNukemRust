@@ -35,14 +35,14 @@
   - [x] Verify seamless map navigation from E4L1 through E4L10 and secret level warping
 
 ## Phase 4: Episode 4 Atmospheric Red Skybox & Menu Pipeline Integration
-- [ ] Task: Write Tests for Episode 4 Skybox & Menu Episode 4 Selection
-  - [ ] Unit test verifying `sky_tile_for_episode(4)` returns `REDSKY1` (#98)
-  - [ ] Unit test verifying Episode Select menu index 3 selects Episode 4 and initializes level 1
-- [ ] Task: Implement `sky_tile_for_episode(4)` & Menu Navigation
-  - [ ] Update `src/sky.rs` `sky_tile_for_episode(4)` to return `crate::names::REDSKY1`
-  - [ ] Verify Episode 4 selection in `src/game_flow/menu.rs` dispatches `LoadLevelEvent { episode: 4, level: 1 }`
-- [ ] Task: Phase 4 Verification & Checkpoint (Refer to workflow.md)
-  - [ ] Verify Episode 4 loads with authentic red atmospheric sky
+- [x] Task: Write Tests for Episode 4 Skybox & Menu Episode 4 Selection
+  - [x] Unit test verifying `sky_tile_for_episode(4)` returns `REDSKY1` (#98)
+  - [x] Unit test verifying Episode Select menu index 3 selects Episode 4 and initializes level 1
+- [x] Task: Implement `sky_tile_for_episode(4)` & Menu Navigation
+  - [x] Update `src/sky.rs` `sky_tile_for_episode(4)` to return `crate::names::REDSKY1`
+  - [x] Verify Episode 4 selection in `src/game_flow/menu.rs` dispatches `LoadLevelEvent { episode: 4, level: 1 }`
+- [x] Task: Phase 4 Verification & Checkpoint (Refer to workflow.md)
+  - [x] Verify Episode 4 loads with authentic red atmospheric sky
 
 ## Phase 5: Full Verification, Warnings Audit & Review
 - [ ] Task: Comprehensive Test Suite & Warning Audit
