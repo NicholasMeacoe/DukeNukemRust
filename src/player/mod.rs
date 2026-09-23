@@ -691,5 +691,139 @@ mod tests {
         );
         assert_eq!(protected_player.inventory.boots_amount, 99);
     }
+
+    #[test]
+    fn test_player_water_boundary_crossing_sound_and_screen_tint() {
+        let mut app = App::new();
+        app.init_resource::<Time>();
+        app.init_resource::<ButtonInput<KeyCode>>();
+        app.init_resource::<Events<crate::audio::PlaySoundEvent>>();
+        app.init_resource::<crate::hud::ScreenTintState>();
+
+        // Camera
+        app.world_mut().spawn(Camera3dBundle::default());
+
+        // Create sector map with lotag 1 (water surface) and lotag 2 (underwater)
+        let map = crate::map::Map {
+            version: 7,
+            posx: 0,
+            posy: 0,
+            posz: 0,
+            ang: 0,
+            cursectnum: 0,
+            sectors: vec![
+                crate::map::Sector {
+                    wallptr: 0,
+                    wallnum: 4,
+                    ceilingz: -16384,
+                    floorz: 0,
+                    ceilingstat: 0,
+                    floorstat: 0,
+                    ceilingpicnum: 0,
+                    ceilingheinum: 0,
+                    ceilingshade: 0,
+                    ceilingpal: 0,
+                    ceilingxpanning: 0,
+                    ceilingypanning: 0,
+                    floorpicnum: 336,
+                    floorheinum: 0,
+                    floorshade: 0,
+                    floorpal: 0,
+                    floorxpanning: 0,
+                    floorypanning: 0,
+                    visibility: 0,
+                    _filler: 0,
+                    lotag: 1, // Water surface
+                    hitag: 0,
+                    extra: -1,
+                },
+                crate::map::Sector {
+                    wallptr: 0,
+                    wallnum: 4,
+                    ceilingz: 0,
+                    floorz: 16384,
+                    ceilingstat: 0,
+                    floorstat: 0,
+                    ceilingpicnum: 336,
+                    ceilingheinum: 0,
+                    ceilingshade: 0,
+                    ceilingpal: 0,
+                    ceilingxpanning: 0,
+                    ceilingypanning: 0,
+                    floorpicnum: 0,
+                    floorheinum: 0,
+                    floorshade: 0,
+                    floorpal: 0,
+                    floorxpanning: 0,
+                    floorypanning: 0,
+                    visibility: 0,
+                    _filler: 0,
+                    lotag: 2, // Submerged underwater
+                    hitag: 0,
+                    extra: -1,
+                },
+            ],
+            walls: vec![
+                crate::map::Wall { x: 0, y: 0, point2: 1, nextwall: -1, nextsector: -1, cstat: 0, picnum: 0, overpicnum: 0, shade: 0, pal: 0, xrepeat: 8, yrepeat: 8, xpanning: 0, ypanning: 0, lotag: 0, hitag: 0, extra: 0 },
+                crate::map::Wall { x: 1024, y: 0, point2: 2, nextwall: -1, nextsector: -1, cstat: 0, picnum: 0, overpicnum: 0, shade: 0, pal: 0, xrepeat: 8, yrepeat: 8, xpanning: 0, ypanning: 0, lotag: 0, hitag: 0, extra: 0 },
+                crate::map::Wall { x: 1024, y: 1024, point2: 3, nextwall: -1, nextsector: -1, cstat: 0, picnum: 0, overpicnum: 0, shade: 0, pal: 0, xrepeat: 8, yrepeat: 8, xpanning: 0, ypanning: 0, lotag: 0, hitag: 0, extra: 0 },
+                crate::map::Wall { x: 0, y: 1024, point2: 0, nextwall: -1, nextsector: -1, cstat: 0, picnum: 0, overpicnum: 0, shade: 0, pal: 0, xrepeat: 8, yrepeat: 8, xpanning: 0, ypanning: 0, lotag: 0, hitag: 0, extra: 0 },
+            ],
+            sprites: Vec::new(),
+        };
+        let sector_map = crate::sector_map::SectorMap::from_map(&map);
+        app.insert_resource(sector_map);
+
+        let player = PlayerController::default();
+        let player_entity = app.world_mut().spawn((
+            player,
+            TransformBundle::from_transform(Transform::from_xyz(0.5, 0.0, 0.5)),
+            bevy_rapier3d::prelude::KinematicCharacterController::default(),
+            crate::sector_map::CurrentSector(0),
+        )).id();
+
+        app.add_systems(Update, movement::update_player_movement);
+
+        // Step 1: Initial frame, player enters water sector (lotag 1) -> triggers splash sound 112 & particles!
+        app.update();
+
+        let p1 = app.world().get::<PlayerController>(player_entity).unwrap();
+        assert_eq!(p1.movement_mode, PlayerMovementMode::Swimming);
+
+        let sound_events = app.world().resource::<Events<crate::audio::PlaySoundEvent>>();
+        let mut reader = sound_events.get_reader();
+        let events: Vec<_> = reader.read(sound_events).collect();
+        assert!(events.iter().any(|e| e.sound_id == 112), "Water entry must trigger splash sound 112");
+
+        let mut splash_query = app.world_mut().query::<&crate::interactivity::WaterSplashParticle>();
+        assert!(splash_query.iter(app.world()).count() > 0, "Water entry must spawn splash particles");
+
+        // Step 2: Player dives (enters lotag 2 underwater sector) -> diving blue tint
+        {
+            let mut sec = app.world_mut().get_mut::<crate::sector_map::CurrentSector>(player_entity).unwrap();
+            sec.0 = 1; // Sector 1 is lotag 2 (underwater)
+        }
+        app.update();
+
+        let p2 = app.world().get::<PlayerController>(player_entity).unwrap();
+        assert_eq!(p2.movement_mode, PlayerMovementMode::Diving);
+
+        let tint = app.world().resource::<crate::hud::ScreenTintState>();
+        assert!((tint.target_color.to_srgba().blue - 0.60).abs() < 0.01, "Diving must activate blue screen tint");
+        assert!((tint.target_color.to_srgba().alpha - 0.30).abs() < 0.01, "Diving tint alpha must be 0.30");
+
+        // Step 3: Player emerges out of water into dry sector (CurrentSector(-1))
+        {
+            let mut sec = app.world_mut().get_mut::<crate::sector_map::CurrentSector>(player_entity).unwrap();
+            sec.0 = -1; // Out of water
+        }
+        app.update();
+
+        let p3 = app.world().get::<PlayerController>(player_entity).unwrap();
+        assert_eq!(p3.movement_mode, PlayerMovementMode::Standing);
+
+        let tint = app.world().resource::<crate::hud::ScreenTintState>();
+        assert_eq!(tint.target_color, Color::NONE, "Exiting water must clear screen tint");
+    }
 }
 

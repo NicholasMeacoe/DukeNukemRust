@@ -97,6 +97,7 @@ pub fn update_projectiles(
     mut wall_damage_events: EventWriter<crate::interactivity::WallDamageEvent>,
     rapier_context: Option<Res<RapierContext>>,
     mut gib_events: EventWriter<GibEvent>,
+    water_surfaces: Query<&crate::interactivity::WaterSurface>,
 ) {
     let dt = time.delta_seconds();
 
@@ -256,6 +257,30 @@ pub fn update_projectiles(
             }
         } else {
             trans.translation += step_vec;
+        }
+
+        let new_pos = trans.translation;
+        if !hit_wall && hit_enemy_entity.is_none() && hit_player_entity.is_none() {
+            for ws in water_surfaces.iter() {
+                let crossed_down = old_pos.y > ws.elevation && new_pos.y <= ws.elevation;
+                let crossed_up = old_pos.y < ws.elevation && new_pos.y >= ws.elevation;
+                if crossed_down || crossed_up {
+                    let splash_pos = Vec3::new(new_pos.x, ws.elevation, new_pos.z);
+                    sound_events.send(crate::audio::PlaySoundEvent { sound_id: 112 }); // WATER_SPLASH
+                    crate::interactivity::spawn_water_splash_burst(&mut commands, splash_pos, 6);
+                    if matches!(proj.projectile_type, ProjectileType::Rocket | ProjectileType::DevastatorMissile) {
+                        explosion_events.send(ExplosionDamageEvent {
+                            origin: splash_pos,
+                            radius: 4.0,
+                            damage: proj.damage,
+                        });
+                        proj.lifetime = 0.0;
+                    } else {
+                        proj.velocity *= 0.6;
+                    }
+                    break;
+                }
+            }
         }
 
         // Check enemy continuous swept collision if player source

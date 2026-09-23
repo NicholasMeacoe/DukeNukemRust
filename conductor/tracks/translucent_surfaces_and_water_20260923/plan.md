@@ -35,17 +35,17 @@
   - [x] Verify water ripples and frame animation cycle continuously in real-time
 
 ## Phase 4: Water Surface Boundary Transitions, Screen Tint & FX
-- [ ] Task: Write Tests for Water Boundary Crossing & Sound Dispatch
-  - [ ] Unit test verifying player crossing water boundary triggers splash sound event
-  - [ ] Unit test verifying underwater screen tint overlay activation
-  - [ ] Unit test verifying projectile splash triggering upon water entry
-- [ ] Task: Implement Water Boundary Detection & Visual/Audio Dispatch
-  - [ ] System detecting player crossing water surface elevation
-  - [ ] Trigger `WATER_SPLASH` (sound 112) and spawn water splash particles
-  - [ ] Activate `ScreenTintOverlay` with blue tint while submerged, clear upon exiting
-  - [ ] Connect to underwater audio muffling system
-- [ ] Task: Phase 4 Verification & Checkpoint (Refer to workflow.md)
-  - [ ] Verify smooth diving in and climbing out of water with splash sound, tint, and audio muffling
+- [x] Task: Write Tests for Water Boundary Crossing & Sound Dispatch
+  - [x] Unit test verifying player crossing water boundary triggers splash sound event
+  - [x] Unit test verifying underwater screen tint overlay activation
+  - [x] Unit test verifying projectile splash triggering upon water entry
+- [x] Task: Implement Water Boundary Detection & Visual/Audio Dispatch
+  - [x] System detecting player crossing water surface elevation
+  - [x] Trigger `WATER_SPLASH` (sound 112) and spawn water splash particles
+  - [x] Activate `ScreenTintOverlay` with blue tint while submerged, clear upon exiting
+  - [x] Connect to underwater audio muffling system
+- [x] Task: Phase 4 Verification & Checkpoint (Refer to workflow.md)
+  - [x] Verify smooth diving in and climbing out of water with splash sound, tint, and audio muffling
 
 ## Phase 5: Full Verification, Warnings Audit & Review
 - [ ] Task: Comprehensive Test Suite & Warning Audit

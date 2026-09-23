@@ -560,6 +560,57 @@ mod tests {
     }
 
     #[test]
+    fn test_projectile_water_entry_splash_sound_and_particles() {
+        let mut app = App::new();
+        app.add_event::<SpawnProjectileEvent>()
+            .add_event::<EntityDamageEvent>()
+            .add_event::<crate::interactivity::ExplosionDamageEvent>()
+            .add_event::<crate::audio::PlaySoundEvent>()
+            .add_event::<crate::combat::decals::SpawnDecalEvent>()
+            .add_event::<crate::interactivity::WallDamageEvent>()
+            .add_event::<GibEvent>()
+            .insert_resource(Time::<()>::default())
+            .add_systems(Update, (spawn_projectiles, update_projectiles));
+
+        // Spawn a water surface at Y = 0.0
+        app.world_mut().spawn(crate::interactivity::WaterSurface {
+            sector_index: 0,
+            elevation: 0.0,
+        });
+
+        // Spawn bullet projectile above water at Y = 0.5 traveling downwards at 10 m/s
+        let proj_entity = app.world_mut().spawn((
+            Projectile {
+                projectile_type: ProjectileType::HitscanBullet,
+                velocity: Vec3::new(0.0, -10.0, 0.0),
+                damage: 10,
+                lifetime: 2.0,
+                bounces: 0,
+                is_player_source: true,
+            },
+            TransformBundle::from_transform(Transform::from_xyz(0.0, 0.5, 0.0)),
+        )).id();
+
+        // Advance time by 0.1s -> old_pos.y = 0.5, new_pos.y = 0.5 - 1.0 = -0.5 (crossed elevation 0.0!)
+        {
+            let mut time = app.world_mut().resource_mut::<Time>();
+            time.advance_by(std::time::Duration::from_millis(100));
+        }
+        app.update();
+
+        let sound_events = app.world().resource::<Events<crate::audio::PlaySoundEvent>>();
+        let mut reader = sound_events.get_reader();
+        let events: Vec<_> = reader.read(sound_events).collect();
+        assert!(events.iter().any(|e| e.sound_id == 112), "Water entry must trigger splash sound 112");
+
+        let mut splash_query = app.world_mut().query::<&crate::interactivity::WaterSplashParticle>();
+        assert!(splash_query.iter(app.world()).count() > 0, "Water entry must spawn splash particles");
+
+        let proj = app.world().get::<Projectile>(proj_entity).unwrap();
+        assert!(proj.velocity.y.abs() < 10.0, "Projectile must decelerate upon entering water");
+    }
+
+    #[test]
     fn test_shrunk_enemy_stomp_damage_execution() {
         let mut app = App::new();
         app.add_event::<EntityDamageEvent>()

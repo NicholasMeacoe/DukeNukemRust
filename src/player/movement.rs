@@ -19,6 +19,7 @@ pub fn update_player_movement(
     sector_map: Option<Res<crate::sector_map::SectorMap>>,
     mut sound_events: EventWriter<PlaySoundEvent>,
     mut tint: Option<ResMut<crate::hud::ScreenTintState>>,
+    mut commands: Commands,
 ) {
     let Ok(camera_transform) = camera_query.get_single() else {
         return;
@@ -137,6 +138,18 @@ pub fn update_player_movement(
             player.movement_mode = PlayerMovementMode::Standing;
         }
 
+        // Water surface boundary crossing: splash sound & FX
+        let was_in_water = prev_movement_mode == PlayerMovementMode::Swimming || prev_movement_mode == PlayerMovementMode::Diving;
+        let now_in_water = player.movement_mode == PlayerMovementMode::Swimming || player.movement_mode == PlayerMovementMode::Diving;
+
+        if now_in_water && !was_in_water {
+            sound_events.send(PlaySoundEvent { sound_id: 112 }); // WATER_SPLASH
+            crate::interactivity::spawn_water_splash_burst(&mut commands, trans.translation, 8);
+        } else if !now_in_water && was_in_water {
+            sound_events.send(PlaySoundEvent { sound_id: 112 }); // WATER_SPLASH
+            crate::interactivity::spawn_water_splash_burst(&mut commands, trans.translation, 8);
+        }
+
         // Resize Rapier collider based on crouching vs standing and adjust translation to keep feet anchored
         if let Some(ref mut col) = collider {
             if player.movement_mode == PlayerMovementMode::Crouching && prev_movement_mode != PlayerMovementMode::Crouching {
@@ -154,7 +167,12 @@ pub fn update_player_movement(
         // Diving blue tint
         if player.movement_mode == PlayerMovementMode::Diving {
             if let Some(ref mut t) = tint {
-                t.target_color = Color::srgba(0.0, 0.25, 0.75, 0.45);
+                t.target_color = Color::srgba(0.0, 0.20, 0.60, 0.30);
+            }
+        } else if prev_movement_mode == PlayerMovementMode::Diving {
+            if let Some(ref mut t) = tint {
+                t.target_color = Color::NONE;
+                t.current_color = Color::NONE;
             }
         }
 

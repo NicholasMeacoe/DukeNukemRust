@@ -176,6 +176,12 @@ pub struct WaterSurface {
 }
 
 #[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct WaterSplashParticle {
+    pub velocity: Vec3,
+    pub lifetime: f32,
+}
+
+#[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SectorEffectorComponent {
     pub sector_idx: usize,
     pub lotag: i16,

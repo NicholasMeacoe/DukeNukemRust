@@ -49,6 +49,7 @@ impl Plugin for InteractivityPlugin {
                     update_mirror_props,
                     update_master_switches,
                     apply_player_healing,
+                    update_water_splash_particles,
                 )
                     .in_set(crate::GameSet::Interactivity),
             );
@@ -335,6 +336,39 @@ pub fn spawn_interactive_elements_from_map(commands: &mut Commands, map: &Map) {
                 crate::game_flow::LevelEntity,
             ));
         }
+    }
+}
+
+pub fn spawn_water_splash_burst(commands: &mut Commands, origin: Vec3, count: usize) {
+    for i in 0..count {
+        let angle = (i as f32 / count as f32) * std::f32::consts::TAU;
+        let speed = 2.0 + (i % 3) as f32 * 0.8;
+        let vel = Vec3::new(angle.cos() * speed, 3.0 + (i % 4) as f32 * 0.5, angle.sin() * speed);
+        commands.spawn((
+            WaterSplashParticle {
+                velocity: vel,
+                lifetime: 0.6,
+            },
+            TransformBundle::from_transform(Transform::from_translation(origin)),
+            crate::game_flow::LevelEntity,
+        ));
+    }
+}
+
+pub fn update_water_splash_particles(
+    time: Res<Time>,
+    mut commands: Commands,
+    mut query: Query<(Entity, &mut Transform, &mut WaterSplashParticle)>,
+) {
+    let dt = time.delta_seconds();
+    for (entity, mut trans, mut splash) in query.iter_mut() {
+        splash.lifetime -= dt;
+        if splash.lifetime <= 0.0 {
+            commands.entity(entity).despawn_recursive();
+            continue;
+        }
+        splash.velocity.y -= 9.81 * dt;
+        trans.translation += splash.velocity * dt;
     }
 }
 
