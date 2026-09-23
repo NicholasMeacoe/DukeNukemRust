@@ -406,6 +406,26 @@ pub fn update_con_actors(
                     ));
                 }
 
+                // Authentic boss death screams
+                match enemy.kind {
+                    EnemyKind::Boss1Battlelord | EnemyKind::Boss1Mini => {
+                        sound_events.send(crate::audio::PlaySoundEvent {
+                            sound_id: crate::audio::BOS1_DYING,
+                        });
+                    }
+                    EnemyKind::Boss2Overlord => {
+                        sound_events.send(crate::audio::PlaySoundEvent {
+                            sound_id: crate::audio::BOS2_DYING,
+                        });
+                    }
+                    EnemyKind::Boss3Cycloid => {
+                        sound_events.send(crate::audio::PlaySoundEvent {
+                            sound_id: crate::audio::BOS3_DYING,
+                        });
+                    }
+                    _ => {}
+                }
+
                 // Climax victory trigger on Boss defeat in boss levels or episodes
                 if matches!(
                     enemy.kind,
@@ -546,6 +566,145 @@ pub fn update_con_actors(
                     });
                     sound_events.send(crate::audio::PlaySoundEvent { sound_id: 112 }); // MORTAR
                 } else if enemy.attack_timer >= 3.5 {
+                    enemy.attack_timer = 0.0;
+                }
+            }
+
+            // Boss 2: Overlord Combat Attacks: Dual Shoulder Rockets & Rapid Blasters
+            if enemy.kind == EnemyKind::Boss2Overlord
+                && can_see
+                && dist_to_player <= 45.0
+                && player_ctrl.health > 0
+            {
+                enemy.attack_timer += dt;
+                let right = dir_to_player.cross(Vec3::Y).normalize_or_zero();
+
+                // Phase 1 (0.0 to 1.5s): Dual Shoulder Rockets
+                if enemy.attack_timer <= 1.5 {
+                    let sub_tick = (enemy.attack_timer / 0.75) as i32;
+                    let prev_sub_tick = ((enemy.attack_timer - dt) / 0.75) as i32;
+                    if sub_tick != prev_sub_tick || enemy.attack_timer == dt {
+                        sound_events.send(crate::audio::PlaySoundEvent {
+                            sound_id: crate::audio::BOS2_ATTACK,
+                        });
+
+                        // Right shoulder rocket
+                        let r_origin = trans.translation + Vec3::Y * 2.0 + right * 0.75 + dir_to_player * 0.6;
+                        let r_dir = (dir_to_player + right * 0.05).normalize_or_zero();
+                        projectile_events.send(SpawnProjectileEvent {
+                            projectile_type: ProjectileType::Rocket,
+                            origin: r_origin,
+                            direction: r_dir,
+                            velocity: 45.0,
+                            damage: 70,
+                            is_player_source: false,
+                        });
+
+                        // Left shoulder rocket
+                        let l_origin = trans.translation + Vec3::Y * 2.0 - right * 0.75 + dir_to_player * 0.6;
+                        let l_dir = (dir_to_player - right * 0.05).normalize_or_zero();
+                        projectile_events.send(SpawnProjectileEvent {
+                            projectile_type: ProjectileType::Rocket,
+                            origin: l_origin,
+                            direction: l_dir,
+                            velocity: 45.0,
+                            damage: 70,
+                            is_player_source: false,
+                        });
+                        sound_events.send(crate::audio::PlaySoundEvent { sound_id: 7 }); // RPG_FIRE
+                    }
+                } else if enemy.attack_timer <= 2.8 {
+                    // Phase 2 (1.6 to 2.8s): Rapid chest blasters
+                    let sub_tick = (enemy.attack_timer / 0.15) as i32;
+                    let prev_sub_tick = ((enemy.attack_timer - dt) / 0.15) as i32;
+                    if sub_tick != prev_sub_tick {
+                        let spread_x = (rng.next_f32() - 0.5) * 0.06;
+                        let spread_y = (rng.next_f32() - 0.5) * 0.04;
+                        let blaster_dir = (dir_to_player + right * spread_x + Vec3::Y * spread_y).normalize_or_zero();
+                        let blaster_origin = trans.translation + Vec3::Y * 1.5 + dir_to_player * 0.8;
+                        projectile_events.send(SpawnProjectileEvent {
+                            projectile_type: ProjectileType::AlienBlaster,
+                            origin: blaster_origin,
+                            direction: blaster_dir,
+                            velocity: 55.0,
+                            damage: 15,
+                            is_player_source: false,
+                        });
+                        sound_events.send(crate::audio::PlaySoundEvent { sound_id: 110 }); // SOMETHINGFROZE / BLASTER
+                    }
+                } else if enemy.attack_timer >= 3.6 {
+                    enemy.attack_timer = 0.0;
+                }
+            }
+
+            // Boss 3: Cycloid Emperor Combat Attacks: Forehead Eye PsiBlast, Arm Rocket Salvos & Quake Shockwave
+            if enemy.kind == EnemyKind::Boss3Cycloid
+                && can_see
+                && dist_to_player <= 50.0
+                && player_ctrl.health > 0
+            {
+                enemy.attack_timer += dt;
+                let right = dir_to_player.cross(Vec3::Y).normalize_or_zero();
+
+                // Phase 1 (0.0 to 1.5s): Forehead Eye Psychic Blasts
+                if enemy.attack_timer <= 1.5 {
+                    let sub_tick = (enemy.attack_timer / 0.25) as i32;
+                    let prev_sub_tick = ((enemy.attack_timer - dt) / 0.25) as i32;
+                    if sub_tick != prev_sub_tick || enemy.attack_timer == dt {
+                        if enemy.attack_timer == dt {
+                            sound_events.send(crate::audio::PlaySoundEvent {
+                                sound_id: crate::audio::BOS3_ATTACK,
+                            });
+                        }
+                        let eye_origin = trans.translation + Vec3::Y * 3.2 + dir_to_player * 0.8;
+                        let spread_x = (rng.next_f32() - 0.5) * 0.04;
+                        let psi_dir = (dir_to_player + right * spread_x).normalize_or_zero();
+                        projectile_events.send(SpawnProjectileEvent {
+                            projectile_type: ProjectileType::PsiBlast,
+                            origin: eye_origin,
+                            direction: psi_dir,
+                            velocity: 50.0,
+                            damage: 25,
+                            is_player_source: false,
+                        });
+                        sound_events.send(crate::audio::PlaySoundEvent { sound_id: 110 });
+                    }
+                } else if enemy.attack_timer <= 2.8 {
+                    // Phase 2 (1.6 to 2.8s): Arm Rocket Salvos
+                    let sub_tick = (enemy.attack_timer / 0.3) as i32;
+                    let prev_sub_tick = ((enemy.attack_timer - dt) / 0.3) as i32;
+                    if sub_tick != prev_sub_tick || (enemy.attack_timer >= 1.6 && (enemy.attack_timer - dt) < 1.6) {
+                        let arm_side = if sub_tick % 2 == 0 { 1.2 } else { -1.2 };
+                        let arm_origin = trans.translation + Vec3::Y * 2.2 + right * arm_side + dir_to_player * 0.7;
+                        projectile_events.send(SpawnProjectileEvent {
+                            projectile_type: ProjectileType::Rocket,
+                            origin: arm_origin,
+                            direction: dir_to_player,
+                            velocity: 45.0,
+                            damage: 75,
+                            is_player_source: false,
+                        });
+                        sound_events.send(crate::audio::PlaySoundEvent { sound_id: 7 }); // RPG_FIRE
+                    }
+                } else if enemy.attack_timer >= 3.1 && (enemy.attack_timer - dt) < 3.1 {
+                    // Phase 3 (3.1s): Ground Shockwave Stomp
+                    if let Some(ref mut shake) = camera_shake {
+                        shake.intensity = 0.5;
+                        shake.offset = Vec3::new(
+                            (rng.next_f32() - 0.5) * 0.3,
+                            (rng.next_f32() - 0.5) * 0.3,
+                            (rng.next_f32() - 0.5) * 0.3,
+                        );
+                    }
+                    if dist_to_player <= 15.0 {
+                        explosion_events.send(crate::interactivity::ExplosionDamageEvent {
+                            origin: trans.translation,
+                            radius: 15.0,
+                            damage: 50,
+                        });
+                    }
+                    sound_events.send(crate::audio::PlaySoundEvent { sound_id: 112 }); // Quake stomp
+                } else if enemy.attack_timer >= 4.0 {
                     enemy.attack_timer = 0.0;
                 }
             }

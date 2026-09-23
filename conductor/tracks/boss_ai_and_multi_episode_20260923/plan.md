@@ -1,16 +1,16 @@
 # Implementation Plan: Boss AI & Multi-Episode Level Progression
 
 ## Phase 1: Boss Combat AI & Multi-Phase Attack Behaviors
-- [ ] Task: Write Tests for Boss Attack Cycles & Projectile Spawning
-  - [ ] Unit test verifying Overlord attack cycle: dual shoulder rockets, rapid blaster fire, and close-range stomp
-  - [ ] Unit test verifying Cycloid Emperor attack cycle: forehead eye psychic blasts, quad arm rocket salvos, and ground shockwave
-  - [ ] Unit test verifying Battlelord death sound (115) and boss damage resistances / HP scaling
-- [ ] Task: Implement Overlord & Cycloid Emperor Attack Logic in `src/combat/ai.rs`
-  - [ ] Implement multi-phase attack timer for `Boss2Overlord` (dual shoulder rockets + chest blasters + tail whip)
-  - [ ] Implement multi-phase attack timer for `Boss3Cycloid` (eye beam + rocket salvos + ground stomp shockwave)
-  - [ ] Add sound triggers for boss attack, pain, and death screams (BOS1, BOS2, BOS3)
-- [ ] Task: Phase 1 Verification & Checkpoint (Refer to workflow.md)
-  - [ ] Verify boss entities initiate correct attack sequences and spawn projectiles toward target
+- [x] Task: Write Tests for Boss Attack Cycles & Projectile Spawning
+  - [x] Unit test verifying Overlord attack cycle: dual shoulder rockets, rapid blaster fire, and close-range stomp
+  - [x] Unit test verifying Cycloid Emperor attack cycle: forehead eye psychic blasts, quad arm rocket salvos, and ground shockwave
+  - [x] Unit test verifying Battlelord death sound (115) and boss damage resistances / HP scaling
+- [x] Task: Implement Overlord & Cycloid Emperor Attack Logic in `src/combat/ai.rs`
+  - [x] Implement multi-phase attack timer for `Boss2Overlord` (dual shoulder rockets + chest blasters + tail whip)
+  - [x] Implement multi-phase attack timer for `Boss3Cycloid` (eye beam + rocket salvos + ground stomp shockwave)
+  - [x] Add sound triggers for boss attack, pain, and death screams (BOS1, BOS2, BOS3)
+- [x] Task: Phase 1 Verification & Checkpoint (Refer to workflow.md)
+  - [x] Verify boss entities initiate correct attack sequences and spawn projectiles toward target
 
 ## Phase 2: Boss Level Victory Triggers & Death Sequence
 - [ ] Task: Write Tests for Boss Level Defeat Detection

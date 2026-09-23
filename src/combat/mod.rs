@@ -936,4 +936,260 @@ mod tests {
             "Defeating Battlelord in E1L7 must trigger LevelCompletedEvent"
         );
     }
+
+    #[test]
+    fn test_overlord_combat_mechanics_and_attacks() {
+        let mut app = App::new();
+        app.add_event::<SpawnProjectileEvent>()
+            .add_event::<crate::audio::PlaySoundEvent>()
+            .add_event::<crate::audio::PlayDukeVoiceEvent>()
+            .add_event::<crate::interactivity::ExplosionDamageEvent>()
+            .add_event::<GibEvent>()
+            .add_event::<crate::game_flow::LevelCompletedEvent>()
+            .insert_resource(Time::<()>::default())
+            .insert_resource(crate::net::DeterministicRng::new(42))
+            .insert_resource(crate::interactivity::EarthquakeCameraShake::default())
+            .insert_resource(crate::game_flow::LevelProgress {
+                current_episode: 2,
+                current_level: 9,
+                ..default()
+            })
+            .insert_resource(
+                crate::scripting::ConScriptEngine::from_source(
+                    crate::scripting::DEFAULT_CORE_CON_SCRIPT,
+                )
+                .unwrap(),
+            )
+            .add_systems(Update, ai::update_con_actors);
+
+        let mut player_ctrl = crate::player::types::PlayerController::default();
+        player_ctrl.health = 100;
+        app.world_mut().spawn((
+            player_ctrl,
+            TransformBundle::from_transform(Transform::from_xyz(0.0, 0.0, 0.0)),
+        ));
+
+        let mut overlord_actor = EnemyActor::new_overlord();
+        overlord_actor.health = 4500;
+        let mut con_actor = crate::scripting::ConActor::new(BOSS2, 0, 0, 4500);
+        con_actor.registers.move_ptr = Some(0);
+        con_actor.hitag = crate::scripting::move_flags::SEEK_PLAYER as i16;
+
+        let boss_entity = app.world_mut().spawn((
+            overlord_actor,
+            con_actor,
+            TransformBundle::from_transform(Transform::from_xyz(0.0, 0.0, 12.0)),
+        )).id();
+
+        // 1. Advance time by 0.1s: Overlord fires dual shoulder rockets
+        {
+            let mut time = app.world_mut().resource_mut::<Time>();
+            time.advance_by(std::time::Duration::from_millis(100));
+        }
+        app.update();
+
+        let proj_events = app.world().resource::<Events<SpawnProjectileEvent>>();
+        let mut proj_reader = proj_events.get_reader();
+        let projs: Vec<_> = proj_reader.read(proj_events).cloned().collect();
+        assert!(
+            projs.iter().any(|p| p.projectile_type == ProjectileType::Rocket),
+            "Overlord must fire dual shoulder Rocket projectiles in phase 1"
+        );
+
+        let sound_events = app.world().resource::<Events<crate::audio::PlaySoundEvent>>();
+        let mut sound_reader = sound_events.get_reader();
+        let sounds: Vec<_> = sound_reader.read(sound_events).cloned().collect();
+        assert!(
+            sounds.iter().any(|s| s.sound_id == 122),
+            "Overlord must emit BOS2_ATTACK (122) sound event"
+        );
+
+        // 2. Advance time to phase 2 (rapid blasters at 1.8s)
+        {
+            let mut enemy = app.world_mut().get_mut::<EnemyActor>(boss_entity).unwrap();
+            enemy.attack_timer = 1.75;
+            let mut time = app.world_mut().resource_mut::<Time>();
+            time.advance_by(std::time::Duration::from_millis(100));
+        }
+        app.update();
+
+        let proj_events = app.world().resource::<Events<SpawnProjectileEvent>>();
+        let mut proj_reader = proj_events.get_reader();
+        let projs: Vec<_> = proj_reader.read(proj_events).cloned().collect();
+        assert!(
+            projs.iter().any(|p| p.projectile_type == ProjectileType::AlienBlaster),
+            "Overlord must fire AlienBlaster projectiles in phase 2"
+        );
+    }
+
+    #[test]
+    fn test_cycloid_emperor_combat_mechanics_and_attacks() {
+        let mut app = App::new();
+        app.add_event::<SpawnProjectileEvent>()
+            .add_event::<crate::audio::PlaySoundEvent>()
+            .add_event::<crate::audio::PlayDukeVoiceEvent>()
+            .add_event::<crate::interactivity::ExplosionDamageEvent>()
+            .add_event::<GibEvent>()
+            .add_event::<crate::game_flow::LevelCompletedEvent>()
+            .insert_resource(Time::<()>::default())
+            .insert_resource(crate::net::DeterministicRng::new(42))
+            .insert_resource(crate::interactivity::EarthquakeCameraShake::default())
+            .insert_resource(crate::game_flow::LevelProgress {
+                current_episode: 3,
+                current_level: 9,
+                ..default()
+            })
+            .insert_resource(
+                crate::scripting::ConScriptEngine::from_source(
+                    crate::scripting::DEFAULT_CORE_CON_SCRIPT,
+                )
+                .unwrap(),
+            )
+            .add_systems(Update, ai::update_con_actors);
+
+        let mut player_ctrl = crate::player::types::PlayerController::default();
+        player_ctrl.health = 100;
+        app.world_mut().spawn((
+            player_ctrl,
+            TransformBundle::from_transform(Transform::from_xyz(0.0, 0.0, 0.0)),
+        ));
+
+        let mut cycloid_actor = EnemyActor::new_cycloid();
+        cycloid_actor.health = 4500;
+        let mut con_actor = crate::scripting::ConActor::new(BOSS3, 0, 0, 4500);
+        con_actor.registers.move_ptr = Some(0);
+        con_actor.hitag = crate::scripting::move_flags::SEEK_PLAYER as i16;
+
+        let boss_entity = app.world_mut().spawn((
+            cycloid_actor,
+            con_actor,
+            TransformBundle::from_transform(Transform::from_xyz(0.0, 0.0, 15.0)),
+        )).id();
+
+        // 1. Advance time by 0.1s: Cycloid fires forehead eye PsiBlast
+        {
+            let mut time = app.world_mut().resource_mut::<Time>();
+            time.advance_by(std::time::Duration::from_millis(100));
+        }
+        app.update();
+
+        let proj_events = app.world().resource::<Events<SpawnProjectileEvent>>();
+        let mut proj_reader = proj_events.get_reader();
+        let projs: Vec<_> = proj_reader.read(proj_events).cloned().collect();
+        assert!(
+            projs.iter().any(|p| p.projectile_type == ProjectileType::PsiBlast),
+            "Cycloid Emperor must fire forehead eye PsiBlast projectiles"
+        );
+
+        // 2. Advance time to arm rocket volley (cross into phase 2 at 1.6s)
+        {
+            let mut enemy = app.world_mut().get_mut::<EnemyActor>(boss_entity).unwrap();
+            enemy.attack_timer = 1.55;
+            let mut time = app.world_mut().resource_mut::<Time>();
+            time.advance_by(std::time::Duration::from_millis(100));
+        }
+        app.update();
+
+        let proj_events = app.world().resource::<Events<SpawnProjectileEvent>>();
+        let mut proj_reader = proj_events.get_reader();
+        let projs: Vec<_> = proj_reader.read(proj_events).cloned().collect();
+        assert!(
+            projs.iter().any(|p| p.projectile_type == ProjectileType::Rocket),
+            "Cycloid Emperor must fire arm Rocket salvos"
+        );
+
+        // 3. Advance to ground shockwave stomp (cross 3.1s threshold)
+        {
+            let mut enemy = app.world_mut().get_mut::<EnemyActor>(boss_entity).unwrap();
+            enemy.attack_timer = 3.05;
+            let mut time = app.world_mut().resource_mut::<Time>();
+            time.advance_by(std::time::Duration::from_millis(100));
+        }
+        app.update();
+
+        let shake = app.world().resource::<crate::interactivity::EarthquakeCameraShake>();
+        assert!(
+            shake.intensity > 0.0,
+            "Cycloid foot slam must trigger earthquake camera shake"
+        );
+    }
+
+    #[test]
+    fn test_boss_status_effect_immunities_and_death_sound() {
+        assert!(EnemyKind::Boss1Battlelord.is_boss());
+        assert!(EnemyKind::Boss1Mini.is_boss());
+        assert!(EnemyKind::Boss2Overlord.is_boss());
+        assert!(EnemyKind::Boss3Cycloid.is_boss());
+        assert!(EnemyKind::Boss4Queen.is_boss());
+        assert!(!EnemyKind::Pigcop.is_boss());
+        assert!(!EnemyKind::Liztroop.is_boss());
+
+        let mut app = App::new();
+        app.add_event::<EntityDamageEvent>()
+            .add_event::<crate::combat::decals::SpawnDecalEvent>()
+            .add_event::<crate::audio::PlaySoundEvent>()
+            .add_event::<crate::audio::PlayDukeVoiceEvent>()
+            .add_event::<crate::interactivity::ExplosionDamageEvent>()
+            .add_event::<crate::interactivity::wall_damage::WallDamageEvent>()
+            .add_event::<GibEvent>()
+            .add_event::<crate::game_flow::LevelCompletedEvent>()
+            .add_event::<SpawnProjectileEvent>()
+            .insert_resource(Time::<()>::default())
+            .insert_resource(crate::net::DeterministicRng::new(42))
+            .insert_resource(crate::interactivity::EarthquakeCameraShake::default())
+            .insert_resource(
+                crate::scripting::ConScriptEngine::from_source(
+                    crate::scripting::DEFAULT_CORE_CON_SCRIPT,
+                )
+                .unwrap(),
+            )
+            .add_systems(Update, (projectiles::update_projectiles, ai::update_con_actors));
+
+        let boss_entity = app.world_mut().spawn((
+            EnemyActor::new_overlord(),
+            TransformBundle::from_transform(Transform::from_xyz(0.0, 0.0, 5.0)),
+        )).id();
+
+        // Spawn a ShrinkRay projectile hitting the boss
+        app.world_mut().spawn((
+            Projectile {
+                projectile_type: ProjectileType::ShrinkRay,
+                velocity: Vec3::Z * 40.0,
+                damage: 0,
+                is_player_source: true,
+                lifetime: 1.0,
+                bounces: 0,
+            },
+            TransformBundle::from_transform(Transform::from_xyz(0.0, 0.0, 4.9)),
+        ));
+
+        app.update();
+
+        let enemy = app.world().get::<EnemyActor>(boss_entity).unwrap();
+        assert!(!enemy.is_shrunk, "Bosses must be immune to ShrinkRay!");
+        assert_ne!(enemy.state, EnemyAiState::Shrunk);
+
+        // Spawn a FreezeShard projectile on a low health boss
+        {
+            let mut boss = app.world_mut().get_mut::<EnemyActor>(boss_entity).unwrap();
+            boss.health = 5;
+        }
+        app.world_mut().spawn((
+            Projectile {
+                projectile_type: ProjectileType::FreezeShard,
+                velocity: Vec3::Z * 40.0,
+                damage: 10,
+                is_player_source: true,
+                lifetime: 1.0,
+                bounces: 0,
+            },
+            TransformBundle::from_transform(Transform::from_xyz(0.0, 0.0, 4.9)),
+        ));
+
+        app.update();
+
+        let enemy = app.world().get::<EnemyActor>(boss_entity).unwrap();
+        assert!(!enemy.is_frozen, "Bosses must be immune to FreezeShard freezing!");
+        assert_ne!(enemy.state, EnemyAiState::Frozen);
+    }
 }

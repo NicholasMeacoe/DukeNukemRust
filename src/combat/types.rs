@@ -95,6 +95,19 @@ pub enum EnemyKind {
     Boss4Queen,
 }
 
+impl EnemyKind {
+    pub fn is_boss(&self) -> bool {
+        matches!(
+            self,
+            EnemyKind::Boss1Battlelord
+                | EnemyKind::Boss1Mini
+                | EnemyKind::Boss2Overlord
+                | EnemyKind::Boss3Cycloid
+                | EnemyKind::Boss4Queen
+        )
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum EnemyAiState {
     Idle,
@@ -130,6 +143,10 @@ pub struct EnemyActor {
 }
 
 impl EnemyActor {
+    pub fn is_boss(&self) -> bool {
+        self.kind.is_boss()
+    }
+
     pub fn new_pigcop() -> Self {
         Self {
             kind: EnemyKind::Pigcop,

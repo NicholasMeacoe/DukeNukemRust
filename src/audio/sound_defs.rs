@@ -51,6 +51,14 @@ pub const PIG_DIE: i32 = 538;
 pub const OCTA_ATTACK: i32 = 570;
 pub const OCTA_DIE: i32 = 572;
 
+// Boss Encounters & Attacks
+pub const BOS1_WALK: i32 = 114;
+pub const BOS1_DYING: i32 = 115;
+pub const BOS2_ATTACK: i32 = 122;
+pub const BOS2_DYING: i32 = 123;
+pub const BOS3_ATTACK: i32 = 127;
+pub const BOS3_DYING: i32 = 128;
+
 // Underwater & Atmosphere
 pub const DUKE_BREATHING: i32 = 23;
 pub const DUKE_EXHALING: i32 = 24;
@@ -72,6 +80,12 @@ mod tests {
         assert_eq!(DUKE_PAIN, 37);
         assert_eq!(DUKE_DEAD, 41);
         assert_eq!(DUKE_LAND, 42);
+        assert_eq!(BOS1_WALK, 114);
+        assert_eq!(BOS1_DYING, 115);
+        assert_eq!(BOS2_ATTACK, 122);
+        assert_eq!(BOS2_DYING, 123);
+        assert_eq!(BOS3_ATTACK, 127);
+        assert_eq!(BOS3_DYING, 128);
         assert_eq!(MENU_MOVE, 0);
         assert_eq!(MENU_SELECT, 2);
         assert_eq!(BONUS_SPEECH1, 195);

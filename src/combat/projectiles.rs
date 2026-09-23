@@ -287,29 +287,31 @@ pub fn update_projectiles(
         if let Some(e_entity) = hit_enemy_entity {
             if let Ok((_, _, mut enemy)) = enemies.get_mut(e_entity) {
                 if enemy.state != EnemyAiState::Dying && enemy.state != EnemyAiState::Gibbed {
-                    // Status effects
-                    match proj.projectile_type {
-                        ProjectileType::ShrinkRay => {
-                            enemy.is_shrunk = true;
-                            enemy.shrink_timer = 9.0;
-                            enemy.state = EnemyAiState::Shrunk;
-                            enemy.speed *= 0.5;
-                        }
-                        ProjectileType::FreezeShard => {
-                            if enemy.health - proj.damage <= 0 {
-                                enemy.is_frozen = true;
-                                enemy.freeze_timer = 4.6;
-                                enemy.state = EnemyAiState::Frozen;
+                    // Status effects (bosses are immune to shrink/freeze/expand)
+                    if !enemy.is_boss() {
+                        match proj.projectile_type {
+                            ProjectileType::ShrinkRay => {
+                                enemy.is_shrunk = true;
+                                enemy.shrink_timer = 9.0;
+                                enemy.state = EnemyAiState::Shrunk;
+                                enemy.speed *= 0.5;
                             }
-                        }
-                        ProjectileType::ExpanderRay => {
-                            if enemy.health - proj.damage <= 0 {
-                                enemy.is_expanding = true;
-                                enemy.expand_timer = 1.0;
-                                enemy.state = EnemyAiState::Expanding;
+                            ProjectileType::FreezeShard => {
+                                if enemy.health - proj.damage <= 0 {
+                                    enemy.is_frozen = true;
+                                    enemy.freeze_timer = 4.6;
+                                    enemy.state = EnemyAiState::Frozen;
+                                }
                             }
+                            ProjectileType::ExpanderRay => {
+                                if enemy.health - proj.damage <= 0 {
+                                    enemy.is_expanding = true;
+                                    enemy.expand_timer = 1.0;
+                                    enemy.state = EnemyAiState::Expanding;
+                                }
+                            }
+                            _ => {}
                         }
-                        _ => {}
                     }
 
                     damage_events.send(EntityDamageEvent {
