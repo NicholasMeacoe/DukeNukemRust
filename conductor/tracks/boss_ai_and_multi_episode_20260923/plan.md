@@ -36,14 +36,14 @@
   - [x] Verify level transitions, secret level warping, and episode advancements flow seamlessly
 
 ## Phase 4: Episode-Specific Atmospheric Skyboxes & Victory Intermission UI
-- [ ] Task: Write Tests for Episode Skybox Selection & Victory Banner
-  - [ ] Unit test verifying correct skybox tile selection per episode (Ep 1 LA_SKY #89, Ep 2 MOONSKY1 #80, Ep 3 CITY_SKY #84)
-  - [ ] Unit test verifying intermission stats screen renders "EPISODE VICTORY" banner on boss defeat
-- [ ] Task: Implement Episode Skybox Selection & Victory UI in `src/game_flow/` & `src/sky/`
-  - [ ] Update `handle_load_level_events` in `src/game_flow/level_loader.rs` to select episode-authentic skybox tiles
-  - [ ] Update intermission UI in `src/game_flow/ui.rs` to render "EPISODE COMPLETED" / "VICTORY" banner and play victory quote
-- [ ] Task: Phase 4 Verification & Checkpoint (Refer to workflow.md)
-  - [ ] Verify authentic visual skybox in Episodes 1, 2, and 3, and victory banner appearance
+- [x] Task: Write Tests for Episode Skybox Selection & Victory Banner
+  - [x] Unit test verifying correct skybox tile selection per episode (Ep 1 LA_SKY #89, Ep 2 MOONSKY1 #80, Ep 3 CITY_SKY #84)
+  - [x] Unit test verifying intermission stats screen renders "EPISODE VICTORY" banner on boss defeat
+- [x] Task: Implement Episode Skybox Selection & Victory UI in `src/game_flow/` & `src/sky/`
+  - [x] Update `handle_load_level_events` in `src/game_flow/level_loader.rs` to select episode-authentic skybox tiles
+  - [x] Update intermission UI in `src/game_flow/ui.rs` to render "EPISODE COMPLETED" / "VICTORY" banner and play victory quote
+- [x] Task: Phase 4 Verification & Checkpoint (Refer to workflow.md)
+  - [x] Verify authentic visual skybox in Episodes 1, 2, and 3, and victory banner appearance
 
 ## Phase 5: Full Verification, Warnings Audit & Review
 - [ ] Task: Comprehensive Test Suite & Warning Audit

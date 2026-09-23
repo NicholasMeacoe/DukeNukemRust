@@ -23,10 +23,10 @@ pub struct MenuSubheaderText;
 #[derive(Component)]
 pub struct MenuFooterText;
 
-const DUKE_GOLD: Color = Color::srgb(1.0, 0.82, 0.12);
-const DUKE_RED: Color = Color::srgb(0.95, 0.22, 0.15);
-const DUKE_GREY: Color = Color::srgb(0.65, 0.65, 0.70);
-const DUKE_WHITE: Color = Color::srgb(1.0, 1.0, 1.0);
+pub const DUKE_GOLD: Color = Color::srgb(1.0, 0.82, 0.12);
+pub const DUKE_RED: Color = Color::srgb(0.95, 0.22, 0.15);
+pub const DUKE_GREY: Color = Color::srgb(0.65, 0.65, 0.70);
+pub const DUKE_WHITE: Color = Color::srgb(1.0, 1.0, 1.0);
 
 pub fn setup_menu_ui(mut commands: Commands) {
     commands
@@ -259,13 +259,30 @@ pub fn update_menu_ui(
     // Update Header & Subheader
     if let Ok(mut header) = header_query.get_single_mut() {
         header.sections[0].value = match current_phase {
-            GamePhase::Intermission => format!(
-                "E{}L{}: LEVEL COMPLETED",
-                progress.current_episode, progress.current_level
-            ),
+            GamePhase::Intermission => {
+                if progress.is_boss_victory {
+                    format!(
+                        "E{}L{}: EPISODE VICTORY!",
+                        progress.current_episode, progress.current_level
+                    )
+                } else {
+                    format!(
+                        "E{}L{}: LEVEL COMPLETED",
+                        progress.current_episode, progress.current_level
+                    )
+                }
+            }
             GamePhase::Paused => "PAUSED".to_string(),
             _ => "DUKE NUKEM 3D".to_string(),
         };
+
+        if current_phase == GamePhase::Intermission && progress.is_boss_victory {
+            header.sections[0].style.color = DUKE_GOLD;
+        } else if current_phase == GamePhase::Intermission {
+            header.sections[0].style.color = DUKE_RED;
+        } else {
+            header.sections[0].style.color = DUKE_GOLD;
+        }
     }
 
     if let Ok(mut subheader) = subheader_query.get_single_mut() {
@@ -280,14 +297,26 @@ pub fn update_menu_ui(
             GamePhase::SoundSetup => "SOUND SETUP".to_string(),
             GamePhase::VideoSetup => "VIDEO & DISPLAY".to_string(),
             GamePhase::ControlsSetup => "GAMEPLAY & CONTROLS".to_string(),
-            GamePhase::Intermission => "MISSION STATISTICS".to_string(),
+            GamePhase::Intermission => {
+                if progress.is_boss_victory {
+                    "EPISODE COMPLETED".to_string()
+                } else {
+                    "MISSION STATISTICS".to_string()
+                }
+            }
             _ => "".to_string(),
         };
     }
 
     if let Ok(mut footer) = footer_query.get_single_mut() {
         footer.sections[0].value = match current_phase {
-            GamePhase::Intermission => "PRESS SPACE OR ENTER TO CONTINUE TO NEXT LEVEL".to_string(),
+            GamePhase::Intermission => {
+                if progress.is_boss_victory {
+                    "PRESS SPACE OR ENTER TO ADVANCE TO NEXT EPISODE".to_string()
+                } else {
+                    "PRESS SPACE OR ENTER TO CONTINUE TO NEXT LEVEL".to_string()
+                }
+            }
             GamePhase::Paused => "PRESS ESC TO RESUME • ENTER TO SELECT".to_string(),
             GamePhase::MainMenu => "USE ARROWS / W/S TO MOVE • ENTER TO SELECT".to_string(),
             GamePhase::SaveMenu | GamePhase::LoadMenu => {

@@ -102,12 +102,21 @@ pub fn update_intermission_animation(
         IntermissionStage::TimeReveal => {
             if !anim_state.speech_played && anim_state.timer >= 3.3 {
                 anim_state.speech_played = true;
-                if stats.time_taken_seconds <= stats.par_time_seconds {
+                if progress.is_boss_victory {
+                    // Boss victory -> "Damn, I'm good!" (BONUS_SPEECH1 = 195)
+                    sound_events.send(crate::audio::PlaySoundEvent {
+                        sound_id: crate::audio::sound_defs::BONUS_SPEECH1,
+                    });
+                } else if stats.time_taken_seconds <= stats.par_time_seconds {
                     // Beat par time -> "Damn, I'm good!"
-                    sound_events.send(crate::audio::PlaySoundEvent { sound_id: 195 });
+                    sound_events.send(crate::audio::PlaySoundEvent {
+                        sound_id: crate::audio::sound_defs::BONUS_SPEECH1,
+                    });
                 } else if stats.secret_percentage >= 100 {
                     // All secrets -> "Groovy!"
-                    sound_events.send(crate::audio::PlaySoundEvent { sound_id: 196 });
+                    sound_events.send(crate::audio::PlaySoundEvent {
+                        sound_id: crate::audio::sound_defs::BONUS_SPEECH2,
+                    });
                 }
             }
 

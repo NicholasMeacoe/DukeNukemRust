@@ -56,6 +56,7 @@ pub const MOONSKY2: i16 = 81;
 pub const MOONSKY3: i16 = 82;
 pub const MOONSKY4: i16 = 83;
 pub const BIGORBIT1: i16 = 84;
+pub const CITY_SKY: i16 = BIGORBIT1;
 pub const BIGORBIT2: i16 = 85;
 pub const BIGORBIT3: i16 = 86;
 pub const BIGORBIT4: i16 = 87;

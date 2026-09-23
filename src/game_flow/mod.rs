@@ -1264,5 +1264,95 @@ mod tests {
         assert_eq!(*app.world().resource::<State<GamePhase>>().get(), GamePhase::OptionsMenu);
         assert_eq!(app.world().resource::<MenuCursor>().selected_index, 2);
     }
+
+    #[test]
+    fn test_intermission_ui_boss_victory_and_level_completed() {
+        let mut app = App::new();
+        app.insert_resource(State::new(GamePhase::Intermission))
+            .init_resource::<LevelProgress>()
+            .init_resource::<IntermissionAnimationState>()
+            .init_resource::<MenuCursor>()
+            .init_resource::<CursorAnimTimer>()
+            .add_systems(Startup, setup_menu_ui)
+            .add_systems(Update, update_menu_ui);
+
+        // Run startup systems to spawn UI nodes
+        app.update();
+
+        // 1. Regular level completion (e.g. E1L1)
+        {
+            let mut progress = app.world_mut().resource_mut::<LevelProgress>();
+            progress.current_episode = 1;
+            progress.current_level = 1;
+            progress.is_boss_victory = false;
+        }
+        app.update();
+
+        // Query MenuHeaderTitle, MenuSubheaderText, MenuFooterText
+        let mut header_q = app.world_mut().query_filtered::<&Text, With<MenuHeaderTitle>>();
+        let header_text = header_q.single(app.world());
+        assert_eq!(header_text.sections[0].value, "E1L1: LEVEL COMPLETED");
+        assert_eq!(header_text.sections[0].style.color, DUKE_RED);
+
+        let mut subheader_q = app.world_mut().query_filtered::<&Text, With<MenuSubheaderText>>();
+        let subheader_text = subheader_q.single(app.world());
+        assert_eq!(subheader_text.sections[0].value, "MISSION STATISTICS");
+
+        let mut footer_q = app.world_mut().query_filtered::<&Text, With<MenuFooterText>>();
+        let footer_text = footer_q.single(app.world());
+        assert!(footer_text.sections[0].value.contains("CONTINUE TO NEXT LEVEL"));
+
+        // 2. Boss level completion / victory (e.g. E1L6 Battlelord defeat)
+        {
+            let mut progress = app.world_mut().resource_mut::<LevelProgress>();
+            progress.current_episode = 1;
+            progress.current_level = 6;
+            progress.is_boss_victory = true;
+        }
+        app.update();
+
+        let mut header_q = app.world_mut().query_filtered::<&Text, With<MenuHeaderTitle>>();
+        let header_text = header_q.single(app.world());
+        assert_eq!(header_text.sections[0].value, "E1L6: EPISODE VICTORY!");
+        assert_eq!(header_text.sections[0].style.color, DUKE_GOLD);
+
+        let mut subheader_q = app.world_mut().query_filtered::<&Text, With<MenuSubheaderText>>();
+        let subheader_text = subheader_q.single(app.world());
+        assert_eq!(subheader_text.sections[0].value, "EPISODE COMPLETED");
+
+        let mut footer_q = app.world_mut().query_filtered::<&Text, With<MenuFooterText>>();
+        let footer_text = footer_q.single(app.world());
+        assert!(footer_text.sections[0].value.contains("ADVANCE TO NEXT EPISODE"));
+    }
+
+    #[test]
+    fn test_intermission_speech_on_boss_victory() {
+        let mut app = App::new();
+        app.init_resource::<Time>()
+            .insert_resource(State::new(GamePhase::Intermission))
+            .init_resource::<LevelProgress>()
+            .init_resource::<IntermissionAnimationState>()
+            .add_event::<crate::audio::PlaySoundEvent>()
+            .add_systems(Update, update_intermission_animation);
+
+        {
+            let mut progress = app.world_mut().resource_mut::<LevelProgress>();
+            progress.is_boss_victory = true;
+            let mut anim = app.world_mut().resource_mut::<IntermissionAnimationState>();
+            anim.stage = IntermissionStage::TimeReveal;
+            anim.timer = 3.5;
+            anim.speech_played = false;
+        }
+
+        app.update();
+
+        let anim = app.world().resource::<IntermissionAnimationState>();
+        assert!(anim.speech_played);
+
+        let sound_events = app.world().resource::<Events<crate::audio::PlaySoundEvent>>();
+        let mut reader = sound_events.get_reader();
+        let events: Vec<_> = reader.read(sound_events).collect();
+        assert!(events.iter().any(|e| e.sound_id == crate::audio::sound_defs::BONUS_SPEECH1));
+    }
 }
 
