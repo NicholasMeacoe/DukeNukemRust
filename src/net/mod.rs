@@ -4,6 +4,7 @@ pub mod pvp;
 pub mod rng;
 pub mod scoreboard;
 pub mod splitscreen;
+pub mod udp;
 
 pub use actor::*;
 pub use protocol::*;
@@ -11,6 +12,7 @@ pub use pvp::*;
 pub use rng::*;
 pub use scoreboard::*;
 pub use splitscreen::*;
+pub use udp::*;
 
 use bevy::prelude::*;
 
@@ -21,12 +23,16 @@ impl Plugin for NetPlugin {
         app.init_resource::<DukematchState>()
             .init_resource::<DeterministicRng>()
             .init_resource::<SplitscreenConfig>()
+            .init_resource::<NetTransport>()
             .add_event::<PvpDamageEvent>()
             .add_event::<PlayerFragEvent>()
             .add_systems(Startup, setup_scoreboard_ui)
             .add_systems(
                 Update,
                 (
+                    net_receive_packets_system,
+                    net_send_sync_system,
+                    net_peer_timeout_system,
                     toggle_scoreboard,
                     update_dukematch_timer,
                     update_splitscreen_viewports,
@@ -46,6 +52,7 @@ impl Plugin for NetPlugin {
             .add_systems(
                 Update,
                 (
+                    update_remote_network_interpolation,
                     update_remote_player_animations,
                     update_actor_billboard_transforms,
                     update_player_billboard_sprites,
@@ -131,6 +138,18 @@ mod tests {
         let bytes5 = pkt5.to_bytes();
         let decoded5 = NetPacket::from_bytes(&bytes5).unwrap();
         assert_eq!(pkt5, decoded5);
+
+        // 6. Disconnect
+        let pkt6 = NetPacket::Disconnect { player_id: 3 };
+        let bytes6 = pkt6.to_bytes();
+        let decoded6 = NetPacket::from_bytes(&bytes6).unwrap();
+        assert_eq!(pkt6, decoded6);
+
+        // 7. Heartbeat
+        let pkt7 = NetPacket::Heartbeat { player_id: 2 };
+        let bytes7 = pkt7.to_bytes();
+        let decoded7 = NetPacket::from_bytes(&bytes7).unwrap();
+        assert_eq!(pkt7, decoded7);
     }
 
     #[test]

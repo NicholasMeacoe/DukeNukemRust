@@ -42,6 +42,12 @@ pub enum NetPacket {
         sender_id: u8,
         message: String,
     },
+    Disconnect {
+        player_id: u8,
+    },
+    Heartbeat {
+        player_id: u8,
+    },
 }
 
 impl NetPacket {
@@ -118,6 +124,14 @@ impl NetPacket {
                 let msg_bytes = safe_msg.as_bytes();
                 buf.push(msg_bytes.len().min(255) as u8);
                 buf.extend_from_slice(msg_bytes);
+            }
+            NetPacket::Disconnect { player_id } => {
+                buf.push(6);
+                buf.push(*player_id);
+            }
+            NetPacket::Heartbeat { player_id } => {
+                buf.push(7);
+                buf.push(*player_id);
             }
         }
         buf
@@ -213,6 +227,18 @@ impl NetPacket {
                 }
                 let message = String::from_utf8_lossy(&data[3..3 + msg_len]).to_string();
                 Ok(NetPacket::ChatMessage { sender_id, message })
+            }
+            6 => {
+                if data.len() < 2 {
+                    return Err("Invalid Disconnect packet".to_string());
+                }
+                Ok(NetPacket::Disconnect { player_id: data[1] })
+            }
+            7 => {
+                if data.len() < 2 {
+                    return Err("Invalid Heartbeat packet".to_string());
+                }
+                Ok(NetPacket::Heartbeat { player_id: data[1] })
             }
             _ => Err(format!("Unknown packet type {}", data[0])),
         }

@@ -41,17 +41,17 @@
   - [x] Verify player vs player damage, frag attribution, and F7 scoreboard display
 
 ## Phase 4: Non-Blocking UDP Network Socket Transport
-- [ ] Task: Write Tests for Non-Blocking UDP Transport & State Synchronization
-  - [ ] Unit test for UDP socket initialization with non-blocking mode on client/server ports
-  - [ ] Unit test for peer connection handshake, packet serialization/deserialization over UDP loopback
-  - [ ] Unit test for `InputSync` and `PlayerStateSync` interpolation and position smoothing
-- [ ] Task: Implement Non-Blocking UDP Transport in `src/net/`
-  - [ ] Implement `NetTransport` resource wrapping `std::net::UdpSocket` with non-blocking recv/send
-  - [ ] Add client/server network loop systems: `net_send_sync_system` and `net_receive_packets_system`
-  - [ ] Synchronize remote player positions, rotations, animations, and weapon firing over UDP
-  - [ ] Handle peer disconnection and timeout detection gracefully
-- [ ] Task: Phase 4 Verification & Checkpoint (Refer to workflow.md)
-  - [ ] Verify non-blocking UDP packets transmit and sync player state across peers
+- [x] Task: Write Tests for Non-Blocking UDP Transport & State Synchronization
+  - [x] Unit test for UDP socket initialization with non-blocking mode on client/server ports
+  - [x] Unit test for peer connection handshake, packet serialization/deserialization over UDP loopback
+  - [x] Unit test for `InputSync` and `PlayerStateSync` interpolation and position smoothing
+- [x] Task: Implement Non-Blocking UDP Transport in `src/net/`
+  - [x] Implement `NetTransport` resource wrapping `std::net::UdpSocket` with non-blocking recv/send
+  - [x] Add client/server network loop systems: `net_send_sync_system` and `net_receive_packets_system`
+  - [x] Synchronize remote player positions, rotations, animations, and weapon firing over UDP
+  - [x] Handle peer disconnection and timeout detection gracefully
+- [x] Task: Phase 4 Verification & Checkpoint (Refer to workflow.md)
+  - [x] Verify non-blocking UDP packets transmit and sync player state across peers
 
 ## Phase 5: Cooperative Campaign Mechanics (Shared Keys & Co-op Respawning)
 - [ ] Task: Write Tests for Shared Keycards & Cooperative Respawning
