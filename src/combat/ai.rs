@@ -423,6 +423,11 @@ pub fn update_con_actors(
                             sound_id: crate::audio::BOS3_DYING,
                         });
                     }
+                    EnemyKind::Boss4Queen => {
+                        sound_events.send(crate::audio::PlaySoundEvent {
+                            sound_id: crate::audio::BOS4_DYING,
+                        });
+                    }
                     _ => {}
                 }
 
@@ -706,6 +711,80 @@ pub fn update_con_actors(
                     }
                     sound_events.send(crate::audio::PlaySoundEvent { sound_id: 112 }); // Quake stomp
                 } else if enemy.attack_timer >= 4.0 {
+                    enemy.attack_timer = 0.0;
+                }
+            }
+
+            // Boss 4: Alien Queen Combat Attacks: Eye Lightning Blasts, Venom Spit Bursts & Tail Strike
+            if enemy.kind == EnemyKind::Boss4Queen
+                && can_see
+                && dist_to_player <= 45.0
+                && player_ctrl.health > 0
+            {
+                enemy.attack_timer += dt;
+                let right = dir_to_player.cross(Vec3::Y).normalize_or_zero();
+
+                // Phase 1 (0.0 to 1.5s): Triple Eye Lightning / Electrical Discharge
+                if enemy.attack_timer <= 1.5 {
+                    let sub_tick = (enemy.attack_timer / 0.2) as i32;
+                    let prev_sub_tick = ((enemy.attack_timer - dt) / 0.2) as i32;
+                    if sub_tick != prev_sub_tick || enemy.attack_timer == dt {
+                        if enemy.attack_timer == dt {
+                            sound_events.send(crate::audio::PlaySoundEvent {
+                                sound_id: crate::audio::BOS4_ATTACK,
+                            });
+                        }
+                        let eye_origin = trans.translation + Vec3::Y * 2.8 + dir_to_player * 0.7;
+                        let spread_x = (rng.next_f32() - 0.5) * 0.05;
+                        let lightning_dir = (dir_to_player + right * spread_x).normalize_or_zero();
+                        projectile_events.send(SpawnProjectileEvent {
+                            projectile_type: ProjectileType::AlienBlaster,
+                            origin: eye_origin,
+                            direction: lightning_dir,
+                            velocity: 60.0,
+                            damage: 20,
+                            is_player_source: false,
+                        });
+                        sound_events.send(crate::audio::PlaySoundEvent { sound_id: 110 });
+                    }
+                } else if enemy.attack_timer <= 2.8 {
+                    // Phase 2 (1.6 to 2.8s): Spit / Venom Organic Barrage
+                    let sub_tick = (enemy.attack_timer / 0.25) as i32;
+                    let prev_sub_tick = ((enemy.attack_timer - dt) / 0.25) as i32;
+                    if sub_tick != prev_sub_tick || (enemy.attack_timer >= 1.6 && (enemy.attack_timer - dt) < 1.6) {
+                        let mouth_origin = trans.translation + Vec3::Y * 2.2 + dir_to_player * 0.8;
+                        let spread_x = (rng.next_f32() - 0.5) * 0.08;
+                        let spread_y = (rng.next_f32() - 0.5) * 0.04;
+                        let spit_dir = (dir_to_player + right * spread_x + Vec3::Y * spread_y).normalize_or_zero();
+                        projectile_events.send(SpawnProjectileEvent {
+                            projectile_type: ProjectileType::Spit,
+                            origin: mouth_origin,
+                            direction: spit_dir,
+                            velocity: 40.0,
+                            damage: 30,
+                            is_player_source: false,
+                        });
+                        sound_events.send(crate::audio::PlaySoundEvent { sound_id: 570 }); // OCTA_ATTACK / SPIT
+                    }
+                } else if enemy.attack_timer >= 3.0 && (enemy.attack_timer - dt) < 3.0 {
+                    // Phase 3 (3.0s): Close-Range Tail Strike
+                    if dist_to_player <= 12.0 {
+                        if let Some(ref mut shake) = camera_shake {
+                            shake.intensity = 0.4;
+                            shake.offset = Vec3::new(
+                                (rng.next_f32() - 0.5) * 0.2,
+                                (rng.next_f32() - 0.5) * 0.2,
+                                (rng.next_f32() - 0.5) * 0.2,
+                            );
+                        }
+                        explosion_events.send(crate::interactivity::ExplosionDamageEvent {
+                            origin: trans.translation + dir_to_player * 2.0,
+                            radius: 8.0,
+                            damage: 60,
+                        });
+                        sound_events.send(crate::audio::PlaySoundEvent { sound_id: 0 }); // KICK_HIT
+                    }
+                } else if enemy.attack_timer >= 3.8 {
                     enemy.attack_timer = 0.0;
                 }
             }

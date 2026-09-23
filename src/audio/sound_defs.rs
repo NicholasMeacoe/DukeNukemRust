@@ -58,6 +58,8 @@ pub const BOS2_ATTACK: i32 = 122;
 pub const BOS2_DYING: i32 = 123;
 pub const BOS3_ATTACK: i32 = 127;
 pub const BOS3_DYING: i32 = 128;
+pub const BOS4_ATTACK: i32 = 135;
+pub const BOS4_DYING: i32 = 136;
 
 // Underwater & Atmosphere
 pub const DUKE_BREATHING: i32 = 23;
@@ -86,6 +88,8 @@ mod tests {
         assert_eq!(BOS2_DYING, 123);
         assert_eq!(BOS3_ATTACK, 127);
         assert_eq!(BOS3_DYING, 128);
+        assert_eq!(BOS4_ATTACK, 135);
+        assert_eq!(BOS4_DYING, 136);
         assert_eq!(MENU_MOVE, 0);
         assert_eq!(MENU_SELECT, 2);
         assert_eq!(BONUS_SPEECH1, 195);

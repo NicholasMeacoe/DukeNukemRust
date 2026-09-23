@@ -1115,6 +1115,114 @@ mod tests {
     }
 
     #[test]
+    fn test_alien_queen_combat_mechanics_and_attacks() {
+        let mut app = App::new();
+        app.add_event::<SpawnProjectileEvent>()
+            .add_event::<crate::audio::PlaySoundEvent>()
+            .add_event::<crate::audio::PlayDukeVoiceEvent>()
+            .add_event::<crate::interactivity::ExplosionDamageEvent>()
+            .add_event::<GibEvent>()
+            .add_event::<crate::game_flow::LevelCompletedEvent>()
+            .insert_resource(Time::<()>::default())
+            .insert_resource(crate::net::DeterministicRng::new(42))
+            .insert_resource(crate::interactivity::EarthquakeCameraShake::default())
+            .insert_resource(crate::game_flow::LevelProgress {
+                current_episode: 4,
+                current_level: 10,
+                ..default()
+            })
+            .insert_resource(
+                crate::scripting::ConScriptEngine::from_source(
+                    crate::scripting::DEFAULT_CORE_CON_SCRIPT,
+                )
+                .unwrap(),
+            )
+            .add_systems(Update, ai::update_con_actors);
+
+        let mut player_ctrl = crate::player::types::PlayerController::default();
+        player_ctrl.health = 100;
+        app.world_mut().spawn((
+            player_ctrl,
+            TransformBundle::from_transform(Transform::from_xyz(0.0, 0.0, 0.0)),
+        ));
+
+        let mut queen_actor = EnemyActor::new_queen();
+        queen_actor.health = 6000;
+        let mut con_actor = crate::scripting::ConActor::new(BOSS4, 0, 0, 6000);
+        con_actor.registers.move_ptr = Some(0);
+        con_actor.hitag = crate::scripting::move_flags::SEEK_PLAYER as i16;
+
+        let boss_entity = app.world_mut().spawn((
+            queen_actor,
+            con_actor,
+            TransformBundle::from_transform(Transform::from_xyz(0.0, 0.0, 10.0)),
+        )).id();
+
+        // 1. Advance time by 0.1s: Queen fires eye lightning AlienBlaster and plays BOS4_ATTACK
+        {
+            let mut time = app.world_mut().resource_mut::<Time>();
+            time.advance_by(std::time::Duration::from_millis(100));
+        }
+        app.update();
+
+        let proj_events = app.world().resource::<Events<SpawnProjectileEvent>>();
+        let mut proj_reader = proj_events.get_reader();
+        let projs: Vec<_> = proj_reader.read(proj_events).cloned().collect();
+        assert!(
+            projs.iter().any(|p| p.projectile_type == ProjectileType::AlienBlaster),
+            "Alien Queen must fire eye lightning AlienBlaster projectiles in phase 1"
+        );
+
+        let sound_events = app.world().resource::<Events<crate::audio::PlaySoundEvent>>();
+        let mut sound_reader = sound_events.get_reader();
+        let sounds: Vec<_> = sound_reader.read(sound_events).cloned().collect();
+        assert!(
+            sounds.iter().any(|s| s.sound_id == crate::audio::BOS4_ATTACK),
+            "Alien Queen must play BOS4_ATTACK sound on initiating attack"
+        );
+
+        // 2. Advance to phase 2 (1.6s): Organic spit/venom barrage
+        {
+            let mut enemy = app.world_mut().get_mut::<EnemyActor>(boss_entity).unwrap();
+            enemy.attack_timer = 1.55;
+            let mut time = app.world_mut().resource_mut::<Time>();
+            time.advance_by(std::time::Duration::from_millis(100));
+        }
+        app.update();
+
+        let proj_events = app.world().resource::<Events<SpawnProjectileEvent>>();
+        let mut proj_reader = proj_events.get_reader();
+        let projs: Vec<_> = proj_reader.read(proj_events).cloned().collect();
+        assert!(
+            projs.iter().any(|p| p.projectile_type == ProjectileType::Spit),
+            "Alien Queen must fire organic Spit projectiles in phase 2"
+        );
+
+        // 3. Advance to phase 3 (3.0s): Close-range tail strike (within 12m)
+        {
+            let mut enemy = app.world_mut().get_mut::<EnemyActor>(boss_entity).unwrap();
+            enemy.attack_timer = 2.95;
+            let mut time = app.world_mut().resource_mut::<Time>();
+            time.advance_by(std::time::Duration::from_millis(100));
+        }
+        app.update();
+
+        let shake = app.world().resource::<crate::interactivity::EarthquakeCameraShake>();
+        assert!(
+            shake.intensity > 0.0,
+            "Alien Queen tail strike must trigger camera rumble"
+        );
+
+        let exp_events = app.world().resource::<Events<crate::interactivity::ExplosionDamageEvent>>();
+        let mut exp_reader = exp_events.get_reader();
+        let exps: Vec<_> = exp_reader.read(exp_events).cloned().collect();
+        assert!(
+            exps.iter().any(|e| e.damage == 60),
+            "Alien Queen tail strike must deal heavy impact damage"
+        );
+    }
+
+    #[test]
     fn test_boss_status_effect_immunities_and_death_sound() {
         assert!(EnemyKind::Boss1Battlelord.is_boss());
         assert!(EnemyKind::Boss1Mini.is_boss());

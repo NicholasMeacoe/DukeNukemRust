@@ -1,16 +1,16 @@
 # Implementation Plan: Episode 4 Plutonium Pak Campaign Maps & Alien Queen Boss Fight
 
 ## Phase 1: Alien Queen Combat AI & Multi-Phase Attack Behaviors
-- [ ] Task: Write Tests for Alien Queen Attack Cycle & Status Immunities
-  - [ ] Unit test verifying Queen attack cycle: triple eye lightning discharge, spit/venom burst, and close-range tail swipe
-  - [ ] Unit test verifying Queen sound definitions (`BOS4_ATTACK`, `BOS4_DYING`) and dropped Atomic Health
-  - [ ] Unit test verifying Queen status effect immunities (immune to shrink, freeze, expander)
-- [ ] Task: Implement Alien Queen Attack Routines & Sounds in `src/combat/` and `src/audio/`
-  - [ ] Add `BOS4_ATTACK` and `BOS4_DYING` sound constants in `src/audio/sound_defs.rs`
-  - [ ] Implement multi-phase attack timer for `Boss4Queen` in `src/combat/ai.rs`
-  - [ ] Wire boss footstep tremors and death scream in `src/combat/ai.rs`
-- [ ] Task: Phase 1 Verification & Checkpoint (Refer to workflow.md)
-  - [ ] Verify Alien Queen initiates combat attacks, spawns projectiles towards player, and resists status effects
+- [x] Task: Write Tests for Alien Queen Attack Cycle & Status Immunities
+  - [x] Unit test verifying Queen attack cycle: triple eye lightning discharge, spit/venom burst, and close-range tail swipe
+  - [x] Unit test verifying Queen sound definitions (`BOS4_ATTACK`, `BOS4_DYING`) and dropped Atomic Health
+  - [x] Unit test verifying Queen status effect immunities (immune to shrink, freeze, expander)
+- [x] Task: Implement Alien Queen Attack Routines & Sounds in `src/combat/` and `src/audio/`
+  - [x] Add `BOS4_ATTACK` and `BOS4_DYING` sound constants in `src/audio/sound_defs.rs`
+  - [x] Implement multi-phase attack timer for `Boss4Queen` in `src/combat/ai.rs`
+  - [x] Wire boss footstep tremors and death scream in `src/combat/ai.rs`
+- [x] Task: Phase 1 Verification & Checkpoint (Refer to workflow.md)
+  - [x] Verify Alien Queen initiates combat attacks, spawns projectiles towards player, and resists status effects
 
 ## Phase 2: Episode 4 Boss Level Victory Sequence
 - [ ] Task: Write Tests for Queen Boss Defeat Level Completion on E4L10
