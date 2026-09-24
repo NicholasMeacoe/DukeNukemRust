@@ -234,6 +234,7 @@ pub fn update_projectiles(
                         radius: 5.0,
                         damage: proj.damage,
                         attacker_id: proj.source_player_id,
+                        excluded_entity: None,
                     });
                     decal_events.send(crate::combat::decals::SpawnDecalEvent {
                         origin: hit_point,
@@ -294,6 +295,7 @@ pub fn update_projectiles(
                             radius: 4.0,
                             damage: proj.damage,
                             attacker_id: proj.source_player_id,
+                            excluded_entity: None,
                         });
                         proj.lifetime = 0.0;
                     } else {
@@ -357,6 +359,7 @@ pub fn update_projectiles(
                             radius: 5.0,
                             damage: proj.damage,
                             attacker_id: proj.source_player_id,
+                            excluded_entity: Some(e_entity),
                         });
                     }
 
@@ -403,6 +406,7 @@ pub fn update_projectiles(
                     radius: 5.0,
                     damage: proj.damage,
                     attacker_id: proj.source_player_id,
+                    excluded_entity: Some(p_entity),
                 });
             }
 
@@ -470,6 +474,7 @@ pub fn update_enemy_status_effects(
                     radius: 4.0,
                     damage: 80,
                     attacker_id: None,
+                    excluded_entity: None,
                 });
             }
         }

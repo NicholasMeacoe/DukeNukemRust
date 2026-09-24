@@ -23,14 +23,14 @@
   - [x] Verify trap and barrel explosion kills attribute correctly to the attacker
 
 ## Phase 3: Explosive Double-Damage Fix & HandRemote Glitch Resolution
-- [ ] Task: Write Tests for Rocket Splash Anti-Double-Dipping & HandRemote Detonation
-  - [ ] Unit test: Direct RPG rocket hit applies 120 direct damage without applying duplicate epicenter splash to the primary target
-  - [ ] Unit test: Firing `HandRemote` detonates active pipebombs without immediately throwing another pipebomb
-- [ ] Task: Implement Anti-Double-Dipping and Detonation Fire Guard in `src/combat/projectiles.rs` and `src/player/weapons.rs`
-  - [ ] Guard `handle_weapon_firing` auto-fire check with `!is_detonating`
-  - [ ] Exclude direct-hit victim from taking stacked epicenter explosion splash damage
-- [ ] Task: Phase 3 Verification & Checkpoint (Refer to workflow.md)
-  - [ ] Verify rocket damage values and clean single-trigger pipebomb detonation
+- [x] Task: Write Tests for Rocket Splash Anti-Double-Dipping & HandRemote Detonation
+  - [x] Unit test: Direct RPG rocket hit applies 120 direct damage without applying duplicate epicenter splash to the primary target
+  - [x] Unit test: Firing `HandRemote` detonates active pipebombs without immediately throwing another pipebomb
+- [x] Task: Implement Anti-Double-Dipping and Detonation Fire Guard in `src/combat/projectiles.rs` and `src/player/weapons.rs`
+  - [x] Guard `handle_weapon_firing` auto-fire check with `!is_detonating`
+  - [x] Exclude direct-hit victim from taking stacked epicenter explosion splash damage
+- [x] Task: Phase 3 Verification & Checkpoint (Refer to workflow.md)
+  - [x] Verify rocket damage values and clean single-trigger pipebomb detonation
 
 ## Phase 4: Exotic PvP Weapon Effects (Shrinker & Freezethrower)
 - [ ] Task: Write Tests for Shrinker & Freezethrower Effects on Players

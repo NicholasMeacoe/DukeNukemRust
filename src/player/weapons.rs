@@ -249,6 +249,7 @@ pub fn handle_weapon_firing(
                     radius: 7.0,
                     damage: 150,
                     attacker_id: Some(player_id),
+                    excluded_entity: None,
                 });
                 light_events.send(crate::lighting::SpawnDynamicLightEvent::explosion(
                     p_trans.translation,
@@ -269,6 +270,7 @@ pub fn handle_weapon_firing(
     }
 
     if is_firing
+        && !is_detonating
         && player.weapons[cur_idx].fire_timer <= 0.0
         && player.weapons[cur_idx].reload_timer <= 0.0
     {
@@ -655,6 +657,7 @@ pub fn handle_weapon_firing(
                             radius: 7.0,
                             damage: 150,
                             attacker_id: Some(player_id),
+                            excluded_entity: None,
                         });
                         light_events.send(crate::lighting::SpawnDynamicLightEvent::explosion(
                             p_trans.translation,
@@ -765,6 +768,7 @@ pub fn update_laser_tripbombs(
                 radius: bomb.damage_radius,
                 damage: bomb.damage,
                 attacker_id: bomb.owner_player_id,
+                excluded_entity: None,
             });
             commands.entity(entity).despawn_recursive();
         }
@@ -945,6 +949,7 @@ pub fn detonate_player_pipebombs(
             radius: 7.0,
             damage: 150,
             attacker_id: None,
+            excluded_entity: None,
         });
         commands.entity(entity).despawn_recursive();
     }
@@ -1163,5 +1168,96 @@ mod tests {
         let exps: Vec<_> = exp_reader.read(exp_events).cloned().collect();
         assert_eq!(exps.len(), 1, "Tripbomb must detonate when player intersects beam");
         assert_eq!(exps[0].attacker_id, Some(2), "Explosion must preserve owner_player_id as attacker_id");
+    }
+
+    #[test]
+    fn test_hand_remote_detonation_does_not_auto_rethrow() {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins);
+        app.init_resource::<ButtonInput<KeyCode>>();
+        app.init_resource::<ButtonInput<MouseButton>>();
+        app.insert_resource(crate::net::DeterministicRng::new(42));
+        app.add_event::<SpawnProjectileEvent>();
+        app.add_event::<ExplosionDamageEvent>();
+        app.add_event::<PlaySoundEvent>();
+        app.add_event::<crate::combat::gore::SpawnCasingEvent>();
+        app.add_event::<crate::lighting::SpawnDynamicLightEvent>();
+
+        // Spawn player holding HandRemote, with 5 pipebomb ammo
+        let mut player = PlayerController::default();
+        player.current_weapon = WeaponType::HandRemote;
+        let pipe_idx = WeaponType::Pipebomb as usize;
+        player.weapons[pipe_idx].ammo = 5;
+        player.weapons[pipe_idx].is_unlocked = true;
+
+        let player_entity = app.world_mut().spawn((Transform::default(), player)).id();
+        app.world_mut().spawn(Camera3dBundle::default());
+
+        // Spawn an active pipebomb in the world owned by player 0
+        let pipebomb_entity = app
+            .world_mut()
+            .spawn((
+                TransformBundle::from_transform(Transform::from_xyz(0.0, 0.0, 5.0)),
+                crate::combat::types::Projectile {
+                    projectile_type: ProjectileType::Pipebomb,
+                    velocity: Vec3::ZERO,
+                    damage: 150,
+                    is_player_source: true,
+                    source_player_id: Some(0),
+                    lifetime: f32::INFINITY,
+                    bounces: 0,
+                },
+            ))
+            .id();
+
+        let mut config = crate::config::GameConfig::default();
+        config.controls.auto_switch_weapon = true;
+        app.insert_resource(config);
+
+        app.add_systems(Update, handle_weapon_firing);
+
+        // Click Left mouse to trigger HandRemote detonation
+        app.world_mut()
+            .resource_mut::<ButtonInput<MouseButton>>()
+            .press(MouseButton::Left);
+        app.update();
+
+        // 1. Verify pipebomb in world was detonated and despawned
+        assert!(
+            app.world().get_entity(pipebomb_entity).is_none(),
+            "Pipebomb must be despawned upon detonation"
+        );
+
+        // 2. Verify an ExplosionDamageEvent was emitted
+        let exp_events = app.world().resource::<Events<ExplosionDamageEvent>>();
+        let mut exp_reader = exp_events.get_reader();
+        let exps: Vec<_> = exp_reader.read(exp_events).cloned().collect();
+        assert_eq!(
+            exps.len(),
+            1,
+            "Detonating pipebomb must emit ExplosionDamageEvent"
+        );
+
+        // 3. Verify no new projectile was spawned (no auto-rethrow glitch)
+        let proj_events = app.world().resource::<Events<SpawnProjectileEvent>>();
+        let mut proj_reader = proj_events.get_reader();
+        let projs: Vec<_> = proj_reader.read(proj_events).cloned().collect();
+        assert_eq!(
+            projs.len(),
+            0,
+            "Detonating HandRemote must NOT immediately rethrow a new pipebomb"
+        );
+
+        // 4. Verify pipebomb ammo is still 5 (not consumed to 4)
+        let pl = app.world().entity(player_entity).get::<PlayerController>().unwrap();
+        assert_eq!(
+            pl.weapons[pipe_idx].ammo, 5,
+            "Pipebomb ammo must not be consumed by detonation click"
+        );
+        assert_eq!(
+            pl.current_weapon,
+            WeaponType::Pipebomb,
+            "Weapon should switch back to Pipebomb ready for next deliberate throw"
+        );
     }
 }

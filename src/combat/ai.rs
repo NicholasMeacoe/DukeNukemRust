@@ -718,6 +718,7 @@ pub fn update_con_actors(
                             radius: 15.0,
                             damage: 50,
                             attacker_id: None,
+                            excluded_entity: None,
                         });
                     }
                     sound_events.send(crate::audio::PlaySoundEvent { sound_id: 112 }); // Quake stomp
@@ -795,6 +796,7 @@ pub fn update_con_actors(
                             radius: 8.0,
                             damage: 60,
                             attacker_id: None,
+                            excluded_entity: None,
                         });
                         sound_events.send(crate::audio::PlaySoundEvent { sound_id: 0 }); // KICK_HIT
                     }
@@ -863,6 +865,7 @@ pub fn update_con_actors(
                 radius: radius as f32 / 1024.0,
                 damage: dmg,
                 attacker_id: None,
+                excluded_entity: None,
             });
         }
 

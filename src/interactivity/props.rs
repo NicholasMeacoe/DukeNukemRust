@@ -304,7 +304,7 @@ pub fn handle_explosions(
     mut fountains: Query<(&Transform, &mut WaterFountain)>,
     mut crack_walls: Query<(&Transform, &mut CrackWall)>,
     mut glass_windows: Query<(Entity, &Transform, &mut BreakableGlass)>,
-    mut players: Query<(&Transform, &mut crate::player::PlayerController, Option<&crate::player::types::PlayerId>)>,
+    mut players: Query<(Entity, &Transform, &mut crate::player::PlayerController, Option<&crate::player::types::PlayerId>)>,
     mut enemies: Query<(
         Entity,
         &Transform,
@@ -334,7 +334,10 @@ pub fn handle_explosions(
         }
 
         // 1. Damage Player with 4-tier hitradius falloff and armor mitigation
-        for (p_trans, mut player, opt_id) in players.iter_mut() {
+        for (p_entity, p_trans, mut player, opt_id) in players.iter_mut() {
+            if Some(p_entity) == exp.excluded_entity {
+                continue;
+            }
             let dist = p_trans.translation.distance(origin);
             if dist <= exp.radius && !player.god_mode && player.health > 0 {
                 let mut damage = calculate_hitradius_damage(dist, exp.radius, exp.damage);
@@ -368,7 +371,10 @@ pub fn handle_explosions(
         }
 
         // 2. Damage Enemies with 4-tier hitradius falloff & gibbing
-        for (_e_entity, e_trans, mut enemy, con_actor) in enemies.iter_mut() {
+        for (e_entity, e_trans, mut enemy, con_actor) in enemies.iter_mut() {
+            if Some(e_entity) == exp.excluded_entity {
+                continue;
+            }
             let dist = e_trans.translation.distance(origin);
             if dist <= exp.radius && enemy.health > 0 {
                 let damage = calculate_hitradius_damage(dist, exp.radius, exp.damage);
@@ -501,6 +507,7 @@ pub fn handle_barrel_chain_explosions(
             radius: exp.radius,
             damage: exp.damage,
             attacker_id: exp.attacker_id,
+            excluded_entity: None,
         });
     }
 }
@@ -614,6 +621,7 @@ mod tests {
             radius: 5.0,
             damage: 50,
             attacker_id: None,
+            excluded_entity: None,
         });
 
         app.update();
@@ -686,6 +694,7 @@ mod tests {
             radius: 5.0,
             damage: 80,
             attacker_id: None,
+            excluded_entity: None,
         });
 
         app.update();

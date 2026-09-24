@@ -415,6 +415,7 @@ pub struct ExplosionDamageEvent {
     pub radius: f32,
     pub damage: i32,
     pub attacker_id: Option<usize>,
+    pub excluded_entity: Option<Entity>,
 }
 
 #[derive(Event, Debug, Clone)]

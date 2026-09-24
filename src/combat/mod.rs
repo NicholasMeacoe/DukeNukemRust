@@ -1778,4 +1778,95 @@ mod tests {
         assert!(trans.translation.z <= -50.0, "Bullet must have traveled at least 50m forward (z <= -50.0), got {}", trans.translation.z);
         assert!(proj.lifetime > 0.0, "Bullet lifetime must still be active");
     }
+
+    #[test]
+    fn test_direct_rocket_anti_double_dipping() {
+        let mut app = App::new();
+        app.add_event::<crate::interactivity::types::ExplosionDamageEvent>()
+            .add_event::<crate::interactivity::BarrelExplodeEvent>()
+            .add_event::<crate::interactivity::ActivateTagEvent>()
+            .add_event::<crate::audio::PlaySoundEvent>()
+            .add_event::<crate::combat::GibEvent>()
+            .add_event::<crate::lighting::SpawnDynamicLightEvent>()
+            .add_event::<crate::net::PlayerFragEvent>()
+            .add_event::<crate::net::PvpDamageEvent>()
+            .add_systems(
+                Update,
+                (
+                    crate::net::pvp::apply_pvp_damage,
+                    crate::interactivity::props::handle_explosions,
+                )
+                    .chain(),
+            );
+
+        // Spawn direct-hit target player (Player 1) with 200 HP
+        let mut target_ctrl = crate::player::PlayerController::default();
+        target_ctrl.health = 200;
+        let target_entity = app
+            .world_mut()
+            .spawn((
+                target_ctrl,
+                crate::player::types::PlayerId(1),
+                TransformBundle::from_transform(Transform::from_xyz(0.0, 0.0, 5.0)),
+            ))
+            .id();
+
+        // Spawn bystander player (Player 2) with 200 HP at 1.0m away from hit point
+        let mut bystander_ctrl = crate::player::PlayerController::default();
+        bystander_ctrl.health = 200;
+        let bystander_entity = app
+            .world_mut()
+            .spawn((
+                bystander_ctrl,
+                crate::player::types::PlayerId(2),
+                TransformBundle::from_transform(Transform::from_xyz(0.0, 0.0, 6.0)),
+            ))
+            .id();
+
+        // Simulate direct rocket impact:
+        // 1. Direct hit deals 120 direct PvP damage to target
+        app.world_mut().send_event(crate::net::PvpDamageEvent {
+            attacker_id: 0,
+            target_player_id: 1,
+            damage: 120,
+            weapon_type: 4,
+        });
+
+        // 2. Rocket explosion at hit point (0.0, 0.0, 5.0) with excluded_entity = target_entity
+        app.world_mut()
+            .send_event(crate::interactivity::types::ExplosionDamageEvent {
+                origin: Vec3::new(0.0, 0.0, 5.0),
+                radius: 5.0,
+                damage: 120,
+                attacker_id: Some(0),
+                excluded_entity: Some(target_entity),
+            });
+
+        app.update();
+
+        let target_hp = app
+            .world()
+            .entity(target_entity)
+            .get::<crate::player::PlayerController>()
+            .unwrap()
+            .health;
+        let bystander_hp = app
+            .world()
+            .entity(bystander_entity)
+            .get::<crate::player::PlayerController>()
+            .unwrap()
+            .health;
+
+        // Target must take ONLY direct damage (200 - 120 = 80), NOT double-dipped duplicate splash (which would be 200 - 240 <= 0)
+        assert_eq!(
+            target_hp, 80,
+            "Direct hit target must take exactly 120 direct damage without stacked splash double-dipping"
+        );
+
+        // Bystander must take splash damage
+        assert!(
+            bystander_hp < 200,
+            "Bystander within explosion radius must take splash damage"
+        );
+    }
 }

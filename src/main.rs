@@ -698,6 +698,7 @@ fn update_weapon(
                                 radius: 6.0,
                                 damage: 100,
                                 attacker_id: None,
+                                excluded_entity: None,
                             });
                         }
                         commands.entity(entity).despawn_recursive();
