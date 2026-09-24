@@ -84,6 +84,45 @@ pub fn apply_pvp_damage(
                 remaining_dmg -= absorbed;
             }
 
+            // Frozen player shatters on any damage
+            if player.freeze_timer > 0.0 {
+                player.freeze_timer = 0.0;
+                player.health = 0;
+                player.death_timer = 3.0;
+                frag_events.send(PlayerFragEvent {
+                    killer_id: ev.attacker_id,
+                    victim_id: ev.target_player_id,
+                    weapon_type: ev.weapon_type,
+                });
+                continue;
+            }
+
+            // Boot stomp on shrunk player
+            if ev.weapon_type == 0 && player.shrink_timer > 0.0 {
+                player.health = 0;
+                player.death_timer = 3.0;
+                frag_events.send(PlayerFragEvent {
+                    killer_id: ev.attacker_id,
+                    victim_id: ev.target_player_id,
+                    weapon_type: ev.weapon_type,
+                });
+                continue;
+            }
+
+            // Shrinker weapon effect (weapon_type 6)
+            if ev.weapon_type == 6 {
+                player.shrink_timer = 9.0;
+            }
+
+            // Freezethrower lethal freeze (weapon_type 8)
+            if ev.weapon_type == 8 {
+                if player.health - remaining_dmg <= 0 {
+                    player.health = 1;
+                    player.freeze_timer = 4.6;
+                    continue;
+                }
+            }
+
             player.health -= remaining_dmg;
 
             if player.health <= 0 {
@@ -579,5 +618,145 @@ mod tests {
 
         let invuln = app.world().entity(player_entity).get::<SpawnInvulnerability>();
         assert!(invuln.is_some(), "Respawned player must gain SpawnInvulnerability");
+    }
+
+    #[test]
+    fn test_shrinker_status_effect_on_player() {
+        let mut app = App::new();
+        app.add_event::<PvpDamageEvent>()
+            .add_event::<PlayerFragEvent>()
+            .add_systems(Update, apply_pvp_damage);
+
+        let mut victim = PlayerController::default();
+        victim.health = 100;
+        let victim_entity = app.world_mut().spawn((victim, PlayerId(1))).id();
+
+        // Attacker (Player 0) hits Player 1 with Shrinker (weapon_type = 6)
+        app.world_mut().send_event(PvpDamageEvent {
+            attacker_id: 0,
+            target_player_id: 1,
+            damage: 0,
+            weapon_type: 6,
+        });
+
+        app.update();
+
+        let updated_victim = app
+            .world()
+            .entity(victim_entity)
+            .get::<PlayerController>()
+            .unwrap();
+        assert_eq!(
+            updated_victim.shrink_timer, 9.0,
+            "Player hit by Shrinker must enter shrink_timer = 9.0"
+        );
+
+        // Now test boot stomp on shrunk player
+        app.world_mut().send_event(PvpDamageEvent {
+            attacker_id: 0,
+            target_player_id: 1,
+            damage: 15,
+            weapon_type: 0, // Mighty Boot
+        });
+
+        app.update();
+
+        let updated_victim2 = app
+            .world()
+            .entity(victim_entity)
+            .get::<PlayerController>()
+            .unwrap();
+        assert_eq!(
+            updated_victim2.health, 0,
+            "Boot kick on shrunk player must execute an instant squash fatality"
+        );
+
+        let frag_events = app.world().resource::<Events<PlayerFragEvent>>();
+        let mut frag_reader = frag_events.get_reader();
+        let frags: Vec<_> = frag_reader.read(frag_events).cloned().collect();
+        assert_eq!(
+            frags.len(),
+            1,
+            "Squashed shrunk player must emit PlayerFragEvent"
+        );
+        assert_eq!(frags[0].killer_id, 0);
+        assert_eq!(frags[0].victim_id, 1);
+    }
+
+    #[test]
+    fn test_freezethrower_lethal_freeze_and_shatter() {
+        let mut app = App::new();
+        app.add_event::<PvpDamageEvent>()
+            .add_event::<PlayerFragEvent>()
+            .add_systems(Update, apply_pvp_damage);
+
+        let mut victim = PlayerController::default();
+        victim.health = 20; // Low health
+        let victim_entity = app.world_mut().spawn((victim, PlayerId(1))).id();
+
+        // Freezethrower shard deals lethal damage (25 >= 20)
+        app.world_mut().send_event(PvpDamageEvent {
+            attacker_id: 0,
+            target_player_id: 1,
+            damage: 25,
+            weapon_type: 8, // Freezethrower
+        });
+
+        app.update();
+
+        let updated_victim = app
+            .world()
+            .entity(victim_entity)
+            .get::<PlayerController>()
+            .unwrap();
+        assert_eq!(
+            updated_victim.health, 1,
+            "Lethal Freezethrower damage must set health to 1"
+        );
+        assert_eq!(
+            updated_victim.freeze_timer, 4.6,
+            "Lethal Freezethrower damage must set freeze_timer = 4.6"
+        );
+
+        // Verify NO frag event was sent yet (player is frozen, not dead)
+        let frag_events = app.world().resource::<Events<PlayerFragEvent>>();
+        let mut frag_reader = frag_events.get_reader();
+        let frags: Vec<_> = frag_reader.read(frag_events).cloned().collect();
+        assert_eq!(
+            frags.len(),
+            0,
+            "Frozen player must not trigger frag until shattered"
+        );
+
+        // Player takes ANY damage while frozen -> glass shatter fatality
+        app.world_mut().send_event(PvpDamageEvent {
+            attacker_id: 0,
+            target_player_id: 1,
+            damage: 5,
+            weapon_type: 1, // Pistol
+        });
+
+        app.update();
+
+        let updated_victim2 = app
+            .world()
+            .entity(victim_entity)
+            .get::<PlayerController>()
+            .unwrap();
+        assert_eq!(
+            updated_victim2.health, 0,
+            "Any damage to frozen player must shatter them to 0 health"
+        );
+
+        let frag_events = app.world().resource::<Events<PlayerFragEvent>>();
+        let mut frag_reader = frag_events.get_reader();
+        let frags: Vec<_> = frag_reader.read(frag_events).cloned().collect();
+        assert_eq!(
+            frags.len(),
+            1,
+            "Shattered frozen player must emit PlayerFragEvent"
+        );
+        assert_eq!(frags[0].killer_id, 0);
+        assert_eq!(frags[0].victim_id, 1);
     }
 }

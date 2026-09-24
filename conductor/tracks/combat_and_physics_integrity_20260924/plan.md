@@ -33,13 +33,13 @@
   - [x] Verify rocket damage values and clean single-trigger pipebomb detonation
 
 ## Phase 4: Exotic PvP Weapon Effects (Shrinker & Freezethrower)
-- [ ] Task: Write Tests for Shrinker & Freezethrower Effects on Players
-  - [ ] Unit test: Player hit by Shrinker enters `shrink_timer = 9.0`
-  - [ ] Unit test: Lethal damage from Freezethrower triggers `freeze_timer = 4.6` and `health = 1`
-- [ ] Task: Implement Exotic PvP Status Effects in `src/net/pvp.rs`
-  - [ ] Wire weapon types 6 (Shrinker) and 8 (Freezethrower) in `apply_pvp_damage`
-- [ ] Task: Phase 4 Verification & Checkpoint (Refer to workflow.md)
-  - [ ] Verify player shrinkage and freezing behavior under PvP conditions
+- [x] Task: Write Tests for Shrinker & Freezethrower Effects on Players
+  - [x] Unit test: Player hit by Shrinker enters `shrink_timer = 9.0`
+  - [x] Unit test: Lethal damage from Freezethrower triggers `freeze_timer = 4.6` and `health = 1`
+- [x] Task: Implement Exotic PvP Status Effects in `src/net/pvp.rs`
+  - [x] Wire weapon types 6 (Shrinker) and 8 (Freezethrower) in `apply_pvp_damage`
+- [x] Task: Phase 4 Verification & Checkpoint (Refer to workflow.md)
+  - [x] Verify player shrinkage and freezing behavior under PvP conditions
 
 ## Phase 5: Full Verification, Warnings Audit & Track Completion
 - [ ] Task: Comprehensive Test Suite & Warning Audit
