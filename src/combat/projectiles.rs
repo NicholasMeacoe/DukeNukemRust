@@ -11,8 +11,8 @@ pub fn spawn_projectiles(mut events: EventReader<SpawnProjectileEvent>, mut comm
         let vel = ev.direction.normalize_or_zero() * ev.velocity;
         let lifetime = match ev.projectile_type {
             ProjectileType::HitscanBullet
-            | ProjectileType::ShotgunPellet
-            | ProjectileType::MightyBoot => 0.05,
+            | ProjectileType::ShotgunPellet => 1.5,
+            ProjectileType::MightyBoot => 0.05,
             ProjectileType::Rocket | ProjectileType::DevastatorMissile => 4.0,
             ProjectileType::Pipebomb => f32::INFINITY,
             _ => 3.0,
@@ -159,10 +159,22 @@ pub fn update_projectiles(
             if step_dist > 0.001 {
                 let ray_dir = step_vec / step_dist;
                 let filter = if proj.is_player_source {
-                    QueryFilter::new().groups(CollisionGroups::new(
+                    let mut f = QueryFilter::new().groups(CollisionGroups::new(
                         Group::ALL,
                         Group::GROUP_1 | Group::GROUP_2 | Group::GROUP_3,
-                    ))
+                    ));
+                    if let Some(src_pid) = proj.source_player_id {
+                        for (p_ent, _, _, opt_pid) in players.iter() {
+                            let pid = opt_pid.map_or(0, |id| id.0);
+                            if pid == src_pid {
+                                f = f.exclude_collider(p_ent);
+                                break;
+                            }
+                        }
+                    } else if let Some((first_p_ent, _, _, _)) = players.iter().next() {
+                        f = f.exclude_collider(first_p_ent);
+                    }
+                    f
                 } else {
                     QueryFilter::new().groups(CollisionGroups::new(
                         Group::ALL,

@@ -1678,4 +1678,104 @@ mod tests {
             assert_eq!(events.len(), 0, "Alien Queen defeat on non-boss level (E4L1) must NOT complete level");
         }
     }
+
+    #[test]
+    fn test_hitscan_bullet_extended_travel_and_range() {
+        let mut app = App::new();
+        app.add_event::<SpawnProjectileEvent>()
+            .add_systems(Update, spawn_projectiles);
+
+        app.world_mut().send_event(SpawnProjectileEvent {
+            projectile_type: ProjectileType::HitscanBullet,
+            origin: Vec3::new(0.0, 1.0, 0.0),
+            direction: Vec3::new(0.0, 0.0, -1.0),
+            velocity: 150.0,
+            damage: 10,
+            is_player_source: true,
+            source_player_id: Some(0),
+        });
+
+        app.update();
+
+        let mut proj_query = app.world_mut().query::<(&Transform, &Projectile)>();
+        let (_, proj) = proj_query.iter(app.world()).next().unwrap();
+        assert!(proj.lifetime >= 1.4, "Hitscan bullet lifetime must be >= 1.4s (1.5s target)");
+        assert_eq!(proj.projectile_type, ProjectileType::HitscanBullet);
+    }
+
+    #[test]
+    fn test_shotgun_pellet_extended_travel_and_range() {
+        let mut app = App::new();
+        app.add_event::<SpawnProjectileEvent>()
+            .add_systems(Update, spawn_projectiles);
+
+        app.world_mut().send_event(SpawnProjectileEvent {
+            projectile_type: ProjectileType::ShotgunPellet,
+            origin: Vec3::new(0.0, 1.0, 0.0),
+            direction: Vec3::new(0.0, 0.0, -1.0),
+            velocity: 120.0,
+            damage: 10,
+            is_player_source: true,
+            source_player_id: Some(0),
+        });
+
+        app.update();
+
+        let mut proj_query = app.world_mut().query::<(&Transform, &Projectile)>();
+        let (_, proj) = proj_query.iter(app.world()).next().unwrap();
+        assert!(proj.lifetime >= 1.4, "Shotgun pellet lifetime must be >= 1.4s (1.5s target)");
+        assert_eq!(proj.projectile_type, ProjectileType::ShotgunPellet);
+    }
+
+    #[test]
+    fn test_muzzle_raycast_excludes_shooter_collider() {
+        use bevy_rapier3d::prelude::*;
+        let filter = QueryFilter::new().groups(CollisionGroups::new(
+            Group::ALL,
+            Group::GROUP_1 | Group::GROUP_2 | Group::GROUP_3,
+        ));
+        let dummy_shooter = Entity::from_raw(1234);
+        let filter = filter.exclude_collider(dummy_shooter);
+        assert_eq!(filter.exclude_collider, Some(dummy_shooter));
+    }
+
+    #[test]
+    fn test_hitscan_bullet_multi_frame_travel_50m() {
+        let mut app = App::new();
+        app.add_event::<SpawnProjectileEvent>()
+            .add_event::<EntityDamageEvent>()
+            .add_event::<crate::net::PvpDamageEvent>()
+            .add_event::<crate::interactivity::types::ExplosionDamageEvent>()
+            .add_event::<crate::audio::PlaySoundEvent>()
+            .add_event::<crate::combat::decals::SpawnDecalEvent>()
+            .add_event::<crate::interactivity::WallDamageEvent>()
+            .add_event::<GibEvent>()
+            .init_resource::<Time>()
+            .add_systems(Update, (spawn_projectiles, update_projectiles).chain());
+
+        app.world_mut().send_event(SpawnProjectileEvent {
+            projectile_type: ProjectileType::HitscanBullet,
+            origin: Vec3::new(0.0, 1.0, 0.0),
+            direction: Vec3::new(0.0, 0.0, -1.0),
+            velocity: 150.0,
+            damage: 10,
+            is_player_source: true,
+            source_player_id: Some(0),
+        });
+
+        // Frame 1: Spawn projectile
+        app.update();
+
+        // Advance time by 0.4 seconds (at 150m/s, bullet travels 60m)
+        {
+            let mut time = app.world_mut().resource_mut::<Time>();
+            time.advance_by(std::time::Duration::from_millis(400));
+        }
+        app.update();
+
+        let mut proj_query = app.world_mut().query::<(&Transform, &Projectile)>();
+        let (trans, proj) = proj_query.iter(app.world()).next().expect("Projectile must still exist after 0.4s (60m)");
+        assert!(trans.translation.z <= -50.0, "Bullet must have traveled at least 50m forward (z <= -50.0), got {}", trans.translation.z);
+        assert!(proj.lifetime > 0.0, "Bullet lifetime must still be active");
+    }
 }

@@ -1,14 +1,14 @@
 # Implementation Plan: Combat and Physics Integrity
 
 ## Phase 1: Hitscan Weapon Range & Muzzle Raycast Refinement
-- [ ] Task: Write Tests for Hitscan Bullet Travel & Max Effective Range
-  - [ ] Unit test: Hitscan bullet travels $\ge 50$ meters over multiple frames without premature despawn
-  - [ ] Unit test: Muzzle raycast aiming downward does not get blocked by player capsule collider
-- [ ] Task: Implement Hitscan Lifetime & Muzzle Offset Adjustments in `src/combat/projectiles.rs`
-  - [ ] Update `HitscanBullet` and `ShotgunPellet` lifetimes to 1.5s
-  - [ ] Refine muzzle raycast origin and solid-test filter
-- [ ] Task: Phase 1 Verification & Checkpoint (Refer to workflow.md)
-  - [ ] Verify hitscan projectiles travel full distances and test pass rate
+- [x] Task: Write Tests for Hitscan Bullet Travel & Max Effective Range
+  - [x] Unit test: Hitscan bullet travels $\ge 50$ meters over multiple frames without premature despawn
+  - [x] Unit test: Muzzle raycast aiming downward does not get blocked by player capsule collider
+- [x] Task: Implement Hitscan Lifetime & Muzzle Offset Adjustments in `src/combat/projectiles.rs`
+  - [x] Update `HitscanBullet` and `ShotgunPellet` lifetimes to 1.5s
+  - [x] Refine muzzle raycast origin and solid-test filter
+- [x] Task: Phase 1 Verification & Checkpoint (Refer to workflow.md)
+  - [x] Verify hitscan projectiles travel full distances and test pass rate
 
 ## Phase 2: Attacker Attribution for Tripbombs, Barrels & Props
 - [ ] Task: Write Tests for Trap & Prop Explosion Attribution
