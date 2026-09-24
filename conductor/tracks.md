@@ -8,6 +8,10 @@
 - [x] **Track: Cooperative and Deathmatch Multiplayer (Networking / Splitscreen)**
   *Link: [./tracks/multiplayer_coop_and_deathmatch_20260923/index.md](./tracks/multiplayer_coop_and_deathmatch_20260923/index.md)*
 
+---
+- [~] **Track: Combat and Physics Integrity**
+  *Link: [./tracks/combat_and_physics_integrity_20260924/plan.md](./tracks/combat_and_physics_integrity_20260924/plan.md)*
+
 
 
 
