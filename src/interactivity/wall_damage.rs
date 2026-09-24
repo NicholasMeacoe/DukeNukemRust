@@ -11,6 +11,7 @@ pub struct WallDamageEvent {
     pub damage: i32,
     pub is_explosive: bool,
     pub hit_entity: Option<Entity>,
+    pub attacker_id: Option<usize>,
 }
 
 /// System that processes wall and prop damage from impacts (`checkhitwall`).
@@ -121,7 +122,7 @@ pub fn handle_wall_damage(
                         origin: trans.translation,
                         radius: 4.0,
                         damage: 80,
-                        attacker_id: None,
+                        attacker_id: ev.attacker_id,
                     });
                     gib_events.send(crate::combat::GibEvent {
                         origin: trans.translation,
@@ -148,7 +149,7 @@ pub fn handle_wall_damage(
                         origin: trans.translation,
                         radius: barrel.damage_radius,
                         damage: barrel.damage,
-                        attacker_id: None,
+                        attacker_id: ev.attacker_id,
                     });
                     gib_events.send(crate::combat::GibEvent {
                         origin: trans.translation,

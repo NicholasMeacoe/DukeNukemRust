@@ -545,6 +545,7 @@ pub fn handle_weapon_firing(
                                 beam_length,
                                 damage: 150,
                                 damage_radius: 6.0,
+                                owner_player_id: Some(player_id),
                             },
                             crate::game_flow::LevelEntity,
                         ));
@@ -763,7 +764,7 @@ pub fn update_laser_tripbombs(
                 origin,
                 radius: bomb.damage_radius,
                 damage: bomb.damage,
-                attacker_id: None,
+                attacker_id: bomb.owner_player_id,
             });
             commands.entity(entity).despawn_recursive();
         }
@@ -1119,5 +1120,48 @@ mod tests {
 
         let vm = app.world().entity(vm_entity).get::<FirstPersonViewModel>().unwrap();
         assert!(vm.bob_phase > 0.0);
+    }
+
+    #[test]
+    fn test_laser_tripbomb_owner_attribution() {
+        let mut app = App::new();
+        app.add_event::<ExplosionDamageEvent>()
+            .add_event::<PlaySoundEvent>()
+            .init_resource::<Time>()
+            .add_systems(Update, update_laser_tripbombs);
+
+        // Spawn a tripbomb owned by player 2
+        app.world_mut().spawn((
+            SpatialBundle {
+                transform: Transform::from_xyz(0.0, 1.0, 0.0),
+                ..default()
+            },
+            crate::combat::LaserTripbomb {
+                normal: Vec3::new(0.0, 0.0, 1.0),
+                arm_timer: 0.0,
+                is_armed: true,
+                beam_length: 10.0,
+                damage: 150,
+                damage_radius: 6.0,
+                owner_player_id: Some(2),
+            },
+        ));
+
+        // Spawn a victim player intersecting the beam
+        app.world_mut().spawn((
+            SpatialBundle {
+                transform: Transform::from_xyz(0.0, 1.0, 3.0),
+                ..default()
+            },
+            PlayerController::default(),
+        ));
+
+        app.update();
+
+        let exp_events = app.world().resource::<Events<ExplosionDamageEvent>>();
+        let mut exp_reader = exp_events.get_reader();
+        let exps: Vec<_> = exp_reader.read(exp_events).cloned().collect();
+        assert_eq!(exps.len(), 1, "Tripbomb must detonate when player intersects beam");
+        assert_eq!(exps[0].attacker_id, Some(2), "Explosion must preserve owner_player_id as attacker_id");
     }
 }

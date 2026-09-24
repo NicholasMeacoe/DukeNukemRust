@@ -345,8 +345,9 @@ pub fn handle_explosions(
                         damage -= absorbed;
                     }
                     let was_alive = player.health > 0;
-                    player.health = player.health.saturating_sub(damage);
-                    if player.health == 0 && was_alive {
+                    player.health -= damage;
+                    if player.health <= 0 && was_alive {
+                        player.health = 0;
                         player.death_timer = 3.0;
                         sound_events.send(PlaySoundEvent { sound_id: 41 }); // DUKE_DEAD
                         let victim_id = opt_id.map_or(0, |id| id.0);
@@ -403,6 +404,7 @@ pub fn handle_explosions(
                             origin: trans.translation,
                             radius: barrel.damage_radius,
                             damage: barrel.damage,
+                            attacker_id: exp.attacker_id,
                         });
                         gib_events.send(crate::combat::GibEvent {
                             origin: trans.translation,
@@ -459,6 +461,7 @@ pub fn handle_explosions(
                             origin: trans.translation,
                             radius: 4.0,
                             damage: 80,
+                            attacker_id: exp.attacker_id,
                         });
                         gib_events.send(crate::combat::GibEvent {
                             origin: trans.translation,
@@ -497,7 +500,7 @@ pub fn handle_barrel_chain_explosions(
             origin: exp.origin,
             radius: exp.radius,
             damage: exp.damage,
-            attacker_id: None,
+            attacker_id: exp.attacker_id,
         });
     }
 }
@@ -741,5 +744,103 @@ mod tests {
         let fountain = app.world().get::<WaterFountain>(fountain_entity).unwrap();
         assert_eq!(fountain.uses_left, 0);
         assert!(fountain.is_broken, "Fountain must become broken after last use");
+    }
+
+    #[test]
+    fn test_shooting_barrel_propagates_attacker_and_awards_frag() {
+        use crate::interactivity::WallDamageEvent;
+        let mut app = App::new();
+        app.add_event::<WallDamageEvent>()
+            .add_event::<ExplosionDamageEvent>()
+            .add_event::<BarrelExplodeEvent>()
+            .add_event::<ActivateTagEvent>()
+            .add_event::<PlaySoundEvent>()
+            .add_event::<crate::combat::GibEvent>()
+            .add_event::<crate::lighting::SpawnDynamicLightEvent>()
+            .add_event::<crate::net::PlayerFragEvent>()
+            .init_resource::<crate::hud::ScreenTintState>()
+            .add_systems(
+                Update,
+                (
+                    crate::interactivity::wall_damage::handle_wall_damage,
+                    handle_explosions,
+                )
+                    .chain(),
+            );
+
+        // Spawn explosive barrel at origin
+        let barrel_entity = app
+            .world_mut()
+            .spawn((
+                ExplodingBarrel {
+                    health: 20,
+                    damage_radius: 6.0,
+                    damage: 100,
+                    is_exploded: false,
+                },
+                TransformBundle::from_transform(Transform::from_xyz(0.0, 0.0, 0.0)),
+            ))
+            .id();
+
+        // Spawn victim player (Player 1) at distance 1.0m
+        let mut victim_ctrl = crate::player::PlayerController::default();
+        victim_ctrl.health = 30;
+        app.world_mut().spawn((
+            victim_ctrl,
+            crate::player::types::PlayerId(1),
+            TransformBundle::from_transform(Transform::from_xyz(0.0, 0.0, 1.0)),
+        ));
+
+        // Shooter (Player 0) shoots the barrel
+        app.world_mut().send_event(WallDamageEvent {
+            hit_point: Vec3::ZERO,
+            hit_normal: Vec3::Y,
+            damage: 30,
+            is_explosive: false,
+            hit_entity: Some(barrel_entity),
+            attacker_id: Some(0),
+        });
+
+        app.update();
+        app.update();
+
+        let exp_events = app.world().resource::<Events<ExplosionDamageEvent>>();
+        let mut exp_reader = exp_events.get_reader();
+        let exps: Vec<_> = exp_reader.read(exp_events).cloned().collect();
+        assert_eq!(exps.len(), 1, "ExplosionDamageEvent must be emitted by handle_wall_damage");
+        assert_eq!(exps[0].attacker_id, Some(0), "Attacker ID must be Some(0)");
+        let victim_hp = app.world_mut().query::<&crate::player::PlayerController>().iter(app.world()).next().unwrap().health;
+        assert_eq!(victim_hp, 0, "Victim health must be 0 after lethal explosion");
+
+        // Verify PlayerFragEvent was sent with killer_id: 0, victim_id: 1
+        let frag_events = app.world().resource::<Events<crate::net::PlayerFragEvent>>();
+        let mut frag_reader = frag_events.get_reader();
+        let frags: Vec<_> = frag_reader.read(frag_events).cloned().collect();
+        assert_eq!(
+            frags.len(),
+            1,
+            "Victim player dying to barrel explosion must emit PlayerFragEvent"
+        );
+        assert_eq!(frags[0].killer_id, 0, "Killer must be credited to shooter (Player 0)");
+        assert_eq!(frags[0].victim_id, 1, "Victim must be Player 1");
+    }
+
+    #[test]
+    fn test_victim_of_trap_or_barrel_credited_with_death_not_suicide() {
+        let mut dmatch = crate::net::scoreboard::DukematchState::default();
+        // Process a frag where player 0 killed player 1 via trap/barrel explosion
+        dmatch.record_frag(0, 1);
+
+        assert_eq!(
+            dmatch.frags[0][1], 1,
+            "Player 0 must receive frag credit against Player 1"
+        );
+        assert_eq!(dmatch.get_total_frags(0), 1, "Player 0 total frags must be 1");
+        assert_eq!(
+            dmatch.get_total_frags(1),
+            0,
+            "Player 1 total frags must be 0 (not -1 suicide penalty)"
+        );
+        assert_eq!(dmatch.get_deaths(1), 1, "Player 1 must have 1 death recorded");
     }
 }

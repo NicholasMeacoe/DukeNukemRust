@@ -116,6 +116,7 @@ mod tests {
             beam_length: 12.0,
             damage: 150,
             damage_radius: 6.0,
+            owner_player_id: Some(0),
         };
 
         // Tick arm timer

@@ -48,6 +48,8 @@ pub struct LaserTripbomb {
     pub beam_length: f32,
     pub damage: i32,
     pub damage_radius: f32,
+    #[serde(default)]
+    pub owner_player_id: Option<usize>,
 }
 
 #[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]

@@ -222,6 +222,7 @@ pub fn update_projectiles(
                 damage: proj.damage,
                 is_explosive,
                 hit_entity: hit_wall_entity,
+                attacker_id: proj.source_player_id,
             });
 
             match proj.projectile_type {

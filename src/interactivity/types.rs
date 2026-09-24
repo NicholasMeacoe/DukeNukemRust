@@ -429,6 +429,7 @@ pub struct BarrelExplodeEvent {
     pub origin: Vec3,
     pub radius: f32,
     pub damage: i32,
+    pub attacker_id: Option<usize>,
 }
 
 #[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]

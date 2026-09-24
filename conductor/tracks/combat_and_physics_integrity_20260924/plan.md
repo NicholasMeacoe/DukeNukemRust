@@ -11,16 +11,16 @@
   - [x] Verify hitscan projectiles travel full distances and test pass rate
 
 ## Phase 2: Attacker Attribution for Tripbombs, Barrels & Props
-- [ ] Task: Write Tests for Trap & Prop Explosion Attribution
-  - [ ] Unit test: `LaserTripbomb` preserves `owner_player_id` and forwards to `ExplosionDamageEvent`
-  - [ ] Unit test: Shooting an explosive barrel propagates shooter's `attacker_id` and awards frag to shooter
-  - [ ] Unit test: Victim of enemy trap/barrel death is credited with a death, not a suicide (-1 frag)
-- [ ] Task: Implement Attacker Propagation in `src/combat/`, `src/interactivity/`, and `src/player/`
-  - [ ] Add `owner_player_id: Option<usize>` to `LaserTripbomb` in `src/combat/types.rs` and wire during placement in `src/player/weapons.rs`
-  - [ ] Add `attacker_id: Option<usize>` to `WallDamageEvent` in `src/interactivity/types.rs`
-  - [ ] Forward attacker from projectile impacts to barrels/extinguishers in `src/interactivity/wall_damage.rs` and `src/interactivity/props.rs`
-- [ ] Task: Phase 2 Verification & Checkpoint (Refer to workflow.md)
-  - [ ] Verify trap and barrel explosion kills attribute correctly to the attacker
+- [x] Task: Write Tests for Trap & Prop Explosion Attribution
+  - [x] Unit test: `LaserTripbomb` preserves `owner_player_id` and forwards to `ExplosionDamageEvent`
+  - [x] Unit test: Shooting an explosive barrel propagates shooter's `attacker_id` and awards frag to shooter
+  - [x] Unit test: Victim of enemy trap/barrel death is credited with a death, not a suicide (-1 frag)
+- [x] Task: Implement Attacker Propagation in `src/combat/`, `src/interactivity/`, and `src/player/`
+  - [x] Add `owner_player_id: Option<usize>` to `LaserTripbomb` in `src/combat/types.rs` and wire during placement in `src/player/weapons.rs`
+  - [x] Add `attacker_id: Option<usize>` to `WallDamageEvent` in `src/interactivity/types.rs`
+  - [x] Forward attacker from projectile impacts to barrels/extinguishers in `src/interactivity/wall_damage.rs` and `src/interactivity/props.rs`
+- [x] Task: Phase 2 Verification & Checkpoint (Refer to workflow.md)
+  - [x] Verify trap and barrel explosion kills attribute correctly to the attacker
 
 ## Phase 3: Explosive Double-Damage Fix & HandRemote Glitch Resolution
 - [ ] Task: Write Tests for Rocket Splash Anti-Double-Dipping & HandRemote Detonation
