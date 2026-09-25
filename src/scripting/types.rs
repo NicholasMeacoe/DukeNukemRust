@@ -1,3 +1,4 @@
+#[cfg(test)]
 pub const NUM_KEYWORDS: usize = 112;
 pub const MAX_TILES: usize = 6144;
 pub const TICSPERFRAME: i32 = 3;
@@ -269,6 +270,7 @@ pub struct AiDef {
     pub flags: i32,
 }
 
+#[cfg(test)]
 pub const NULL_PTR: usize = 0;
 
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]

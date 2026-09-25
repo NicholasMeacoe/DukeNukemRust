@@ -10,6 +10,7 @@ pub mod game_flow;
 mod grp;
 pub mod hud;
 mod interactivity;
+#[cfg(test)]
 mod kwv;
 pub mod lighting;
 mod map;

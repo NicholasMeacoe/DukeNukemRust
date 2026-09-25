@@ -18,6 +18,7 @@ pub enum MaterialAlphaMode {
     Blend(u8), // Percentage opacity: e.g. 66 for water surface or glass, 33 for faint forcefields
 }
 
+#[cfg(test)]
 pub fn is_water_sector(lotag: i16) -> bool {
     lotag == 1 || lotag == 2
 }

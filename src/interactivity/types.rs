@@ -465,6 +465,7 @@ impl Default for CarrierPlatform {
     }
 }
 
+#[cfg(test)]
 impl CarrierPlatform {
     pub fn new(velocity: Vec3) -> Self {
         Self {

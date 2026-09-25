@@ -214,6 +214,7 @@ impl Default for PaletteFlashState {
     }
 }
 
+#[cfg(test)]
 impl PaletteFlashState {
     pub fn compute_screen_tint(&self) -> [f32; 4] {
         let r = 1.0 + self.red_flash * 0.8 + self.yellow_flash * 0.4 + self.amber_glow * 0.5;

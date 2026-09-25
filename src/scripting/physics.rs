@@ -1,5 +1,7 @@
+#[cfg(test)]
 use crate::scripting::types::*;
 
+#[cfg(test)]
 pub struct PhysicsContext<'a> {
     pub sprite_x: &'a mut i32,
     pub sprite_y: &'a mut i32,
@@ -42,6 +44,7 @@ impl TrigTables {
     }
 }
 
+#[cfg(test)]
 impl<'a> PhysicsContext<'a> {
     pub fn apply_movement(&mut self, move_def: Option<&MoveDef>, trig: &TrigTables) {
         self.registers.count += 1;
@@ -118,11 +121,13 @@ impl<'a> PhysicsContext<'a> {
     }
 }
 
+#[cfg(test)]
 #[inline]
 pub fn get_angle(dx: i32, dy: i32) -> i16 {
     (((dy as f64).atan2(dx as f64) * (2048.0 / (2.0 * std::f64::consts::PI))) as i32 & 2047) as i16
 }
 
+#[cfg(test)]
 #[inline]
 pub fn get_inc_angle(a: i16, na: i16) -> i16 {
     let mut diff = (na & 2047) - (a & 2047);

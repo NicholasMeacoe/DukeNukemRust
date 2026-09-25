@@ -7,7 +7,7 @@ pub mod wall_damage;
 pub use effectors::*;
 pub use props::*;
 #[allow(unused_imports)]
-pub use props_extended::{DancerProp, ExtendedPropsPlugin, FountainProp, MoneyItem};
+pub use props_extended::{DancerProp, ExtendedPropsPlugin, MoneyItem};
 pub use types::*;
 pub use wall_damage::*;
 
@@ -844,5 +844,13 @@ mod tests {
             WeaponExpander,
         ];
         assert_eq!(all_pickups.len(), 30);
+    }
+
+    #[test]
+    fn test_handle_master_switch_activations_schedule_no_conflicts() {
+        let mut app = App::new();
+        app.add_event::<ActivateTagEvent>();
+        app.add_systems(Update, handle_master_switch_activations);
+        app.update();
     }
 }

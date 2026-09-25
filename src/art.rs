@@ -1,3 +1,4 @@
+#[cfg(test)]
 use crate::palette::Palette;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -185,6 +186,7 @@ impl Art {
     }
 
     // Convert with palette lookup remapping (e.g. pal 1=blue, 2=red, 6=green/nightvision)
+    #[cfg(test)]
     pub fn get_tile_rgba_with_pal(
         &self,
         tile_index: u32,

@@ -18,9 +18,11 @@ impl ToiletProp {
     }
 }
 
+#[cfg(test)]
 #[derive(Component, Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct FountainProp;
 
+#[cfg(test)]
 impl FountainProp {
     pub fn drink(&mut self, player: &mut PlayerController) -> Option<usize> {
         if player.health < 100 {

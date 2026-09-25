@@ -3,7 +3,6 @@ use std::io::{Cursor, Read};
 
 #[derive(Debug)]
 pub struct KvvWave {
-    #[allow(dead_code)]
     pub name: String,
     pub data: Vec<u8>,
     pub sample_rate: u32,
@@ -115,6 +114,7 @@ mod tests {
             sample_rate: 11025,
         };
 
+        assert_eq!(wave.name, "PISTOL");
         let wav_bytes = wave.to_wav_bytes();
         // RIFF header starts with b"RIFF" and has b"WAVE"
         assert!(wav_bytes.starts_with(b"RIFF"));

@@ -204,12 +204,13 @@ pub fn update_master_switches(
 
 /// Triggers MasterSwitch delay chains when matching lotag activation is received.
 pub fn handle_master_switch_activations(
-    mut events: EventReader<ActivateTagEvent>,
+    mut events: ResMut<Events<ActivateTagEvent>>,
+    mut cursor: Local<bevy::ecs::event::ManualEventReader<ActivateTagEvent>>,
     mut master_switches: Query<&mut MasterSwitch>,
     activators: Query<&Activator>,
-    mut tag_events: EventWriter<ActivateTagEvent>,
 ) {
-    for event in events.read() {
+    let mut to_send = Vec::new();
+    for event in cursor.read(&events) {
         // Trigger matching MasterSwitches
         for mut master in master_switches.iter_mut() {
             if master.lotag == event.lotag && !master.is_triggered {
@@ -217,7 +218,7 @@ pub fn handle_master_switch_activations(
                 if master.delay > 0.0 {
                     master.timer = Some(master.delay);
                 } else if master.hitag != 0 {
-                    tag_events.send(ActivateTagEvent { lotag: master.hitag });
+                    to_send.push(ActivateTagEvent { lotag: master.hitag });
                 }
             }
         }
@@ -225,9 +226,13 @@ pub fn handle_master_switch_activations(
         // Trigger matching Activators
         for activator in activators.iter() {
             if activator.lotag == event.lotag && activator.hitag != 0 && activator.hitag != event.lotag {
-                tag_events.send(ActivateTagEvent { lotag: activator.hitag });
+                to_send.push(ActivateTagEvent { lotag: activator.hitag });
             }
         }
+    }
+
+    for ev in to_send {
+        events.send(ev);
     }
 }
 
