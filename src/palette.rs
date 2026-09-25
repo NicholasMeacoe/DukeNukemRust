@@ -177,10 +177,11 @@ impl Palette {
     /// In authentic Build, shade 0 is 100% full brightness, shade 31 is near pitch-black (~2-5% light),
     /// and negative shades provide overbrightening (e.g. muzzle flashes and bright lamps).
     pub fn build_shade_to_light_multiplier(shade: i8) -> f32 {
-        if shade < 0 {
-            (1.0 + (-shade as f32 / 32.0) * 0.5).min(1.75)
+        let shade_f = shade as f32;
+        if shade_f < 0.0 {
+            (1.0 + (-shade_f / 32.0) * 0.5).min(1.75)
         } else {
-            let clamped = shade.min(31) as f32;
+            let clamped = shade_f.min(31.0);
             let normalized = 1.0 - (clamped / 31.0);
             (normalized.powf(1.4) * 0.97 + 0.03).clamp(0.02, 1.0)
         }
@@ -344,6 +345,14 @@ mod tests {
 
         let tint_dark = Palette::authentic_shade_to_tint(31);
         assert!(tint_dark[0] <= 0.05);
+
+        // Extreme negative shade (i8::MIN = -128) must not overflow
+        let tint_min = Palette::authentic_shade_to_tint(i8::MIN);
+        assert_eq!(tint_min[0], 1.75);
+
+        // Extreme positive shade (i8::MAX = 127) must not overflow
+        let tint_max = Palette::authentic_shade_to_tint(i8::MAX);
+        assert_eq!(tint_max[0], tint_dark[0]);
     }
 
     #[test]
