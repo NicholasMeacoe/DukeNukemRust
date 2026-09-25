@@ -71,6 +71,13 @@ pub struct SpawnDecalEvent {
     pub decal_type: DecalType,
 }
 
+#[derive(Component)]
+pub struct ImpactSpark {
+    pub timer: f32,
+    pub max_lifetime: f32,
+    pub base_tile: i16,
+}
+
 pub struct DecalPlugin;
 
 impl Plugin for DecalPlugin {
@@ -79,6 +86,7 @@ impl Plugin for DecalPlugin {
             Update,
             (
                 handle_spawn_decal_events,
+                update_impact_sparks,
                 update_surface_decals,
                 update_atmospheric_emitters,
             )
@@ -87,7 +95,13 @@ impl Plugin for DecalPlugin {
     }
 }
 
-pub fn handle_spawn_decal_events(mut events: EventReader<SpawnDecalEvent>, mut commands: Commands) {
+pub fn handle_spawn_decal_events(
+    mut events: EventReader<SpawnDecalEvent>,
+    mut commands: Commands,
+    mut meshes: Option<ResMut<Assets<Mesh>>>,
+    mut materials: Option<ResMut<Assets<StandardMaterial>>>,
+    game_assets: Option<Res<crate::GameAssets>>,
+) {
     for ev in events.read() {
         let max_lifetime = match ev.decal_type {
             DecalType::BulletHole => 20.0,
@@ -108,9 +122,9 @@ pub fn handle_spawn_decal_events(mut events: EventReader<SpawnDecalEvent>, mut c
             Quat::IDENTITY
         };
 
-        let offset_pos = ev.origin + normal * 0.02;
+        let offset_pos = ev.origin + normal * 0.015;
 
-        commands.spawn((
+        let mut entity_cmd = commands.spawn((
             SurfaceDecal {
                 decal_type: ev.decal_type,
                 lifetime: max_lifetime,
@@ -122,13 +136,112 @@ pub fn handle_spawn_decal_events(mut events: EventReader<SpawnDecalEvent>, mut c
             ),
             crate::game_flow::LevelEntity,
         ));
+
+        if let (Some(ref mut mesh_assets), Some(ref mut mat_assets)) =
+            (meshes.as_mut(), materials.as_mut())
+        {
+            let (size, base_color) = match ev.decal_type {
+                DecalType::BulletHole => (0.16, Color::srgba(0.08, 0.08, 0.1, 0.95)),
+                DecalType::ScorchMark => (1.2, Color::srgba(0.04, 0.04, 0.04, 0.85)),
+                DecalType::BloodSplatter => (0.55, Color::srgba(0.55, 0.02, 0.02, 0.9)),
+                DecalType::GlassCrack => (0.4, Color::srgba(0.9, 0.95, 1.0, 0.7)),
+                DecalType::WaterRipple => (0.6, Color::srgba(0.3, 0.6, 0.9, 0.5)),
+            };
+
+            let decal_mesh = mesh_assets.add(Rectangle::new(size, size));
+            let decal_mat = mat_assets.add(StandardMaterial {
+                base_color,
+                alpha_mode: AlphaMode::Blend,
+                unlit: true,
+                double_sided: true,
+                ..default()
+            });
+
+            entity_cmd.insert((decal_mesh, decal_mat));
+
+            // For bullet impacts, spawn an authentic animated ricochet spark puff (SHOTSPARK1)
+            if ev.decal_type == DecalType::BulletHole {
+                let spark_mesh = mesh_assets.add(Rectangle::new(0.32, 0.32));
+                let spark_mat = if let Some(ref assets) = game_assets {
+                    if let Some(tex) = assets.tile_textures.get(&crate::names::SHOTSPARK1) {
+                        mat_assets.add(StandardMaterial {
+                            base_color_texture: Some(tex.clone()),
+                            alpha_mode: AlphaMode::Blend,
+                            unlit: true,
+                            double_sided: true,
+                            ..default()
+                        })
+                    } else {
+                        mat_assets.add(StandardMaterial {
+                            base_color: Color::srgb(1.0, 0.9, 0.3),
+                            unlit: true,
+                            double_sided: true,
+                            ..default()
+                        })
+                    }
+                } else {
+                    mat_assets.add(StandardMaterial {
+                        base_color: Color::srgb(1.0, 0.9, 0.3),
+                        unlit: true,
+                        double_sided: true,
+                        ..default()
+                    })
+                };
+
+                commands.spawn((
+                    PbrBundle {
+                        mesh: spark_mesh,
+                        material: spark_mat,
+                        transform: Transform::from_translation(ev.origin + normal * 0.04),
+                        ..default()
+                    },
+                    crate::SpriteBillboard,
+                    ImpactSpark {
+                        timer: 0.16,
+                        max_lifetime: 0.16,
+                        base_tile: crate::names::SHOTSPARK1,
+                    },
+                    crate::game_flow::LevelEntity,
+                ));
+            }
+        }
+    }
+}
+
+pub fn update_impact_sparks(
+    time: Res<Time>,
+    mut commands: Commands,
+    mut query: Query<(Entity, &mut ImpactSpark, &Handle<StandardMaterial>)>,
+    mut materials: Option<ResMut<Assets<StandardMaterial>>>,
+    game_assets: Option<Res<crate::GameAssets>>,
+) {
+    let dt = time.delta_seconds();
+    for (entity, mut spark, mat_handle) in query.iter_mut() {
+        spark.timer -= dt;
+        if spark.timer <= 0.0 {
+            commands.entity(entity).despawn_recursive();
+            continue;
+        }
+
+        let progress = 1.0 - (spark.timer / spark.max_lifetime);
+        let frame_offset = ((progress * 4.0) as i16).clamp(0, 3);
+        let tile = spark.base_tile + frame_offset;
+
+        if let (Some(ref mut mats), Some(ref assets)) = (materials.as_mut(), game_assets.as_ref()) {
+            if let Some(tex) = assets.tile_textures.get(&tile) {
+                if let Some(mat) = mats.get_mut(mat_handle) {
+                    mat.base_color_texture = Some(tex.clone());
+                }
+            }
+        }
     }
 }
 
 pub fn update_surface_decals(
     time: Res<Time>,
     mut commands: Commands,
-    mut query: Query<(Entity, &mut SurfaceDecal)>,
+    mut query: Query<(Entity, &mut SurfaceDecal, Option<&Handle<StandardMaterial>>)>,
+    mut materials: Option<ResMut<Assets<StandardMaterial>>>,
 ) {
     let dt = time.delta_seconds();
     let total_decals = query.iter().count();
@@ -138,7 +251,7 @@ pub fn update_surface_decals(
         0
     };
 
-    for (entity, mut decal) in query.iter_mut() {
+    for (entity, mut decal, mat_handle) in query.iter_mut() {
         if excess > 0 {
             commands.entity(entity).despawn_recursive();
             excess -= 1;
@@ -151,6 +264,11 @@ pub fn update_surface_decals(
         } else if decal.lifetime < 3.0 {
             // Fade out in last 3 seconds
             decal.alpha = decal.lifetime / 3.0;
+            if let (Some(handle), Some(ref mut mats)) = (mat_handle, materials.as_mut()) {
+                if let Some(mat) = mats.get_mut(handle) {
+                    mat.base_color.set_alpha(decal.alpha);
+                }
+            }
         }
     }
 }

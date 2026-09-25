@@ -857,20 +857,41 @@ pub fn update_first_person_viewmodel(
                     vm.current_tile = 2521 + frame_offset.clamp(0, 2);
                 }
                 WeaponType::Pistol => {
-                    let frame_offset = (progress * 4.0) as i16;
-                    vm.current_tile = 2524 + frame_offset.clamp(0, 4);
+                    if progress < 0.25 {
+                        vm.current_tile = 2525; // Instant muzzle flash!
+                    } else if progress < 0.60 {
+                        vm.current_tile = 2526; // Recoil slide blown back
+                    } else if progress < 0.90 {
+                        vm.current_tile = 2527; // Slide returning forward
+                    } else {
+                        vm.current_tile = 2524; // Settled idle
+                    }
                 }
                 WeaponType::Shotgun => {
-                    let frame_offset = (progress * 6.0) as i16;
-                    vm.current_tile = 2613 + frame_offset.clamp(0, 6);
+                    if progress < 0.20 {
+                        vm.current_tile = 2614; // Instant muzzle blast!
+                    } else if progress < 0.40 {
+                        vm.current_tile = 2615; // Pump back
+                    } else if progress < 0.60 {
+                        vm.current_tile = 2616; // Shell ejecting
+                    } else if progress < 0.80 {
+                        vm.current_tile = 2617; // Pump forward
+                    } else {
+                        vm.current_tile = 2613; // Settled idle
+                    }
                 }
                 WeaponType::Chaingun => {
-                    let frame_offset = ((time.elapsed_seconds() * 20.0) as i16) % 3;
+                    let frame_offset = ((time.elapsed_seconds() * 25.0) as i16) % 4;
                     vm.current_tile = 2544 + frame_offset;
                 }
                 WeaponType::Rpg => {
-                    let frame_offset = (progress * 3.0) as i16;
-                    vm.current_tile = 2605 + frame_offset.clamp(0, 2);
+                    if progress < 0.35 {
+                        vm.current_tile = 2606; // Rocket launch blast!
+                    } else if progress < 0.85 {
+                        vm.current_tile = 2607; // Tube recoil
+                    } else {
+                        vm.current_tile = 2605; // Settled idle
+                    }
                 }
                 WeaponType::Pipebomb => {
                     let frame_offset = (progress * 4.0) as i16;

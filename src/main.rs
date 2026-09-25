@@ -122,7 +122,7 @@ fn main() {
                 sync_first_person_weapon_visibility,
                 (player_look, emit_player_interaction).in_set(GameSet::Input),
                 (sector_map::update_entity_sectors,).in_set(GameSet::Movement),
-                (play_duke_quotes, update_weapon).in_set(GameSet::Combat),
+                (play_duke_quotes, sync_first_person_viewmodel).in_set(GameSet::Combat),
                 (
                     animation::update_engine_clock,
                     animation::update_tile_animations,
@@ -154,11 +154,7 @@ fn play_duke_quotes(
 pub struct FirstPersonWeaponRoot;
 
 #[derive(Component)]
-struct FirstPersonWeapon {
-    fire_timer: f32,
-    base_y: f32,
-    bob_timer: f32,
-}
+pub struct FirstPersonWeapon;
 
 fn setup(
     mut commands: Commands,
@@ -444,11 +440,7 @@ fn setup(
                     background_color: Color::NONE.into(),
                     ..default()
                 },
-                FirstPersonWeapon {
-                    fire_timer: 0.0,
-                    base_y,
-                    bob_timer: 0.0,
-                },
+                FirstPersonWeapon,
             ));
         });
 }
@@ -464,11 +456,12 @@ pub struct SpriteBillboard;
 
 fn update_billboards(
     mut query: Query<&mut Transform, With<SpriteBillboard>>,
-    camera_query: Query<&Transform, (With<Camera>, Without<SpriteBillboard>)>,
+    camera_query: Query<&GlobalTransform, (With<Camera>, Without<SpriteBillboard>)>,
 ) {
-    if let Ok(camera_transform) = camera_query.get_single() {
+    if let Ok(camera_global) = camera_query.get_single() {
+        let cam_pos = camera_global.translation();
         for mut transform in query.iter_mut() {
-            let mut target = camera_transform.translation;
+            let mut target = cam_pos;
             target.y = transform.translation.y;
             if target.xz().distance_squared(transform.translation.xz()) > 0.001 {
                 transform.look_at(target, Vec3::Y);
@@ -478,7 +471,7 @@ fn update_billboards(
 }
 
 fn update_directional_sprites(
-    camera_query: Query<&Transform, (With<Camera>, Without<crate::scripting::ConActor>)>,
+    camera_query: Query<&GlobalTransform, (With<Camera>, Without<crate::scripting::ConActor>)>,
     mut query: Query<(
         &mut Handle<StandardMaterial>,
         &crate::scripting::ConActor,
@@ -487,8 +480,8 @@ fn update_directional_sprites(
     game_assets: Res<crate::GameAssets>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    if let Some(camera_transform) = camera_query.iter().next() {
-        let cam_pos = camera_transform.translation.xz();
+    if let Some(camera_global) = camera_query.iter().next() {
+        let cam_pos = camera_global.translation().xz();
 
         for (mut material_handle, con_actor, trans) in query.iter_mut() {
             let sprite_pos = trans.translation.xz();
@@ -624,128 +617,91 @@ pub struct GameAssets {
     pub grp_path: String,
 }
 
-fn update_weapon(
-    time: Res<Time>,
-    mut query: Query<(&mut Style, &mut FirstPersonWeapon)>,
-    player_query: Query<&KinematicCharacterControllerOutput, With<Player>>,
-    camera_query: Query<&Transform, (With<Camera>, Without<FirstPersonWeapon>)>,
-    mut destructibles: Query<&mut Destructible>,
-    barrels: Query<&Transform, With<interactivity::ExplodingBarrel>>,
-    mut explosion_events: EventWriter<interactivity::ExplosionDamageEvent>,
-    btn: Res<ButtonInput<MouseButton>>,
-    mut sound_events: EventWriter<audio::PlaySoundEvent>,
-    mut commands: Commands,
-    rapier_context: Res<RapierContext>,
-    assets: Res<GameAssets>,
+fn sync_first_person_viewmodel(
+    player_query: Query<(&Player, &crate::player::weapons::FirstPersonViewModel)>,
+    mut ui_query: Query<(&mut UiImage, &mut Style), With<FirstPersonWeapon>>,
+    game_assets: Res<GameAssets>,
     game_config: Option<Res<config::GameConfig>>,
+    state: Res<State<game_flow::GamePhase>>,
 ) {
-    let is_moving = if let Ok(output) = player_query.get_single() {
-        output.effective_translation.xz().length_squared() > 0.001
-    } else {
-        false
+    if *state.get() != game_flow::GamePhase::Playing {
+        return;
+    }
+    let Ok((player, vm)) = player_query.get_single() else {
+        return;
     };
-
-    let Ok(camera_transform) = camera_query.get_single() else {
+    let Ok((mut ui_image, mut style)) = ui_query.get_single_mut() else {
         return;
     };
 
-    let view_bobbing = game_config.as_ref().map_or(true, |c| c.controls.view_bobbing);
-
-    for (mut style, mut weapon) in query.iter_mut() {
-        // Simple View Bobbing
-        if view_bobbing && is_moving {
-            weapon.bob_timer += time.delta_seconds() * 10.0;
-        } else {
-            weapon.bob_timer = weapon.bob_timer.lerp(0.0, time.delta_seconds() * 5.0);
-            if weapon.bob_timer < 0.1 {
-                weapon.bob_timer = 0.0;
-            }
-        }
-
-        let bob_offset = if view_bobbing {
-            (weapon.bob_timer.sin() * 20.0).abs() * -1.0
-        } else {
-            0.0
-        };
-
-        // Shooting
-        if weapon.fire_timer > 0.0 {
-            weapon.fire_timer -= time.delta_seconds();
-        }
-
-        let mut recoil_offset = 0.0;
-
-        if btn.just_pressed(MouseButton::Left) && weapon.fire_timer <= 0.0 {
-            // "Fire" recoil
-            weapon.fire_timer = 0.5;
-
-            // Play firing sound (PISTOL_FIRE = 3)
-            sound_events.send(audio::PlaySoundEvent { sound_id: 3 });
-
-            // Hitscan Logic
-            let ray_pos = camera_transform.translation;
-            // The camera looks down its negative Z axis
-            let ray_dir = camera_transform.forward();
-            let max_toi = 100.0;
-            let solid = true;
-            let filter = QueryFilter::exclude_kinematic();
-
-            if let Some((entity, toi)) =
-                rapier_context.cast_ray(ray_pos, *ray_dir, max_toi, solid, filter)
-            {
-                let hit_point = ray_pos + ray_dir * toi;
-
-                // Play ricochet sound (1 = PISTOL_RICOCHET) by default
-                let mut hit_sound_idx = 1;
-
-                if let Ok(mut destructible) = destructibles.get_mut(entity) {
-                    destructible.health -= 6; // PISTOL_WEAPON_STRENGTH
-
-                    // 2 = PISTOL_BODYHIT
-                    hit_sound_idx = 2;
-
-                    if destructible.health <= 0 {
-                        if let Ok(barrel_trans) = barrels.get(entity) {
-                            explosion_events.send(interactivity::ExplosionDamageEvent {
-                                origin: barrel_trans.translation,
-                                radius: 6.0,
-                                damage: 100,
-                                attacker_id: None,
-                                excluded_entity: None,
-                            });
-                        }
-                        commands.entity(entity).despawn_recursive();
-                    }
-                }
-
-                sound_events.send(audio::PlaySoundEvent {
-                    sound_id: hit_sound_idx,
-                });
-
-                // Spawn a bullet hole decal (SHOTSPARK1 is tile 2595) using pre-cached material
-                let spark_mat = assets.spark_material.clone();
-
-                // Move slightly towards the camera to prevent z-fighting
-                let decal_pos = hit_point - ray_dir * 0.05;
-
-                commands.spawn((
-                    PbrBundle {
-                        mesh: assets.spark_mesh.clone(),
-                        material: spark_mat,
-                        transform: Transform::from_translation(decal_pos),
-                        ..default()
-                    },
-                    SpriteBillboard,
-                ));
-            }
-        }
-
-        if weapon.fire_timer > 0.4 {
-            recoil_offset = -50.0; // Recoil push down
-        }
-
-        style.margin.bottom = Val::Px(weapon.base_y + bob_offset + recoil_offset);
+    // If weapon is Knee and not kicking, hide the viewmodel
+    if vm.current_weapon == crate::player::WeaponType::Knee
+        && !vm.is_firing
+        && player.quick_kick_timer <= 0.0
+    {
+        style.display = Display::None;
+        return;
+    } else {
+        style.display = Display::Flex;
     }
+
+    // 1. Update active weapon sprite from tile_textures
+    if let Some(texture) = game_assets.tile_textures.get(&vm.current_tile) {
+        if ui_image.texture != *texture {
+            ui_image.texture = texture.clone();
+        }
+    }
+
+    // 2. Aspect-correct scaling based on original ART tile dimensions
+    let (tile_w, tile_h) = game_assets
+        .tile_sizes
+        .get(&vm.current_tile)
+        .copied()
+        .unwrap_or((320, 200));
+
+    let base_height = match vm.current_weapon {
+        crate::player::WeaponType::Shotgun => 450.0,
+        crate::player::WeaponType::Chaingun => 460.0,
+        crate::player::WeaponType::Rpg => 480.0,
+        crate::player::WeaponType::Knee => 500.0,
+        _ => 420.0,
+    };
+
+    let aspect = if tile_h > 0 {
+        tile_w as f32 / tile_h as f32
+    } else {
+        1.2
+    };
+
+    style.height = Val::Px(base_height);
+    style.width = Val::Px(base_height * aspect);
+
+    // 3. View bobbing and recoil offset
+    let view_bobbing = game_config.as_ref().map_or(true, |c| c.controls.view_bobbing);
+    let (bob_x, bob_y) = if view_bobbing && player.speed > 0.1 {
+        (
+            vm.bob_phase.cos() * 8.0,
+            -(vm.bob_phase.sin() * 12.0).abs(),
+        )
+    } else {
+        (0.0, 0.0)
+    };
+
+    let recoil_y = if vm.is_firing {
+        match vm.current_weapon {
+            crate::player::WeaponType::Pistol => -18.0,
+            crate::player::WeaponType::Shotgun => -38.0,
+            crate::player::WeaponType::Rpg => -32.0,
+            crate::player::WeaponType::Chaingun => -10.0,
+            crate::player::WeaponType::Devastator => -22.0,
+            _ => 0.0,
+        }
+    } else {
+        0.0
+    };
+
+    style.margin.bottom = Val::Px(bob_y + recoil_y);
+    style.margin.left = Val::Px(bob_x);
 }
 
 pub fn cursor_grab(
@@ -891,11 +847,7 @@ mod main_tests {
                     visibility: Visibility::Hidden,
                     ..default()
                 },
-                FirstPersonWeapon {
-                    fire_timer: 0.0,
-                    base_y: 0.0,
-                    bob_timer: 0.0,
-                },
+                FirstPersonWeapon,
             ))
             .id();
 

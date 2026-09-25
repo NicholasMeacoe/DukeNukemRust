@@ -26,6 +26,7 @@ pub fn handle_wall_damage(
     mut fire_ext_query: Query<(Entity, &Transform, &mut FireExtinguisher)>,
     mut barrel_query: Query<(Entity, &Transform, &mut ExplodingBarrel)>,
     mut fountain_query: Query<(Entity, &Transform, &mut WaterFountain)>,
+    mut destructible_query: Query<(Entity, &mut crate::Destructible)>,
     mut tag_events: EventWriter<ActivateTagEvent>,
     mut explosion_events: EventWriter<ExplosionDamageEvent>,
     mut sound_events: EventWriter<PlaySoundEvent>,
@@ -177,6 +178,16 @@ pub fn handle_wall_damage(
                     origin: trans.translation,
                     gib_count: 3,
                 });
+            }
+        }
+
+        // 8. Generic Destructible Entities
+        if let Some(hit_ent) = ev.hit_entity {
+            if let Ok((entity, mut dest)) = destructible_query.get_mut(hit_ent) {
+                dest.health -= ev.damage;
+                if dest.health <= 0 {
+                    commands.entity(entity).despawn_recursive();
+                }
             }
         }
     }
