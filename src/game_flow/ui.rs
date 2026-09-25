@@ -43,6 +43,7 @@ pub fn setup_menu_ui(mut commands: Commands) {
                     ..default()
                 },
                 background_color: BackgroundColor(Color::srgba(0.05, 0.05, 0.08, 0.85)),
+                z_index: ZIndex::Global(1000),
                 ..default()
             },
             MenuUiRoot,

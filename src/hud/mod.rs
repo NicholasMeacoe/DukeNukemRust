@@ -78,7 +78,8 @@ impl Plugin for DukeHudPlugin {
                     update_screen_tint,
                 )
                     .run_if(in_state(crate::game_flow::GamePhase::Playing)),
-            );
+            )
+            .add_systems(Update, sync_hud_visibility_with_game_phase);
     }
 }
 
@@ -148,9 +149,11 @@ pub fn setup_hud_ui(mut commands: Commands) {
                     justify_content: JustifyContent::SpaceBetween,
                     align_items: AlignItems::Center,
                     padding: UiRect::horizontal(Val::Px(20.0)),
-                    display: Display::Flex,
+                    display: Display::None,
                     ..default()
                 },
+                visibility: Visibility::Hidden,
+                z_index: ZIndex::Global(10),
                 background_color: BackgroundColor(Color::srgba(0.05, 0.05, 0.08, 0.85)),
                 ..default()
             },
@@ -411,6 +414,40 @@ pub fn toggle_hud_mode(keys: Res<ButtonInput<KeyCode>>, mut query: Query<&mut St
                 HudMode::FullscreenMini => HudMode::Hidden,
                 HudMode::Hidden => HudMode::ClassicStatusbar,
             };
+        }
+    }
+}
+
+pub fn sync_hud_visibility_with_game_phase(
+    state: Res<State<crate::game_flow::GamePhase>>,
+    mut hud_root: Query<(&mut Style, &mut Visibility), With<HudRoot>>,
+    sbar_query: Query<&StatusbarState>,
+) {
+    let is_playing = *state.get() == crate::game_flow::GamePhase::Playing;
+    let Ok((mut style, mut vis)) = hud_root.get_single_mut() else {
+        return;
+    };
+    if !is_playing {
+        if style.display != Display::None {
+            style.display = Display::None;
+        }
+        if *vis != Visibility::Hidden {
+            *vis = Visibility::Hidden;
+        }
+    } else if let Ok(sbar) = sbar_query.get_single() {
+        let target_display = match sbar.hud_mode {
+            HudMode::ClassicStatusbar | HudMode::FullscreenMini => Display::Flex,
+            HudMode::Hidden => Display::None,
+        };
+        if style.display != target_display {
+            style.display = target_display;
+        }
+        let target_vis = match sbar.hud_mode {
+            HudMode::ClassicStatusbar | HudMode::FullscreenMini => Visibility::Inherited,
+            HudMode::Hidden => Visibility::Hidden,
+        };
+        if *vis != target_vis {
+            *vis = target_vis;
         }
     }
 }

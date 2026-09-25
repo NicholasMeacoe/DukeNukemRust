@@ -119,6 +119,7 @@ fn main() {
             Update,
             (
                 cursor_grab,
+                sync_first_person_weapon_visibility,
                 (player_look, emit_player_interaction).in_set(GameSet::Input),
                 (sector_map::update_entity_sectors,).in_set(GameSet::Movement),
                 (play_duke_quotes, update_weapon).in_set(GameSet::Combat),
@@ -148,6 +149,9 @@ fn play_duke_quotes(
         voice_events.send(audio::PlayDukeVoiceEvent { name: None });
     }
 }
+
+#[derive(Component)]
+pub struct FirstPersonWeaponRoot;
 
 #[derive(Component)]
 struct FirstPersonWeapon {
@@ -408,16 +412,22 @@ fn setup(
 
     let base_y = 0.0; // Rest position at bottom of screen
     commands
-        .spawn((NodeBundle {
-            style: Style {
-                width: Val::Percent(100.0),
-                height: Val::Percent(100.0),
-                justify_content: JustifyContent::Center,
-                align_items: AlignItems::FlexEnd, // Align to bottom
+        .spawn((
+            NodeBundle {
+                style: Style {
+                    width: Val::Percent(100.0),
+                    height: Val::Percent(100.0),
+                    justify_content: JustifyContent::Center,
+                    align_items: AlignItems::FlexEnd, // Align to bottom
+                    display: Display::None, // Hidden until Playing state
+                    ..default()
+                },
+                visibility: Visibility::Hidden,
+                z_index: ZIndex::Local(0),
                 ..default()
             },
-            ..default()
-        },))
+            FirstPersonWeaponRoot,
+        ))
         .with_children(|parent| {
             parent.spawn((
                 ImageBundle {
@@ -426,8 +436,10 @@ fn setup(
                         width: Val::Px(400.0),
                         height: Val::Px(400.0),
                         margin: UiRect::bottom(Val::Px(base_y)), // Offset from bottom
+                        display: Display::None,
                         ..default()
                     },
+                    visibility: Visibility::Hidden,
                     // Transparent background so only the weapon sprite pixels render
                     background_color: Color::NONE.into(),
                     ..default()
@@ -759,6 +771,34 @@ pub fn cursor_grab(
     }
 }
 
+fn sync_first_person_weapon_visibility(
+    state: Res<State<game_flow::GamePhase>>,
+    mut root_query: Query<(&mut Style, &mut Visibility), With<FirstPersonWeaponRoot>>,
+    mut weapon_query: Query<(&mut Style, &mut Visibility), (With<FirstPersonWeapon>, Without<FirstPersonWeaponRoot>)>,
+) {
+    let is_playing = *state.get() == game_flow::GamePhase::Playing;
+    for (mut style, mut vis) in root_query.iter_mut() {
+        let target_display = if is_playing { Display::Flex } else { Display::None };
+        let target_vis = if is_playing { Visibility::Inherited } else { Visibility::Hidden };
+        if style.display != target_display {
+            style.display = target_display;
+        }
+        if *vis != target_vis {
+            *vis = target_vis;
+        }
+    }
+    for (mut style, mut vis) in weapon_query.iter_mut() {
+        let target_display = if is_playing { Display::Flex } else { Display::None };
+        let target_vis = if is_playing { Visibility::Inherited } else { Visibility::Hidden };
+        if style.display != target_display {
+            style.display = target_display;
+        }
+        if *vis != target_vis {
+            *vis = target_vis;
+        }
+    }
+}
+
 #[cfg(test)]
 mod main_tests {
     use super::*;
@@ -816,6 +856,92 @@ mod main_tests {
         let win = app.world().entity(window_entity).get::<Window>().unwrap();
         assert_eq!(win.cursor.grab_mode, CursorGrabMode::Locked);
         assert!(!win.cursor.visible);
+    }
+
+    #[test]
+    fn test_weapon_visibility_hidden_in_menus_and_visible_in_playing() {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins);
+        app.add_plugins(bevy::state::app::StatesPlugin);
+        app.init_state::<game_flow::GamePhase>();
+
+        let root_entity = app
+            .world_mut()
+            .spawn((
+                NodeBundle {
+                    style: Style {
+                        display: Display::None,
+                        ..default()
+                    },
+                    visibility: Visibility::Hidden,
+                    ..default()
+                },
+                FirstPersonWeaponRoot,
+            ))
+            .id();
+
+        let weapon_entity = app
+            .world_mut()
+            .spawn((
+                NodeBundle {
+                    style: Style {
+                        display: Display::None,
+                        ..default()
+                    },
+                    visibility: Visibility::Hidden,
+                    ..default()
+                },
+                FirstPersonWeapon {
+                    fire_timer: 0.0,
+                    base_y: 0.0,
+                    bob_timer: 0.0,
+                },
+            ))
+            .id();
+
+        app.add_systems(Update, sync_first_person_weapon_visibility);
+
+        // 1. Initial state (MainMenu): weapon must be Hidden and Display::None
+        app.update();
+        let root_style = app.world().entity(root_entity).get::<Style>().unwrap();
+        let root_vis = app.world().entity(root_entity).get::<Visibility>().unwrap();
+        assert_eq!(root_style.display, Display::None);
+        assert_eq!(*root_vis, Visibility::Hidden);
+
+        let weapon_style = app.world().entity(weapon_entity).get::<Style>().unwrap();
+        let weapon_vis = app.world().entity(weapon_entity).get::<Visibility>().unwrap();
+        assert_eq!(weapon_style.display, Display::None);
+        assert_eq!(*weapon_vis, Visibility::Hidden);
+
+        // 2. Transition to Playing: weapon must become visible
+        app.world_mut()
+            .resource_mut::<NextState<game_flow::GamePhase>>()
+            .set(game_flow::GamePhase::Playing);
+        app.update();
+        let root_style = app.world().entity(root_entity).get::<Style>().unwrap();
+        let root_vis = app.world().entity(root_entity).get::<Visibility>().unwrap();
+        assert_eq!(root_style.display, Display::Flex);
+        assert_eq!(*root_vis, Visibility::Inherited);
+
+        let weapon_style = app.world().entity(weapon_entity).get::<Style>().unwrap();
+        let weapon_vis = app.world().entity(weapon_entity).get::<Visibility>().unwrap();
+        assert_eq!(weapon_style.display, Display::Flex);
+        assert_eq!(*weapon_vis, Visibility::Inherited);
+
+        // 3. Pause the game: weapon must hide again immediately
+        app.world_mut()
+            .resource_mut::<NextState<game_flow::GamePhase>>()
+            .set(game_flow::GamePhase::Paused);
+        app.update();
+        let root_style = app.world().entity(root_entity).get::<Style>().unwrap();
+        let root_vis = app.world().entity(root_entity).get::<Visibility>().unwrap();
+        assert_eq!(root_style.display, Display::None);
+        assert_eq!(*root_vis, Visibility::Hidden);
+
+        let weapon_style = app.world().entity(weapon_entity).get::<Style>().unwrap();
+        let weapon_vis = app.world().entity(weapon_entity).get::<Visibility>().unwrap();
+        assert_eq!(weapon_style.display, Display::None);
+        assert_eq!(*weapon_vis, Visibility::Hidden);
     }
 
     #[test]
