@@ -87,18 +87,18 @@ pub struct SpawnDynamicLightEvent {
 impl SpawnDynamicLightEvent {
     pub fn muzzle_flash(pos: Vec3, weapon: WeaponType) -> Self {
         let (color, intensity, range, lifetime) = match weapon {
-            WeaponType::Pistol => (Color::srgb(1.0, 0.85, 0.3), 80_000.0, 12.0, 0.08),
-            WeaponType::Shotgun => (Color::srgb(1.0, 0.7, 0.2), 160_000.0, 18.0, 0.12),
-            WeaponType::Chaingun => (Color::srgb(1.0, 0.85, 0.3), 110_000.0, 15.0, 0.06),
-            WeaponType::Rpg => (Color::srgb(1.0, 0.5, 0.1), 220_000.0, 22.0, 0.16),
-            WeaponType::Devastator => (Color::srgb(1.0, 0.6, 0.2), 130_000.0, 16.0, 0.09),
-            WeaponType::Shrinker => (Color::srgb(0.3, 1.0, 0.2), 90_000.0, 14.0, 0.12),
-            WeaponType::Freezethrower => (Color::srgb(0.3, 0.85, 1.0), 90_000.0, 14.0, 0.10),
-            WeaponType::Expander => (Color::srgb(0.85, 0.35, 1.0), 95_000.0, 14.0, 0.10),
+            WeaponType::Pistol => (Color::srgb(1.0, 0.85, 0.3), 3_500.0, 7.0, 0.06),
+            WeaponType::Shotgun => (Color::srgb(1.0, 0.7, 0.2), 6_000.0, 9.0, 0.08),
+            WeaponType::Chaingun => (Color::srgb(1.0, 0.85, 0.3), 4_500.0, 8.0, 0.05),
+            WeaponType::Rpg => (Color::srgb(1.0, 0.5, 0.1), 12_000.0, 14.0, 0.12),
+            WeaponType::Devastator => (Color::srgb(1.0, 0.6, 0.2), 6_000.0, 9.0, 0.08),
+            WeaponType::Shrinker => (Color::srgb(0.3, 1.0, 0.2), 4_500.0, 7.0, 0.08),
+            WeaponType::Freezethrower => (Color::srgb(0.3, 0.85, 1.0), 4_000.0, 7.0, 0.07),
+            WeaponType::Expander => (Color::srgb(0.85, 0.35, 1.0), 5_000.0, 8.0, 0.07),
             WeaponType::Pipebomb
             | WeaponType::Tripbomb
             | WeaponType::Knee
-            | WeaponType::HandRemote => (Color::srgb(1.0, 0.8, 0.4), 40_000.0, 8.0, 0.05),
+            | WeaponType::HandRemote => (Color::srgb(1.0, 0.8, 0.4), 1_000.0, 4.0, 0.04),
         };
         Self {
             position: pos,
@@ -250,7 +250,7 @@ pub mod tests {
     fn test_muzzle_flash_light_events() {
         let pistol_flash = SpawnDynamicLightEvent::muzzle_flash(Vec3::new(1.0, 2.0, 3.0), WeaponType::Pistol);
         assert_eq!(pistol_flash.position, Vec3::new(1.0, 2.0, 3.0));
-        assert!(pistol_flash.intensity > 50_000.0);
+        assert!(pistol_flash.intensity > 1_000.0);
         assert!(pistol_flash.lifetime < 0.15);
 
         let rpg_flash = SpawnDynamicLightEvent::muzzle_flash(Vec3::ZERO, WeaponType::Rpg);

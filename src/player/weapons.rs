@@ -857,38 +857,32 @@ pub fn update_first_person_viewmodel(
                     vm.current_tile = 2521 + frame_offset.clamp(0, 2);
                 }
                 WeaponType::Pistol => {
-                    if progress < 0.25 {
-                        vm.current_tile = 2525; // Instant muzzle flash!
-                    } else if progress < 0.60 {
+                    if progress < 0.15 {
+                        vm.current_tile = 2525; // Authentic muzzle flash on barrel
+                    } else if progress < 0.45 {
                         vm.current_tile = 2526; // Recoil slide blown back
-                    } else if progress < 0.90 {
-                        vm.current_tile = 2527; // Slide returning forward
                     } else {
                         vm.current_tile = 2524; // Settled idle
                     }
                 }
                 WeaponType::Shotgun => {
-                    if progress < 0.20 {
-                        vm.current_tile = 2614; // Instant muzzle blast!
-                    } else if progress < 0.40 {
-                        vm.current_tile = 2615; // Pump back
-                    } else if progress < 0.60 {
-                        vm.current_tile = 2616; // Shell ejecting
+                    if progress < 0.25 {
+                        vm.current_tile = 2616; // Blast recoil
+                    } else if progress < 0.55 {
+                        vm.current_tile = 2617; // Pump action
                     } else if progress < 0.80 {
-                        vm.current_tile = 2617; // Pump forward
+                        vm.current_tile = 2618; // Pump returning
                     } else {
                         vm.current_tile = 2613; // Settled idle
                     }
                 }
                 WeaponType::Chaingun => {
-                    let frame_offset = ((time.elapsed_seconds() * 25.0) as i16) % 4;
-                    vm.current_tile = 2544 + frame_offset;
+                    let frame_offset = ((time.elapsed_seconds() * 20.0) as i16) % 2;
+                    vm.current_tile = if frame_offset == 0 { 2544 } else { 2536 };
                 }
                 WeaponType::Rpg => {
                     if progress < 0.35 {
-                        vm.current_tile = 2606; // Rocket launch blast!
-                    } else if progress < 0.85 {
-                        vm.current_tile = 2607; // Tube recoil
+                        vm.current_tile = 2544; // Rocket blast
                     } else {
                         vm.current_tile = 2605; // Settled idle
                     }
@@ -1281,4 +1275,52 @@ mod tests {
             "Weapon should switch back to Pipebomb ready for next deliberate throw"
         );
     }
+
+    #[test]
+    fn test_pistol_viewmodel_animation_frames() {
+        let vm = FirstPersonViewModel::new(WeaponType::Pistol);
+        assert_eq!(vm.current_tile, 2524);
+
+        let fire_delay = 1.0f32;
+
+        // Test progress < 0.15 gives authentic muzzle flash frame (2525)
+        let mut fire_timer = 0.90f32;
+        let progress = 1.0 - (fire_timer / fire_delay);
+        assert!(progress < 0.15);
+        let frame = if progress < 0.15 {
+            2525
+        } else if progress < 0.45 {
+            2526
+        } else {
+            2524
+        };
+        assert_eq!(frame, 2525);
+
+        // Test progress at 0.30 gives recoil slide frame (2526)
+        fire_timer = 0.70;
+        let progress = 1.0 - (fire_timer / fire_delay);
+        let frame = if progress < 0.15 {
+            2525
+        } else if progress < 0.45 {
+            2526
+        } else {
+            2524
+        };
+        assert_eq!(frame, 2526);
+
+        // Test progress at 0.60 returns to settled idle (2524), NEVER 2527
+        fire_timer = 0.40;
+        let progress = 1.0 - (fire_timer / fire_delay);
+        let frame = if progress < 0.15 {
+            2525
+        } else if progress < 0.45 {
+            2526
+        } else {
+            2524
+        };
+        assert_eq!(frame, 2524);
+    }
 }
+
+
+

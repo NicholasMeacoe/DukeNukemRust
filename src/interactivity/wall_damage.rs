@@ -20,7 +20,7 @@ pub fn handle_wall_damage(
     mut wall_damage_events: EventReader<WallDamageEvent>,
     mut commands: Commands,
     mut glass_query: Query<(Entity, &Transform, &mut BreakableGlass)>,
-    mut crack_query: Query<(&Transform, &mut CrackWall)>,
+    mut crack_query: Query<(Entity, &Transform, &mut CrackWall)>,
     mut viewscreen_query: Query<(&Transform, &mut ViewscreenProp)>,
     mut mirror_query: Query<(&Transform, &mut MirrorProp)>,
     mut fire_ext_query: Query<(Entity, &Transform, &mut FireExtinguisher)>,
@@ -29,6 +29,7 @@ pub fn handle_wall_damage(
     mut destructible_query: Query<(Entity, &mut crate::Destructible)>,
     mut tag_events: EventWriter<ActivateTagEvent>,
     mut explosion_events: EventWriter<ExplosionDamageEvent>,
+    mut barrel_explode_events: EventWriter<BarrelExplodeEvent>,
     mut sound_events: EventWriter<PlaySoundEvent>,
     mut gib_events: EventWriter<crate::combat::GibEvent>,
 ) {
@@ -52,13 +53,14 @@ pub fn handle_wall_damage(
             }
         }
 
-        // 2. Crack Walls
-        for (trans, mut crack) in crack_query.iter_mut() {
+        // 2. Crack Walls & Air Vent Covers
+        for (entity, trans, mut crack) in crack_query.iter_mut() {
             if crack.is_blown {
                 continue;
             }
+            let is_direct = ev.hit_entity == Some(entity);
             let is_near = trans.translation.distance_squared(hit_pt) < 2.25; // 1.5m
-            if is_near {
+            if is_direct || is_near {
                 if ev.is_explosive {
                     // Explosives blow the crack wall wide open immediately
                     crack.health = 0;
@@ -68,6 +70,11 @@ pub fn handle_wall_damage(
                     if crack.lotag != 0 {
                         tag_events.send(ActivateTagEvent { lotag: crack.lotag });
                     }
+                    gib_events.send(crate::combat::GibEvent {
+                        origin: trans.translation,
+                        gib_count: 6,
+                    });
+                    commands.entity(entity).despawn_recursive();
                 } else {
                     // Bullet / Melee impacts damage the crack wall progressively
                     crack.health -= ev.damage;
@@ -80,6 +87,11 @@ pub fn handle_wall_damage(
                         if crack.lotag != 0 {
                             tag_events.send(ActivateTagEvent { lotag: crack.lotag });
                         }
+                        gib_events.send(crate::combat::GibEvent {
+                            origin: trans.translation,
+                            gib_count: 6,
+                        });
+                        commands.entity(entity).despawn_recursive();
                     }
                 }
             }
@@ -153,6 +165,12 @@ pub fn handle_wall_damage(
                         damage: barrel.damage,
                         attacker_id: ev.attacker_id,
                         excluded_entity: None,
+                    });
+                    barrel_explode_events.send(BarrelExplodeEvent {
+                        origin: trans.translation,
+                        radius: barrel.damage_radius,
+                        damage: barrel.damage,
+                        attacker_id: ev.attacker_id,
                     });
                     gib_events.send(crate::combat::GibEvent {
                         origin: trans.translation,

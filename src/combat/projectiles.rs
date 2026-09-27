@@ -6,7 +6,12 @@ use bevy_rapier3d::prelude::*;
 
 pub use crate::combat::ai::map_tile_to_projectile;
 
-pub fn spawn_projectiles(mut events: EventReader<SpawnProjectileEvent>, mut commands: Commands) {
+pub fn spawn_projectiles(
+    mut events: EventReader<SpawnProjectileEvent>,
+    mut commands: Commands,
+    mut meshes: Option<ResMut<Assets<Mesh>>>,
+    mut materials: Option<ResMut<Assets<StandardMaterial>>>,
+) {
     for ev in events.read() {
         let vel = ev.direction.normalize_or_zero() * ev.velocity;
         let lifetime = match ev.projectile_type {
@@ -63,6 +68,33 @@ pub fn spawn_projectiles(mut events: EventReader<SpawnProjectileEvent>, mut comm
             _ => None,
         };
 
+        let maybe_pbr = if matches!(
+            ev.projectile_type,
+            ProjectileType::HitscanBullet | ProjectileType::ShotgunPellet
+        ) {
+            if let (Some(ref mut m_assets), Some(ref mut mat_assets)) = (&mut meshes, &mut materials) {
+                let mesh = m_assets.add(Cuboid::new(0.04, 0.04, 0.4));
+                let material = mat_assets.add(StandardMaterial {
+                    base_color: Color::srgb(1.0, 0.9, 0.4),
+                    emissive: LinearRgba::new(2.5, 2.0, 0.5, 1.0),
+                    unlit: true,
+                    ..default()
+                });
+                let rot = if vel.length_squared() > 0.001 {
+                    Transform::default().looking_to(vel.normalize(), Vec3::Y).rotation
+                } else {
+                    Quat::IDENTITY
+                };
+                Some((mesh, material, rot))
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        let rot = maybe_pbr.as_ref().map(|(_, _, r)| *r).unwrap_or(Quat::IDENTITY);
+
         let mut ent_cmd = commands.spawn((
             Projectile {
                 projectile_type: ev.projectile_type,
@@ -73,8 +105,14 @@ pub fn spawn_projectiles(mut events: EventReader<SpawnProjectileEvent>, mut comm
                 lifetime,
                 bounces,
             },
-            TransformBundle::from_transform(Transform::from_translation(ev.origin)),
+            TransformBundle::from_transform(
+                Transform::from_translation(ev.origin).with_rotation(rot),
+            ),
         ));
+
+        if let Some((mesh, material, _)) = maybe_pbr {
+            ent_cmd.insert((mesh, material, Visibility::Inherited));
+        }
 
         if let Some(light) = maybe_light {
             ent_cmd.insert(light);

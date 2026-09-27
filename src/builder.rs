@@ -933,10 +933,11 @@ impl<'a> MapMeshBuilder<'a> {
                         | NUKEBARREL
                         | NUKEBARRELDENTED
                         | NUKEBARRELLEAKED
+                        | SEENINE
                 );
                 let is_wall_prop = matches!(
                     sprite.picnum,
-                    FIREEXT | CAMERA1 | 500 | WATERFOUNTAIN | 564 | 565
+                    FIREEXT | CAMERA1 | 500 | WATERFOUNTAIN | 564 | 565 | FANSPRITE | PANNEL1
                 );
                 let is_ceiling_fan = sprite.picnum == 617;
                 let is_env_prop = is_barrel || is_wall_prop || is_ceiling_fan;
@@ -1040,7 +1041,7 @@ impl<'a> MapMeshBuilder<'a> {
                 ));
 
                 let is_blocking = (sprite.cstat & 1) != 0;
-                if is_blocking || is_enemy {
+                if is_blocking || is_enemy || is_barrel || is_env_prop {
                     entity_cmds.insert(RigidBody::Fixed);
                     
                     if !is_wall_aligned && !is_floor_aligned {
@@ -1322,8 +1323,8 @@ impl<'a> MapMeshBuilder<'a> {
                             entity_cmds.insert(crate::voxel::SecurityCameraVoxel::new(angle_rad, 0.7, 1.2));
                         }
                     }
-                    // EXPLODING BARREL & RADIOACTIVE BARRELS
-                    EXPLODINGBARREL | EXPLODINGBARREL2 | FIREBARREL | NUKEBARREL | NUKEBARRELDENTED | NUKEBARRELLEAKED => {
+                    // EXPLODING BARREL & RADIOACTIVE BARRELS & SEENINE CANISTERS
+                    EXPLODINGBARREL | EXPLODINGBARREL2 | FIREBARREL | NUKEBARREL | NUKEBARRELDENTED | NUKEBARRELLEAKED | SEENINE => {
                         entity_cmds.insert(crate::interactivity::ExplodingBarrel {
                             health: 20,
                             damage_radius: 6.0,
@@ -1331,10 +1332,10 @@ impl<'a> MapMeshBuilder<'a> {
                             is_exploded: false,
                         });
                     }
-                    // CRACK WALL
-                    CRACK1..=CRACK4 => {
+                    // CRACK WALL & AIR VENT GRATES
+                    CRACK1..=CRACK4 | FANSPRITE | PANNEL1 => {
                         entity_cmds.insert(crate::interactivity::CrackWall {
-                            health: 30,
+                            health: 20,
                             stage: 1,
                             lotag: sprite.lotag,
                             is_blown: false,

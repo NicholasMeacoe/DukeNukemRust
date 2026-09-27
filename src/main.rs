@@ -156,6 +156,9 @@ pub struct FirstPersonWeaponRoot;
 #[derive(Component)]
 pub struct FirstPersonWeapon;
 
+#[derive(Component)]
+pub struct CrosshairUi;
+
 fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -406,6 +409,37 @@ fn setup(
         })
     };
 
+    let crosshair_image = if let Some(tex) = tile_textures.get(&CROSSHAIR) {
+        tex.clone()
+    } else {
+        // Fallback crosshair texture (9x9 with center reticle)
+        let mut data = vec![0u8; 9 * 9 * 4];
+        for y in 0..9 {
+            for x in 0..9 {
+                let is_reticle = (y == 4 && (x >= 1 && x <= 7)) || (x == 4 && (y >= 1 && y <= 7));
+                let is_center_dot = x == 4 && y == 4;
+                if is_reticle {
+                    let idx = (y * 9 + x) * 4;
+                    data[idx] = if is_center_dot { 255 } else { 220 };
+                    data[idx + 1] = if is_center_dot { 50 } else { 220 };
+                    data[idx + 2] = if is_center_dot { 50 } else { 220 };
+                    data[idx + 3] = 255;
+                }
+            }
+        }
+        images.add(Image::new(
+            bevy::render::render_resource::Extent3d {
+                width: 9,
+                height: 9,
+                depth_or_array_layers: 1,
+            },
+            bevy::render::render_resource::TextureDimension::D2,
+            data,
+            bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb,
+            RenderAssetUsages::default(),
+        ))
+    };
+
     let base_y = 0.0; // Rest position at bottom of screen
     commands
         .spawn((
@@ -425,6 +459,7 @@ fn setup(
             FirstPersonWeaponRoot,
         ))
         .with_children(|parent| {
+            // First Person Weapon Viewmodel (Bottom Right)
             parent.spawn((
                 ImageBundle {
                     image: UiImage::new(weapon_image),
@@ -441,6 +476,31 @@ fn setup(
                     ..default()
                 },
                 FirstPersonWeapon,
+            ));
+
+            // Centered Targeting Crosshair Reticle (Tile 2523)
+            parent.spawn((
+                ImageBundle {
+                    image: UiImage::new(crosshair_image),
+                    style: Style {
+                        position_type: PositionType::Absolute,
+                        left: Val::Percent(50.0),
+                        top: Val::Percent(50.0),
+                        margin: UiRect {
+                            left: Val::Px(-9.0),
+                            top: Val::Px(-9.0),
+                            ..default()
+                        },
+                        width: Val::Px(18.0),
+                        height: Val::Px(18.0),
+                        display: Display::None,
+                        ..default()
+                    },
+                    visibility: Visibility::Hidden,
+                    background_color: Color::NONE.into(),
+                    ..default()
+                },
+                CrosshairUi,
             ));
         });
 }
@@ -730,7 +790,22 @@ pub fn cursor_grab(
 fn sync_first_person_weapon_visibility(
     state: Res<State<game_flow::GamePhase>>,
     mut root_query: Query<(&mut Style, &mut Visibility), With<FirstPersonWeaponRoot>>,
-    mut weapon_query: Query<(&mut Style, &mut Visibility), (With<FirstPersonWeapon>, Without<FirstPersonWeaponRoot>)>,
+    mut weapon_query: Query<
+        (&mut Style, &mut Visibility),
+        (
+            With<FirstPersonWeapon>,
+            Without<FirstPersonWeaponRoot>,
+            Without<CrosshairUi>,
+        ),
+    >,
+    mut crosshair_query: Query<
+        (&mut Style, &mut Visibility),
+        (
+            With<CrosshairUi>,
+            Without<FirstPersonWeaponRoot>,
+            Without<FirstPersonWeapon>,
+        ),
+    >,
 ) {
     let is_playing = *state.get() == game_flow::GamePhase::Playing;
     for (mut style, mut vis) in root_query.iter_mut() {
@@ -744,6 +819,16 @@ fn sync_first_person_weapon_visibility(
         }
     }
     for (mut style, mut vis) in weapon_query.iter_mut() {
+        let target_display = if is_playing { Display::Flex } else { Display::None };
+        let target_vis = if is_playing { Visibility::Inherited } else { Visibility::Hidden };
+        if style.display != target_display {
+            style.display = target_display;
+        }
+        if *vis != target_vis {
+            *vis = target_vis;
+        }
+    }
+    for (mut style, mut vis) in crosshair_query.iter_mut() {
         let target_display = if is_playing { Display::Flex } else { Display::None };
         let target_vis = if is_playing { Visibility::Inherited } else { Visibility::Hidden };
         if style.display != target_display {
@@ -851,9 +936,24 @@ mod main_tests {
             ))
             .id();
 
+        let crosshair_entity = app
+            .world_mut()
+            .spawn((
+                NodeBundle {
+                    style: Style {
+                        display: Display::None,
+                        ..default()
+                    },
+                    visibility: Visibility::Hidden,
+                    ..default()
+                },
+                CrosshairUi,
+            ))
+            .id();
+
         app.add_systems(Update, sync_first_person_weapon_visibility);
 
-        // 1. Initial state (MainMenu): weapon must be Hidden and Display::None
+        // 1. Initial state (MainMenu): weapon & crosshair must be Hidden and Display::None
         app.update();
         let root_style = app.world().entity(root_entity).get::<Style>().unwrap();
         let root_vis = app.world().entity(root_entity).get::<Visibility>().unwrap();
@@ -865,7 +965,12 @@ mod main_tests {
         assert_eq!(weapon_style.display, Display::None);
         assert_eq!(*weapon_vis, Visibility::Hidden);
 
-        // 2. Transition to Playing: weapon must become visible
+        let crosshair_style = app.world().entity(crosshair_entity).get::<Style>().unwrap();
+        let crosshair_vis = app.world().entity(crosshair_entity).get::<Visibility>().unwrap();
+        assert_eq!(crosshair_style.display, Display::None);
+        assert_eq!(*crosshair_vis, Visibility::Hidden);
+
+        // 2. Transition to Playing: weapon and crosshair must become visible
         app.world_mut()
             .resource_mut::<NextState<game_flow::GamePhase>>()
             .set(game_flow::GamePhase::Playing);
@@ -880,7 +985,12 @@ mod main_tests {
         assert_eq!(weapon_style.display, Display::Flex);
         assert_eq!(*weapon_vis, Visibility::Inherited);
 
-        // 3. Pause the game: weapon must hide again immediately
+        let crosshair_style = app.world().entity(crosshair_entity).get::<Style>().unwrap();
+        let crosshair_vis = app.world().entity(crosshair_entity).get::<Visibility>().unwrap();
+        assert_eq!(crosshair_style.display, Display::Flex);
+        assert_eq!(*crosshair_vis, Visibility::Inherited);
+
+        // 3. Pause the game: weapon & crosshair must hide again immediately
         app.world_mut()
             .resource_mut::<NextState<game_flow::GamePhase>>()
             .set(game_flow::GamePhase::Paused);
@@ -894,6 +1004,11 @@ mod main_tests {
         let weapon_vis = app.world().entity(weapon_entity).get::<Visibility>().unwrap();
         assert_eq!(weapon_style.display, Display::None);
         assert_eq!(*weapon_vis, Visibility::Hidden);
+
+        let crosshair_style = app.world().entity(crosshair_entity).get::<Style>().unwrap();
+        let crosshair_vis = app.world().entity(crosshair_entity).get::<Visibility>().unwrap();
+        assert_eq!(crosshair_style.display, Display::None);
+        assert_eq!(*crosshair_vis, Visibility::Hidden);
     }
 
     #[test]
