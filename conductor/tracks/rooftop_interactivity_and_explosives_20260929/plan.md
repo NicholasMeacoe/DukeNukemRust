@@ -1,16 +1,16 @@
 # Implementation Plan: Rooftop Interactivity and Explosives Integrity
 
 ## Phase 1: Collider Geometry and Positioning Alignment
-- [ ] Task 1.1: TDD - Unit test for 2D barrel collider vertical centering and floor vent orientation
-  - [ ] Write unit test in `src/builder.rs` asserting `SEENINE` collider extends from floor $Y=0.0$ upward to full height ($Y \approx 0.8$)
-  - [ ] Write unit test asserting `FANSPRITE` floor-aligned collider lies flat horizontally along roof
-- [ ] Task 1.2: Correct 2D barrel vertical offset in `src/builder.rs`
-  - [ ] Check if barrel has voxel model; if purely 2D sprite (`SEENINE`, `FIREBARREL`), offset `pos.y += scale_y / 2.0` so cylinder collider rests on floor
-  - [ ] Ensure voxel barrels with bottom pivots preserve grounded translation
-- [ ] Task 1.3: Correct floor-aligned cuboid dimensions in `src/builder.rs`
-  - [ ] Update `is_floor_aligned` branch to `Collider::cuboid(scale_x / 2.0, scale_y / 2.0, 0.05)`
-- [ ] Task 1.4: Phase Verification & Checkpoint
-  - [ ] Run `cargo test builder` to verify collider geometry
+- [x] Task 1.1: TDD - Unit test for 2D barrel collider vertical centering and floor vent orientation
+  - [x] Write unit test in `src/builder.rs` asserting `SEENINE` collider extends from floor $Y=0.0$ upward to full height ($Y \approx 0.8$)
+  - [x] Write unit test asserting `FANSPRITE` floor-aligned collider lies flat horizontally along roof
+- [x] Task 1.2: Correct 2D barrel vertical offset in `src/builder.rs`
+  - [x] Check if barrel has voxel model; if purely 2D sprite (`SEENINE`, `FIREBARREL`), offset `pos.y += scale_y / 2.0` so cylinder collider rests on floor
+  - [x] Ensure voxel barrels with bottom pivots preserve grounded translation
+- [x] Task 1.3: Correct floor-aligned cuboid dimensions in `src/builder.rs`
+  - [x] Update `is_floor_aligned` branch to `Collider::cuboid(scale_x / 2.0, scale_y / 2.0, 0.05)`
+- [x] Task 1.4: Phase Verification & Checkpoint
+  - [x] Run `cargo test builder` to verify collider geometry
 
 ## Phase 2: Explosive Radius Handling and Despawn Pipeline
 - [ ] Task 2.1: TDD - Unit test for AoE damage despawning `CrackWall` and chain reaction deduplication

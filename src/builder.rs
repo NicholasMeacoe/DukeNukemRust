@@ -937,10 +937,11 @@ impl<'a> MapMeshBuilder<'a> {
                 );
                 let is_wall_prop = matches!(
                     sprite.picnum,
-                    FIREEXT | CAMERA1 | 500 | WATERFOUNTAIN | 564 | 565 | FANSPRITE | PANNEL1
+                    FIREEXT | CAMERA1 | 500 | WATERFOUNTAIN | 564 | 565
                 );
+                let is_destructible_prop = matches!(sprite.picnum, FANSPRITE | PANNEL1);
                 let is_ceiling_fan = sprite.picnum == 617;
-                let is_env_prop = is_barrel || is_wall_prop || is_ceiling_fan;
+                let is_env_prop = is_barrel || is_wall_prop || is_ceiling_fan || is_destructible_prop;
 
                 // In Build Engine, Z is the bottom of the sprite unless cstat & 128 is set (Centered)
                 let is_centered = (sprite.cstat & 128) != 0;
@@ -948,7 +949,7 @@ impl<'a> MapMeshBuilder<'a> {
                     if let Some(sector) = self.map.sectors.get(sprite.sectnum as usize) {
                         pos.y = -(sector.ceilingz as f32) / (1024.0 * 16.0);
                     }
-                } else if is_barrel {
+                } else if is_barrel && has_voxel_model {
                     // For barrels with voxel models, pivot.z == 0 means mesh bottom is at local y=0.
                     // Keep pos.y directly at the floor elevation without half-height offset.
                 } else if !is_centered {
@@ -1045,11 +1046,19 @@ impl<'a> MapMeshBuilder<'a> {
                     entity_cmds.insert(RigidBody::Fixed);
                     
                     if !is_wall_aligned && !is_floor_aligned {
-                        entity_cmds.insert(Collider::cylinder(0.4, 0.4));
+                        if is_barrel && is_voxel {
+                            entity_cmds.insert(Collider::compound(vec![(
+                                Vec3::new(0.0, 0.4, 0.0),
+                                Quat::IDENTITY,
+                                Collider::cylinder(0.4, 0.4),
+                            )]));
+                        } else {
+                            entity_cmds.insert(Collider::cylinder(0.4, 0.4));
+                        }
                     } else if is_wall_aligned {
                         entity_cmds.insert(Collider::cuboid(0.5, 0.5, 0.05));
                     } else {
-                        entity_cmds.insert(Collider::cuboid(0.5, 0.05, 0.5));
+                        entity_cmds.insert(Collider::cuboid(0.5, 0.5, 0.05));
                     }
                 }
 
@@ -2662,5 +2671,180 @@ mod tests {
             found_fan = true;
         }
         assert!(found_fan, "Ceiling fan voxel prop was not found");
+    }
+
+    #[test]
+    fn test_2d_barrel_and_floor_vent_collider_alignment() {
+        let mut app = App::new();
+        let test_sector = crate::map::Sector {
+            wallptr: 0,
+            wallnum: 0,
+            ceilingz: -16384, // Y = 1.0
+            floorz: 0,        // Y = 0.0
+            ceilingstat: 0,
+            floorstat: 0,
+            ceilingpicnum: 0,
+            ceilingheinum: 0,
+            ceilingshade: 0,
+            ceilingpal: 0,
+            ceilingxpanning: 0,
+            ceilingypanning: 0,
+            floorpicnum: 0,
+            floorheinum: 0,
+            floorshade: 0,
+            floorpal: 0,
+            floorxpanning: 0,
+            floorypanning: 0,
+            visibility: 0,
+            _filler: 0,
+            lotag: 0,
+            hitag: 0,
+            extra: -1,
+        };
+
+        let map = crate::map::Map {
+            version: 7,
+            posx: 0,
+            posy: 0,
+            posz: 0,
+            ang: 0,
+            cursectnum: 0,
+            sectors: vec![test_sector],
+            walls: Vec::new(),
+            sprites: vec![
+                // 1. SEENINE gas canister (2D sprite without voxel model)
+                crate::map::Sprite {
+                    x: 1024,
+                    y: 1024,
+                    z: 0,
+                    cstat: 0, // Not explicitly blocking in map, but env prop
+                    shade: 0,
+                    pal: 0,
+                    clipdist: 32,
+                    _filler: 0,
+                    xrepeat: 64,
+                    yrepeat: 64,
+                    xoffset: 0,
+                    yoffset: 0,
+                    picnum: SEENINE,
+                    ang: 0,
+                    xvel: 0,
+                    yvel: 0,
+                    zvel: 0,
+                    owner: 0,
+                    sectnum: 0,
+                    statnum: 0,
+                    lotag: 0,
+                    hitag: 0,
+                    extra: -1,
+                },
+                // 2. Floor-aligned FANSPRITE air vent cover
+                crate::map::Sprite {
+                    x: 2048,
+                    y: 2048,
+                    z: 0,
+                    cstat: 32, // Floor-aligned
+                    shade: 0,
+                    pal: 0,
+                    clipdist: 32,
+                    _filler: 0,
+                    xrepeat: 64,
+                    yrepeat: 64,
+                    xoffset: 0,
+                    yoffset: 0,
+                    picnum: FANSPRITE,
+                    ang: 0,
+                    xvel: 0,
+                    yvel: 0,
+                    zvel: 0,
+                    owner: 0,
+                    sectnum: 0,
+                    statnum: 0,
+                    lotag: 0,
+                    hitag: 0,
+                    extra: -1,
+                },
+            ],
+        };
+
+        let mut tile_textures = HashMap::new();
+        let mut images = Assets::<Image>::default();
+        let img = images.add(Image::default());
+        tile_textures.insert(SEENINE, img.clone());
+        tile_textures.insert(FANSPRITE, img);
+
+        let mut tile_sizes = HashMap::new();
+        tile_sizes.insert(SEENINE, (64, 64));
+        tile_sizes.insert(FANSPRITE, (64, 64));
+
+        let picanm_map = HashMap::new();
+        let mut materials: Assets<StandardMaterial> = Assets::default();
+        let default_material = materials.add(StandardMaterial::default());
+        let mut meshes: Assets<Mesh> = Assets::default();
+
+        let builder = MapMeshBuilder::new(
+            &map,
+            &tile_textures,
+            &tile_sizes,
+            &picanm_map,
+            default_material,
+        );
+
+        let mut voxel_reg = crate::voxel::VoxelRegistry::new();
+        let pal = crate::palette::Palette::default();
+
+        let mut commands = app.world_mut().commands();
+        builder.build(
+            &mut commands,
+            &mut meshes,
+            &mut materials,
+            1,
+            Some(&mut voxel_reg),
+            Some(&pal),
+        );
+        app.update();
+
+        // 1. Verify SEENINE canister: has ExplodingBarrel and its center is raised above floor so collider rests on floor
+        let mut barrel_query = app
+            .world_mut()
+            .query::<(&Transform, &crate::interactivity::ExplodingBarrel, &Collider)>();
+        let mut found_canister = false;
+        for (transform, barrel, _collider) in barrel_query.iter(app.world()) {
+            assert_eq!(barrel.health, 20);
+            assert_eq!(barrel.damage_radius, 6.0);
+            // 2D sprite must be lifted so its center is above floor (pos.y > 0.1)
+            assert!(
+                transform.translation.y > 0.1,
+                "2D sprite barrel must have its center above the floor at Y > 0.1, got {}",
+                transform.translation.y
+            );
+            found_canister = true;
+        }
+        assert!(found_canister, "SEENINE canister was not spawned with ExplodingBarrel");
+
+        // 2. Verify Floor Vent: has CrackWall and its cuboid collider is thin on local Z
+        let mut vent_query = app
+            .world_mut()
+            .query::<(&Transform, &crate::interactivity::CrackWall, &Collider)>();
+        let mut found_vent = false;
+        for (transform, crack, collider) in vent_query.iter(app.world()) {
+            assert_eq!(crack.health, 20);
+            // The entity should be rotated -90 deg on X (with Z yaw)
+            assert!(transform.rotation.x.abs() >= 0.49);
+            // Under -90 deg X rotation, local Z maps to world Y, so local Z must be thin (0.05)
+            // If cuboid is (scale_x / 2.0, scale_y / 2.0, 0.05), collider cuboid extents match
+            if let Some(cuboid) = collider.as_cuboid() {
+                let half_extents = cuboid.half_extents();
+                assert!(
+                    half_extents.z < half_extents.x && half_extents.z < half_extents.y,
+                    "Floor-aligned vent collider must have its thin axis along local Z so rotation lays it flat, got {:?}",
+                    half_extents
+                );
+            } else {
+                panic!("Vent collider was not a cuboid");
+            }
+            found_vent = true;
+        }
+        assert!(found_vent, "FANSPRITE was not spawned with CrackWall");
     }
 }
