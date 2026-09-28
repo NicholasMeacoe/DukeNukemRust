@@ -302,7 +302,7 @@ pub fn handle_explosions(
     mut barrels: Query<(Entity, &Transform, &mut ExplodingBarrel)>,
     mut fire_extinguishers: Query<(Entity, &Transform, &mut FireExtinguisher)>,
     mut fountains: Query<(&Transform, &mut WaterFountain)>,
-    mut crack_walls: Query<(&Transform, &mut CrackWall)>,
+    mut crack_walls: Query<(Entity, &Transform, &mut CrackWall)>,
     mut glass_windows: Query<(Entity, &Transform, &mut BreakableGlass)>,
     mut players: Query<(Entity, &Transform, &mut crate::player::PlayerController, Option<&crate::player::types::PlayerId>)>,
     mut enemies: Query<(
@@ -422,8 +422,8 @@ pub fn handle_explosions(
             }
         }
 
-        // 4. Damage Crack Walls
-        for (trans, mut crack) in crack_walls.iter_mut() {
+        // 4. Damage Crack Walls & Air Vent Covers
+        for (entity, trans, mut crack) in crack_walls.iter_mut() {
             if !crack.is_blown {
                 let dist = trans.translation.distance(origin);
                 if dist <= exp.radius {
@@ -436,6 +436,11 @@ pub fn handle_explosions(
                         if crack.lotag != 0 {
                             tag_events.send(ActivateTagEvent { lotag: crack.lotag });
                         }
+                        gib_events.send(crate::combat::GibEvent {
+                            origin: trans.translation,
+                            gib_count: 6,
+                        });
+                        commands.entity(entity).despawn_recursive();
                     }
                 }
             }
@@ -772,6 +777,7 @@ mod tests {
                 Update,
                 (
                     crate::interactivity::wall_damage::handle_wall_damage,
+                    handle_barrel_chain_explosions,
                     handle_explosions,
                 )
                     .chain(),
@@ -851,5 +857,72 @@ mod tests {
             "Player 1 total frags must be 0 (not -1 suicide penalty)"
         );
         assert_eq!(dmatch.get_deaths(1), 1, "Player 1 must have 1 death recorded");
+    }
+
+    #[test]
+    fn test_aoe_explosion_destroys_and_despawns_crack_wall() {
+        let mut app = App::new();
+        app.add_event::<ExplosionDamageEvent>()
+            .add_event::<BarrelExplodeEvent>()
+            .add_event::<ActivateTagEvent>()
+            .add_event::<PlaySoundEvent>()
+            .add_event::<crate::combat::GibEvent>()
+            .add_event::<crate::lighting::SpawnDynamicLightEvent>()
+            .add_event::<crate::net::PlayerFragEvent>()
+            .init_resource::<crate::hud::ScreenTintState>()
+            .add_systems(Update, handle_explosions);
+
+        let crack_entity = app
+            .world_mut()
+            .spawn((
+                CrackWall {
+                    health: 20,
+                    stage: 1,
+                    lotag: 55,
+                    is_blown: false,
+                },
+                TransformBundle::from_transform(Transform::from_xyz(1.0, 0.0, 0.0)),
+            ))
+            .id();
+
+        // Explosion originates at origin with 6.0m radius and 100 damage (hits entity at 1.0m)
+        app.world_mut().send_event(ExplosionDamageEvent {
+            origin: Vec3::ZERO,
+            radius: 6.0,
+            damage: 100,
+            attacker_id: None,
+            excluded_entity: None,
+        });
+
+        app.update();
+
+        // 1. Entity must be despawned from world completely
+        assert!(
+            app.world().get_entity(crack_entity).is_none(),
+            "CrackWall entity must be completely despawned from the world following lethal AoE explosion"
+        );
+
+        // 2. VENT_BUST sound must be emitted
+        let sound_events = app.world().resource::<Events<PlaySoundEvent>>();
+        let mut sound_reader = sound_events.get_reader();
+        let sounds: Vec<_> = sound_reader.read(sound_events).cloned().collect();
+        assert!(
+            sounds.iter().any(|s| s.sound_id == 18),
+            "VENT_BUST (18) sound effect must be emitted when crack wall explodes"
+        );
+
+        // 3. GibEvent must be emitted
+        let gib_events = app.world().resource::<Events<crate::combat::GibEvent>>();
+        let mut gib_reader = gib_events.get_reader();
+        let gibs: Vec<_> = gib_reader.read(gib_events).cloned().collect();
+        assert_eq!(gibs.len(), 1, "GibEvent must be emitted upon vent destruction");
+        assert_eq!(gibs[0].origin, Vec3::new(1.0, 0.0, 0.0));
+
+        // 4. Tag activation event must be emitted
+        let tag_events = app.world().resource::<Events<ActivateTagEvent>>();
+        let mut tag_reader = tag_events.get_reader();
+        let tags: Vec<_> = tag_reader.read(tag_events).cloned().collect();
+        assert_eq!(tags.len(), 1);
+        assert_eq!(tags[0].lotag, 55);
     }
 }

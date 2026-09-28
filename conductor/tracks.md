@@ -13,7 +13,7 @@
   *Link: [./tracks/combat_and_physics_integrity_20260924/plan.md](./tracks/combat_and_physics_integrity_20260924/plan.md)*
 
 ---
-- [~] **Track: Rooftop Interactivity and Explosives Integrity**
+- [x] **Track: Rooftop Interactivity and Explosives Integrity**
   *Link: [./tracks/rooftop_interactivity_and_explosives_20260929/index.md](./tracks/rooftop_interactivity_and_explosives_20260929/index.md)*
 
 ---

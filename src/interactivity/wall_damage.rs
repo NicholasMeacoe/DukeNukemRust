@@ -159,13 +159,6 @@ pub fn handle_wall_damage(
                 if barrel.health <= 0 {
                     barrel.is_exploded = true;
                     sound_events.send(PlaySoundEvent { sound_id: 14 }); // PIPEBOMB_EXPLODE
-                    explosion_events.send(ExplosionDamageEvent {
-                        origin: trans.translation,
-                        radius: barrel.damage_radius,
-                        damage: barrel.damage,
-                        attacker_id: ev.attacker_id,
-                        excluded_entity: None,
-                    });
                     barrel_explode_events.send(BarrelExplodeEvent {
                         origin: trans.translation,
                         radius: barrel.damage_radius,

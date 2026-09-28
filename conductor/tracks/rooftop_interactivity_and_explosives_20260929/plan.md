@@ -13,14 +13,14 @@
   - [x] Run `cargo test builder` to verify collider geometry
 
 ## Phase 2: Explosive Radius Handling and Despawn Pipeline
-- [ ] Task 2.1: TDD - Unit test for AoE damage despawning `CrackWall` and chain reaction deduplication
-  - [ ] Write unit test in `src/interactivity/props.rs` verifying that an `ExplosionDamageEvent` hitting `CrackWall` despawns the entity and writes `GibEvent`
-  - [ ] Write unit test verifying that shooting a barrel generates only a single `ExplosionDamageEvent` via `BarrelExplodeEvent`
-- [ ] Task 2.2: Add entity despawn and gib dispatch to `handle_explosions` in `src/interactivity/props.rs`
-  - [ ] In `props.rs` `CrackWall` branch, query `Entity` and call `commands.entity(entity).despawn_recursive()`
-  - [ ] Send `GibEvent` with origin at vent translation and `gib_count: 6`
-- [ ] Task 2.3: Remove redundant `ExplosionDamageEvent` in `src/interactivity/wall_damage.rs`
-  - [ ] Remove `explosion_events.send(...)` in the `handle_wall_damage` barrel destruction block
-- [ ] Task 2.4: Phase Verification & Checkpoint
-  - [ ] Run `cargo test interactivity` and `cargo test props`
-  - [ ] Confirm full test suite passes with 0 warnings
+- [x] Task 2.1: TDD - Unit test for AoE damage despawning `CrackWall` and chain reaction deduplication
+  - [x] Write unit test in `src/interactivity/props.rs` verifying that an `ExplosionDamageEvent` hitting `CrackWall` despawns the entity and writes `GibEvent`
+  - [x] Write unit test verifying that shooting a barrel generates only a single `ExplosionDamageEvent` via `BarrelExplodeEvent`
+- [x] Task 2.2: Add entity despawn and gib dispatch to `handle_explosions` in `src/interactivity/props.rs`
+  - [x] In `props.rs` `CrackWall` branch, query `Entity` and call `commands.entity(entity).despawn_recursive()`
+  - [x] Send `GibEvent` with origin at vent translation and `gib_count: 6`
+- [x] Task 2.3: Remove redundant `ExplosionDamageEvent` in `src/interactivity/wall_damage.rs`
+  - [x] Remove `explosion_events.send(...)` in the `handle_wall_damage` barrel destruction block
+- [x] Task 2.4: Phase Verification & Checkpoint
+  - [x] Run `cargo test interactivity` and `cargo test props`
+  - [x] Confirm full test suite passes with 0 warnings
