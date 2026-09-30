@@ -150,6 +150,10 @@ pub fn handle_spawn_dynamic_lights(
                 evicted_entities.insert(oldest_entity);
                 commands.safe_despawn_recursive(oldest_entity);
                 current_count = current_count.saturating_sub(1);
+            } else {
+                // All existing lights have already been evicted in this frame batch,
+                // or max capacity is saturated. Drop excess lights to enforce the cap!
+                continue;
             }
         }
 
@@ -371,8 +375,8 @@ pub mod tests {
         let mut query = app.world_mut().query::<&TransientLight>();
         assert_eq!(query.iter(app.world()).count(), 3);
 
-        // Second frame: send 3 MORE light events simultaneously in a single frame batch
-        for i in 3..6 {
+        // Second frame: send 10 MORE light events simultaneously in a single frame batch (burst >> capacity)
+        for i in 3..13 {
             app.world_mut().send_event(SpawnDynamicLightEvent {
                 position: Vec3::new(i as f32, 0.0, 0.0),
                 color: Color::WHITE,
@@ -382,7 +386,7 @@ pub mod tests {
                 decay_mode: LightDecayMode::Linear,
             });
         }
-        // Update must safely evict without duplicate despawn error or panic
+        // Update must safely evict without duplicate despawn error or panic and strictly cap active lights
         app.update();
 
         let mut query2 = app.world_mut().query::<&TransientLight>();
