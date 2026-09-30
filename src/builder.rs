@@ -1006,11 +1006,19 @@ impl<'a> MapMeshBuilder<'a> {
                         [0.5, 0.5, 0.0],
                         [-0.5, 0.5, 0.0],
                     ]);
+                    let (mut u0, mut u1) = (0.001, 0.999);
+                    let (mut v_bottom, mut v_top) = (0.999, 0.001);
+                    if sprite.is_x_flipped() {
+                        std::mem::swap(&mut u0, &mut u1);
+                    }
+                    if sprite.is_y_flipped() {
+                        std::mem::swap(&mut v_bottom, &mut v_top);
+                    }
                     sprite_mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, vec![
-                        [0.001, 0.999],
-                        [0.999, 0.999],
-                        [0.999, 0.001],
-                        [0.001, 0.001],
+                        [u0, v_bottom],
+                        [u1, v_bottom],
+                        [u1, v_top],
+                        [u0, v_top],
                     ]);
                     sprite_mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, vec![
                         [0.0, 0.0, 1.0],
@@ -2297,8 +2305,18 @@ mod tests {
         };
 
         assert_eq!(eval_wall_alpha(0), MaterialAlphaMode::Mask);
+        assert_eq!(eval_wall_alpha(4), MaterialAlphaMode::Mask);
         assert_eq!(eval_wall_alpha(128), MaterialAlphaMode::Blend(33));
         assert_eq!(eval_wall_alpha(512), MaterialAlphaMode::Blend(66));
+
+        // Solid walls (is_masked == false) are always Opaque regardless of cstat
+        let solid_wall_4 = crate::map::Wall {
+            x: 0, y: 0, point2: 1, nextwall: -1, nextsector: -1,
+            cstat: 4, picnum: 100, overpicnum: 0, shade: 0, pal: 0,
+            xrepeat: 8, yrepeat: 8, xpanning: 0, ypanning: 0,
+            lotag: 0, hitag: 0, extra: 0,
+        };
+        assert_eq!(solid_wall_4.alpha_mode(false), MaterialAlphaMode::Opaque);
     }
 
     #[test]

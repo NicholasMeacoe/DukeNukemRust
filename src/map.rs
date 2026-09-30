@@ -352,7 +352,7 @@ impl Wall {
     }
 
     pub fn is_translucent(&self) -> bool {
-        (self.cstat & 128) != 0 || (self.cstat & 4) != 0
+        (self.cstat & 128) != 0
     }
 
     pub fn is_translucent_reversed(&self) -> bool {
@@ -364,12 +364,14 @@ impl Wall {
     }
 
     pub fn alpha_mode(&self, is_masked: bool) -> crate::builder::MaterialAlphaMode {
-        if self.is_translucent_reversed() {
-            crate::builder::MaterialAlphaMode::Blend(66)
-        } else if self.is_translucent() {
-            crate::builder::MaterialAlphaMode::Blend(33)
-        } else if is_masked {
-            crate::builder::MaterialAlphaMode::Mask
+        if is_masked {
+            if self.is_translucent_reversed() {
+                crate::builder::MaterialAlphaMode::Blend(66)
+            } else if self.is_translucent() {
+                crate::builder::MaterialAlphaMode::Blend(33)
+            } else {
+                crate::builder::MaterialAlphaMode::Mask
+            }
         } else {
             crate::builder::MaterialAlphaMode::Opaque
         }
@@ -378,11 +380,19 @@ impl Wall {
 
 impl Sprite {
     pub fn is_translucent(&self) -> bool {
-        (self.cstat & 2) != 0 || (self.cstat & 4) != 0
+        (self.cstat & 2) != 0
     }
 
     pub fn is_translucent_reversed(&self) -> bool {
         (self.cstat & 512) != 0
+    }
+
+    pub fn is_x_flipped(&self) -> bool {
+        (self.cstat & 4) != 0
+    }
+
+    pub fn is_y_flipped(&self) -> bool {
+        (self.cstat & 8) != 0
     }
 
     pub fn alpha_mode(&self) -> crate::builder::MaterialAlphaMode {
@@ -725,20 +735,23 @@ mod tests {
         assert_eq!(opaque_wall.alpha_mode(false), crate::builder::MaterialAlphaMode::Opaque);
         assert_eq!(opaque_wall.alpha_mode(true), crate::builder::MaterialAlphaMode::Mask);
 
-        // Standard translucency (128 or 4)
+        // Standard translucency (128) - only applies when wall is masked
         let trans_wall_128 = make_wall(128);
         assert!(trans_wall_128.is_translucent());
-        assert_eq!(trans_wall_128.alpha_mode(false), crate::builder::MaterialAlphaMode::Blend(33));
+        assert_eq!(trans_wall_128.alpha_mode(false), crate::builder::MaterialAlphaMode::Opaque);
         assert_eq!(trans_wall_128.alpha_mode(true), crate::builder::MaterialAlphaMode::Blend(33));
 
-        let trans_wall_4 = make_wall(4);
-        assert!(trans_wall_4.is_translucent());
-        assert_eq!(trans_wall_4.alpha_mode(false), crate::builder::MaterialAlphaMode::Blend(33));
+        // Bottom-aligned wall (cstat 4) is OPAQUE, NOT translucent!
+        let bottom_aligned_wall = make_wall(4);
+        assert!(!bottom_aligned_wall.is_translucent());
+        assert!(bottom_aligned_wall.align_bottom());
+        assert_eq!(bottom_aligned_wall.alpha_mode(false), crate::builder::MaterialAlphaMode::Opaque);
+        assert_eq!(bottom_aligned_wall.alpha_mode(true), crate::builder::MaterialAlphaMode::Mask);
 
-        // High / reverse translucency (512)
+        // High / reverse translucency (512) - only applies when wall is masked
         let trans_rev_wall = make_wall(512);
         assert!(trans_rev_wall.is_translucent_reversed());
-        assert_eq!(trans_rev_wall.alpha_mode(false), crate::builder::MaterialAlphaMode::Blend(66));
+        assert_eq!(trans_rev_wall.alpha_mode(false), crate::builder::MaterialAlphaMode::Opaque);
         assert_eq!(trans_rev_wall.alpha_mode(true), crate::builder::MaterialAlphaMode::Blend(66));
 
         // Sprites
@@ -775,6 +788,16 @@ mod tests {
         let trans_sprite = make_sprite(2, 100);
         assert!(trans_sprite.is_translucent());
         assert_eq!(trans_sprite.alpha_mode(), crate::builder::MaterialAlphaMode::Blend(33));
+
+        // X-flipped sprite (cstat 4) is mirrored, NOT translucent
+        let x_flipped_sprite = make_sprite(4, 100);
+        assert!(!x_flipped_sprite.is_translucent());
+        assert!(x_flipped_sprite.is_x_flipped());
+        assert_eq!(x_flipped_sprite.alpha_mode(), crate::builder::MaterialAlphaMode::Mask);
+
+        // Y-flipped sprite (cstat 8)
+        let y_flipped_sprite = make_sprite(8, 100);
+        assert!(y_flipped_sprite.is_y_flipped());
 
         let high_trans_sprite = make_sprite(512, 100);
         assert!(high_trans_sprite.is_translucent_reversed());

@@ -32,3 +32,7 @@
 - [x] **Track: ECS Despawn Idempotency and Warning Elimination**
   *Link: [./tracks/ecs_despawn_idempotency_and_warning_elimination_20260930/index.md](./tracks/ecs_despawn_idempotency_and_warning_elimination_20260930/index.md)*
 
+---
+- [x] **Track: Wall Translucency and Cstat Alpha Fix**
+  *Link: [./tracks/wall_translucency_and_cstat_alpha_fix_20260930/index.md](./tracks/wall_translucency_and_cstat_alpha_fix_20260930/index.md)*
+

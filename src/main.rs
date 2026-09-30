@@ -582,7 +582,7 @@ fn update_directional_sprites(
             if let Some(tex) = game_assets.tile_textures.get(&display_picnum) {
                 let (alpha_mode, base_color) = if (con_actor.cstat & 512) != 0 {
                     (AlphaMode::Blend, Color::srgba(1.0, 1.0, 1.0, 0.66))
-                } else if (con_actor.cstat & 2) != 0 || (con_actor.cstat & 4) != 0 {
+                } else if (con_actor.cstat & 2) != 0 {
                     (AlphaMode::Blend, Color::srgba(1.0, 1.0, 1.0, 0.33))
                 } else {
                     (AlphaMode::Mask(0.5), Color::WHITE)
