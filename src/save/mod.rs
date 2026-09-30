@@ -5,6 +5,7 @@ pub use format::*;
 pub use snapshot::*;
 
 use crate::game_flow::state::*;
+use crate::interactivity::SafeDespawnExt;
 use crate::player::types::PlayerController;
 use crate::names::*;
 use bevy::prelude::*;
@@ -376,7 +377,7 @@ pub fn apply_pending_save(
 
     // Despawn all existing dynamic entities (either from current level or freshly spawned by Level Builder)
     for e in &dynamic_query {
-        commands.entity(e).despawn_recursive();
+        commands.safe_despawn_recursive(e);
     }
 
     // Restore Player

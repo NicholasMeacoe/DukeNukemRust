@@ -28,3 +28,7 @@
 - [x] **Track: Rooftop Ventilation Shaft Teleport (SE 7) and Viewmodel Alignment**
   *Link: [./tracks/rooftop_vent_teleport_and_viewmodel_alignment_20260930/index.md](./tracks/rooftop_vent_teleport_and_viewmodel_alignment_20260930/index.md)*
 
+---
+- [x] **Track: ECS Despawn Idempotency and Warning Elimination**
+  *Link: [./tracks/ecs_despawn_idempotency_and_warning_elimination_20260930/index.md](./tracks/ecs_despawn_idempotency_and_warning_elimination_20260930/index.md)*
+

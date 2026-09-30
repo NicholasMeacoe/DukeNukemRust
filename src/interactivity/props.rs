@@ -29,6 +29,8 @@ pub fn handle_player_interactions(
     mut shared_keycards: Option<ResMut<crate::net::coop::SharedKeycards>>,
     mut commands: Commands,
 ) {
+    let mut collected_keycards: std::collections::HashSet<Entity> = std::collections::HashSet::new();
+
     for event in interact_events.read() {
         let player_pos = event.player_pos;
         let player_dir = event.player_dir.normalize_or_zero();
@@ -36,6 +38,9 @@ pub fn handle_player_interactions(
         // 0. Check nearby Keycard pickups
         for mut player in player_query.iter_mut() {
             for (k_entity, k_trans, k_pickup) in keycards.iter() {
+                if collected_keycards.contains(&k_entity) {
+                    continue;
+                }
                 if k_trans.translation.distance_squared(player_pos) < 6.25 {
                     match k_pickup.key_type {
                         1 => player.has_blue_key = true,
@@ -47,7 +52,8 @@ pub fn handle_player_interactions(
                         sk.give_key(k_pickup.key_type);
                     }
                     sound_events.send(PlaySoundEvent { sound_id: 65 }); // KEYCARD_GET
-                    commands.entity(k_entity).despawn_recursive();
+                    collected_keycards.insert(k_entity);
+                    commands.safe_despawn_recursive(k_entity);
                 }
             }
         }
@@ -319,6 +325,8 @@ pub fn handle_explosions(
     mut tint: Option<ResMut<crate::hud::ScreenTintState>>,
     mut commands: Commands,
 ) {
+    let mut despawned_entities: std::collections::HashSet<Entity> = std::collections::HashSet::new();
+
     for exp in explosion_events.read() {
         let origin = exp.origin;
 
@@ -398,7 +406,7 @@ pub fn handle_explosions(
 
         // 3. Damage Exploding Barrels
         for (entity, trans, mut barrel) in barrels.iter_mut() {
-            if !barrel.is_exploded {
+            if !barrel.is_exploded && !despawned_entities.contains(&entity) {
                 let dist = trans.translation.distance(origin);
                 if dist <= exp.radius {
                     let dmg = calculate_hitradius_damage(dist, exp.radius, exp.damage);
@@ -416,7 +424,8 @@ pub fn handle_explosions(
                             origin: trans.translation,
                             gib_count: 6,
                         });
-                        commands.entity(entity).despawn_recursive();
+                        despawned_entities.insert(entity);
+                        commands.safe_despawn_recursive(entity);
                     }
                 }
             }
@@ -424,7 +433,7 @@ pub fn handle_explosions(
 
         // 4. Damage Crack Walls & Air Vent Covers
         for (entity, trans, mut crack) in crack_walls.iter_mut() {
-            if !crack.is_blown {
+            if !crack.is_blown && !despawned_entities.contains(&entity) {
                 let dist = trans.translation.distance(origin);
                 if dist <= exp.radius {
                     let dmg = calculate_hitradius_damage(dist, exp.radius, exp.damage);
@@ -440,7 +449,8 @@ pub fn handle_explosions(
                             origin: trans.translation,
                             gib_count: 6,
                         });
-                        commands.entity(entity).despawn_recursive();
+                        despawned_entities.insert(entity);
+                        commands.safe_despawn_recursive(entity);
                     }
                 }
             }
@@ -448,19 +458,20 @@ pub fn handle_explosions(
 
         // 5. Break Glass Windows
         for (entity, trans, mut glass) in glass_windows.iter_mut() {
-            if !glass.is_broken {
+            if !glass.is_broken && !despawned_entities.contains(&entity) {
                 let dist = trans.translation.distance(origin);
                 if dist <= exp.radius {
                     glass.is_broken = true;
                     sound_events.send(PlaySoundEvent { sound_id: 19 }); // GLASS_BREAKING
-                    commands.entity(entity).despawn_recursive();
+                    despawned_entities.insert(entity);
+                    commands.safe_despawn_recursive(entity);
                 }
             }
         }
 
         // 6. Damage Fire Extinguishers
         for (entity, trans, mut ext) in fire_extinguishers.iter_mut() {
-            if !ext.is_exploded {
+            if !ext.is_exploded && !despawned_entities.contains(&entity) {
                 let dist = trans.translation.distance(origin);
                 if dist <= exp.radius {
                     let dmg = calculate_hitradius_damage(dist, exp.radius, exp.damage);
@@ -478,7 +489,8 @@ pub fn handle_explosions(
                             origin: trans.translation,
                             gib_count: 4,
                         });
-                        commands.entity(entity).despawn_recursive();
+                        despawned_entities.insert(entity);
+                        commands.safe_despawn_recursive(entity);
                     }
                 }
             }

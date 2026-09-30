@@ -526,4 +526,55 @@ mod tests {
         assert_eq!(shake.intensity, 0.0);
         assert_eq!(shake.offset, Vec3::ZERO);
     }
+
+    #[test]
+    fn test_safe_despawn_recursive_idempotent() {
+        let mut world = World::new();
+        let entity = world.spawn_empty().id();
+        assert!(world.get_entity(entity).is_some());
+
+        // Test safe despawn through command queue
+        let mut command_queue = bevy::ecs::world::CommandQueue::default();
+        let mut commands = Commands::new(&mut command_queue, &world);
+
+        // Despawn the entity twice in the same command buffer
+        commands.safe_despawn_recursive(entity);
+        commands.safe_despawn_recursive(entity);
+
+        // Apply commands to world
+        command_queue.apply(&mut world);
+
+        // Verify entity is despawned without panics or errors
+        assert!(world.get_entity(entity).is_none());
+
+        // Queue another despawn after entity is already gone from world
+        let mut command_queue2 = bevy::ecs::world::CommandQueue::default();
+        let mut commands2 = Commands::new(&mut command_queue2, &world);
+        commands2.safe_despawn_recursive(entity);
+        command_queue2.apply(&mut world);
+
+        assert!(world.get_entity(entity).is_none());
+    }
 }
+
+/// Extension trait for idempotent, warning-free entity despawning in Bevy ECS.
+///
+/// Standard `commands.entity(entity).despawn_recursive()` logs a Bevy ECS warning
+/// `error[B0003]: Could not despawn entity ... because it doesn't exist in this World`
+/// if the entity was already despawned in the same frame or earlier in the command buffer.
+/// `safe_despawn_recursive` checks whether the entity still exists at command execution time,
+/// cleanly despawning it if present and no-oping without warning if already despawned.
+pub trait SafeDespawnExt {
+    fn safe_despawn_recursive(&mut self, entity: Entity);
+}
+
+impl<'w, 's> SafeDespawnExt for Commands<'w, 's> {
+    fn safe_despawn_recursive(&mut self, entity: Entity) {
+        self.add(move |world: &mut World| {
+            if let Some(entity_mut) = world.get_entity_mut(entity) {
+                entity_mut.despawn_recursive();
+            }
+        });
+    }
+}
+

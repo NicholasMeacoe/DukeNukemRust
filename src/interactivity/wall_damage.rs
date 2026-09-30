@@ -33,12 +33,14 @@ pub fn handle_wall_damage(
     mut sound_events: EventWriter<PlaySoundEvent>,
     mut gib_events: EventWriter<crate::combat::GibEvent>,
 ) {
+    let mut despawned_entities: std::collections::HashSet<Entity> = std::collections::HashSet::new();
+
     for ev in wall_damage_events.read() {
         let hit_pt = ev.hit_point;
 
         // 1. Breakable Glass
         for (entity, trans, mut glass) in glass_query.iter_mut() {
-            if glass.is_broken {
+            if glass.is_broken || despawned_entities.contains(&entity) {
                 continue;
             }
             let is_direct = ev.hit_entity == Some(entity);
@@ -48,14 +50,15 @@ pub fn handle_wall_damage(
                 if glass.health <= 0 {
                     glass.is_broken = true;
                     sound_events.send(PlaySoundEvent { sound_id: 19 }); // GLASS_BREAKING
-                    commands.entity(entity).despawn_recursive();
+                    despawned_entities.insert(entity);
+                    commands.safe_despawn_recursive(entity);
                 }
             }
         }
 
         // 2. Crack Walls & Air Vent Covers
         for (entity, trans, mut crack) in crack_query.iter_mut() {
-            if crack.is_blown {
+            if crack.is_blown || despawned_entities.contains(&entity) {
                 continue;
             }
             let is_direct = ev.hit_entity == Some(entity);
@@ -74,7 +77,8 @@ pub fn handle_wall_damage(
                         origin: trans.translation,
                         gib_count: 6,
                     });
-                    commands.entity(entity).despawn_recursive();
+                    despawned_entities.insert(entity);
+                    commands.safe_despawn_recursive(entity);
                 } else {
                     // Bullet / Melee impacts damage the crack wall progressively
                     crack.health -= ev.damage;
@@ -91,7 +95,8 @@ pub fn handle_wall_damage(
                             origin: trans.translation,
                             gib_count: 6,
                         });
-                        commands.entity(entity).despawn_recursive();
+                        despawned_entities.insert(entity);
+                        commands.safe_despawn_recursive(entity);
                     }
                 }
             }
@@ -121,7 +126,7 @@ pub fn handle_wall_damage(
 
         // 5. Fire Extinguishers
         for (entity, trans, mut ext) in fire_ext_query.iter_mut() {
-            if ext.is_exploded {
+            if ext.is_exploded || despawned_entities.contains(&entity) {
                 continue;
             }
             let is_direct = ev.hit_entity == Some(entity);
@@ -142,14 +147,15 @@ pub fn handle_wall_damage(
                         origin: trans.translation,
                         gib_count: 4,
                     });
-                    commands.entity(entity).despawn_recursive();
+                    despawned_entities.insert(entity);
+                    commands.safe_despawn_recursive(entity);
                 }
             }
         }
 
         // 6. Exploding Barrels (direct bullet / projectile hits)
         for (entity, trans, mut barrel) in barrel_query.iter_mut() {
-            if barrel.is_exploded {
+            if barrel.is_exploded || despawned_entities.contains(&entity) {
                 continue;
             }
             let is_direct = ev.hit_entity == Some(entity);
@@ -169,7 +175,8 @@ pub fn handle_wall_damage(
                         origin: trans.translation,
                         gib_count: 6,
                     });
-                    commands.entity(entity).despawn_recursive();
+                    despawned_entities.insert(entity);
+                    commands.safe_despawn_recursive(entity);
                 }
             }
         }
@@ -194,10 +201,15 @@ pub fn handle_wall_damage(
 
         // 8. Generic Destructible Entities
         if let Some(hit_ent) = ev.hit_entity {
-            if let Ok((entity, mut dest)) = destructible_query.get_mut(hit_ent) {
-                dest.health -= ev.damage;
-                if dest.health <= 0 {
-                    commands.entity(entity).despawn_recursive();
+            if !despawned_entities.contains(&hit_ent) {
+                if let Ok((entity, mut dest)) = destructible_query.get_mut(hit_ent) {
+                    if dest.health > 0 {
+                        dest.health -= ev.damage;
+                        if dest.health <= 0 {
+                            despawned_entities.insert(entity);
+                            commands.safe_despawn_recursive(entity);
+                        }
+                    }
                 }
             }
         }

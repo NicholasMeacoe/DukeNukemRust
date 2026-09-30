@@ -1,4 +1,5 @@
 use crate::audio::PlaySoundEvent;
+use crate::interactivity::SafeDespawnExt;
 use crate::player::types::*;
 use bevy::prelude::*;
 
@@ -62,7 +63,7 @@ pub fn handle_inventory_input(
                 ));
             } else {
                 for entity in holoduke_query.iter() {
-                    commands.entity(entity).despawn_recursive();
+                    commands.safe_despawn_recursive(entity);
                 }
             }
         }
@@ -115,7 +116,7 @@ pub fn update_inventory_timers(
             if player.inventory.holoduke_amount == 0 {
                 player.inventory.holoduke_active = false;
                 for entity in holoduke_query.iter() {
-                    commands.entity(entity).despawn_recursive();
+                    commands.safe_despawn_recursive(entity);
                 }
             }
         }
@@ -196,10 +197,14 @@ pub fn update_player_pickups(
     mut rng: ResMut<crate::net::DeterministicRng>,
 ) {
     let mut sbar = sbar_query.get_single_mut().ok();
+    let mut collected_pickups: std::collections::HashSet<Entity> = std::collections::HashSet::new();
 
     for (p_trans, mut player) in player_query.iter_mut() {
 
     for (pickup_entity, item_trans, item) in pickup_query.iter() {
+        if collected_pickups.contains(&pickup_entity) {
+            continue;
+        }
         if p_trans.translation.distance_squared(item_trans.translation) < 4.0 {
             // 2.0m radius
             use crate::interactivity::PickupKind::*;
@@ -488,13 +493,17 @@ pub fn update_player_pickups(
                         name: Some("LOOK01".into()),
                     });
                 }
-                commands.entity(pickup_entity).despawn_recursive();
+                collected_pickups.insert(pickup_entity);
+                commands.safe_despawn_recursive(pickup_entity);
             }
         }
     }
 
     // Auto-collect keycards when walking over them
     for (k_entity, k_trans, k_pickup) in keycard_query.iter() {
+        if collected_pickups.contains(&k_entity) {
+            continue;
+        }
         if p_trans.translation.distance_squared(k_trans.translation) < 4.0 {
             let key_name = match k_pickup.key_type {
                 1 => {
@@ -519,7 +528,8 @@ pub fn update_player_pickups(
             if let Some(ref mut t) = tint {
                 t.target_color = Color::srgba(0.2, 0.4, 0.9, 0.4);
             }
-            commands.entity(k_entity).despawn_recursive();
+            collected_pickups.insert(k_entity);
+            commands.safe_despawn_recursive(k_entity);
         }
     }
     }

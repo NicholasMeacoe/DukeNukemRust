@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use crate::interactivity::SafeDespawnExt;
 use crate::player::weapons::WeaponType;
 
 /// Configuration for dynamic point lighting in the engine.
@@ -136,15 +137,18 @@ pub fn handle_spawn_dynamic_lights(
     }
 
     let mut current_count = existing_lights.iter().count();
+    let mut evicted_entities: std::collections::HashSet<Entity> = std::collections::HashSet::new();
 
     for ev in events.read() {
         // Enforce light capacity by despawning the light closest to expiration
         if current_count >= config.max_active_lights {
             if let Some((oldest_entity, _)) = existing_lights
                 .iter()
+                .filter(|(e, l)| !evicted_entities.contains(e) && l.progress() < 1.0)
                 .max_by(|a, b| a.1.progress().partial_cmp(&b.1.progress()).unwrap_or(std::cmp::Ordering::Equal))
             {
-                commands.entity(oldest_entity).despawn_recursive();
+                evicted_entities.insert(oldest_entity);
+                commands.safe_despawn_recursive(oldest_entity);
                 current_count = current_count.saturating_sub(1);
             }
         }
@@ -179,7 +183,7 @@ pub fn update_transient_lights(
         light.current_time += dt;
         let progress = light.progress();
         if progress >= 1.0 {
-            commands.entity(entity).despawn_recursive();
+            commands.safe_despawn_recursive(entity);
         } else {
             point_light.intensity = light.calculate_intensity(progress, light.current_time);
         }
@@ -337,5 +341,52 @@ pub mod tests {
         }
         app.update();
         assert!(app.world().get_entity(entity).is_none());
+    }
+
+    #[test]
+    fn test_dynamic_lights_batch_eviction_in_same_frame() {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins)
+            .insert_resource(DynamicLightingConfig {
+                enabled: true,
+                max_active_lights: 3,
+                intensity_scale: 1.0,
+            })
+            .add_event::<SpawnDynamicLightEvent>()
+            .add_systems(Update, handle_spawn_dynamic_lights);
+
+        // First frame: spawn 3 lights to reach capacity
+        for i in 0..3 {
+            app.world_mut().send_event(SpawnDynamicLightEvent {
+                position: Vec3::new(i as f32, 0.0, 0.0),
+                color: Color::WHITE,
+                intensity: 1000.0,
+                range: 10.0,
+                lifetime: 0.5 + (i as f32) * 0.1,
+                decay_mode: LightDecayMode::Linear,
+            });
+        }
+        app.update();
+
+        let mut query = app.world_mut().query::<&TransientLight>();
+        assert_eq!(query.iter(app.world()).count(), 3);
+
+        // Second frame: send 3 MORE light events simultaneously in a single frame batch
+        for i in 3..6 {
+            app.world_mut().send_event(SpawnDynamicLightEvent {
+                position: Vec3::new(i as f32, 0.0, 0.0),
+                color: Color::WHITE,
+                intensity: 1000.0,
+                range: 10.0,
+                lifetime: 0.5 + (i as f32) * 0.1,
+                decay_mode: LightDecayMode::Linear,
+            });
+        }
+        // Update must safely evict without duplicate despawn error or panic
+        app.update();
+
+        let mut query2 = app.world_mut().query::<&TransientLight>();
+        let active_count = query2.iter(app.world()).count();
+        assert!(active_count <= 3, "Dynamic light count should not exceed max_active_lights: got {}", active_count);
     }
 }

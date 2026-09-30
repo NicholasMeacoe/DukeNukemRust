@@ -1,4 +1,5 @@
 use crate::combat::types::GibEvent;
+use crate::interactivity::SafeDespawnExt;
 use bevy::prelude::*;
 
 #[derive(Component)]
@@ -142,7 +143,7 @@ pub fn update_brass_casings(
         }
 
         if casing.lifetime <= 0.0 {
-            commands.entity(entity).despawn_recursive();
+            commands.safe_despawn_recursive(entity);
         }
     }
 }
@@ -160,7 +161,7 @@ pub fn update_gib_particles(
         trans.translation += gib.velocity * dt;
 
         if gib.lifetime <= 0.0 {
-            commands.entity(entity).despawn_recursive();
+            commands.safe_despawn_recursive(entity);
         }
     }
 }

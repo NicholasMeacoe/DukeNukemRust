@@ -405,7 +405,7 @@ pub fn update_water_splash_particles(
     for (entity, mut trans, mut splash) in query.iter_mut() {
         splash.lifetime -= dt;
         if splash.lifetime <= 0.0 {
-            commands.entity(entity).despawn_recursive();
+            commands.safe_despawn_recursive(entity);
             continue;
         }
         splash.velocity.y -= 9.81 * dt;

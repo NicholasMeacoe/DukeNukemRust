@@ -1,4 +1,5 @@
 use crate::combat::types::*;
+use crate::interactivity::SafeDespawnExt;
 use crate::player::types::PlayerController;
 use crate::scripting::{getincangle, move_flags, ConActor, ConScriptEngine, VmActorContext};
 use crate::names::*;
@@ -341,7 +342,7 @@ pub fn update_con_actors(
 
         // Apply death / killit
         if killit {
-            commands.entity(entity).despawn_recursive();
+            commands.safe_despawn_recursive(entity);
             continue;
         }
 

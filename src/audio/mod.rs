@@ -11,6 +11,7 @@ pub use synth_stream::*;
 pub use voc::*;
 
 use crate::grp::Grp;
+use crate::interactivity::SafeDespawnExt;
 use crate::player::PlayerMovementMode;
 use bevy::prelude::*;
 use std::collections::HashMap;
@@ -245,7 +246,7 @@ pub fn cull_oldest_voice_if_needed(
             .enumerate()
             .min_by_key(|(_, &(_, seq))| seq)
         {
-            commands.entity(oldest_entity).despawn_recursive();
+            commands.safe_despawn_recursive(oldest_entity);
             current_voices.remove(idx);
         } else {
             break;
@@ -775,7 +776,7 @@ pub fn handle_play_music_track_events(
         if let Some(music_handle) = audio_assets.music_tracks.get(&ev.track) {
             // Despawn old tracks
             for entity in &old_music {
-                commands.entity(entity).despawn_recursive();
+                commands.safe_despawn_recursive(entity);
             }
 
             music_state.current_track = ev.track.filename().to_string();
@@ -792,7 +793,7 @@ pub fn handle_play_music_track_events(
         } else if let Some(wav_handle) = audio_assets.wav_music_tracks.get(&ev.track) {
             // Despawn old tracks
             for entity in &old_music {
-                commands.entity(entity).despawn_recursive();
+                commands.safe_despawn_recursive(entity);
             }
 
             music_state.current_track = ev.track.filename().to_string();

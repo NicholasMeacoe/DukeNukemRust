@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use crate::interactivity::SafeDespawnExt;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum DecalType {
@@ -219,7 +220,7 @@ pub fn update_impact_sparks(
     for (entity, mut spark, mat_handle) in query.iter_mut() {
         spark.timer -= dt;
         if spark.timer <= 0.0 {
-            commands.entity(entity).despawn_recursive();
+            commands.safe_despawn_recursive(entity);
             continue;
         }
 
@@ -253,14 +254,14 @@ pub fn update_surface_decals(
 
     for (entity, mut decal, mat_handle) in query.iter_mut() {
         if excess > 0 {
-            commands.entity(entity).despawn_recursive();
+            commands.safe_despawn_recursive(entity);
             excess -= 1;
             continue;
         }
 
         decal.lifetime -= dt;
         if decal.lifetime <= 0.0 {
-            commands.entity(entity).despawn_recursive();
+            commands.safe_despawn_recursive(entity);
         } else if decal.lifetime < 3.0 {
             // Fade out in last 3 seconds
             decal.alpha = decal.lifetime / 3.0;

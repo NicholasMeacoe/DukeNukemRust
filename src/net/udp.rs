@@ -1,3 +1,4 @@
+use crate::interactivity::SafeDespawnExt;
 use crate::net::actor::RemotePlayerActor;
 use crate::net::protocol::NetPacket;
 use crate::net::scoreboard::DukematchState;
@@ -351,7 +352,7 @@ pub fn net_receive_packets_system(
                 transport.disconnect_peer_by_id(pid);
                 for (entity, id) in player_query.iter() {
                     if id.0 == pid {
-                        commands.entity(entity).despawn_recursive();
+                        commands.safe_despawn_recursive(entity);
                     }
                 }
             }
@@ -410,7 +411,7 @@ pub fn net_peer_timeout_system(
     for pid in timed_out_ids {
         for (entity, id) in player_query.iter() {
             if id.0 == pid {
-                commands.entity(entity).despawn_recursive();
+                commands.safe_despawn_recursive(entity);
             }
         }
     }

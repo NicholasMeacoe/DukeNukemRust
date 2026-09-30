@@ -1,6 +1,7 @@
 use crate::builder::MapMeshBuilder;
 use crate::game_flow::state::*;
 use crate::grp::Grp;
+use crate::interactivity::SafeDespawnExt;
 use crate::map::Map;
 use crate::player::PlayerController;
 use crate::names::*;
@@ -34,7 +35,7 @@ pub fn handle_load_level_events(
         // 1. Teardown all previous level entities
         let mut despawned_count = 0;
         for entity in level_entities.iter() {
-            commands.entity(entity).despawn_recursive();
+            commands.safe_despawn_recursive(entity);
             despawned_count += 1;
         }
         println!("Despawned {} previous level entities.", despawned_count);

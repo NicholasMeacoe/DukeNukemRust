@@ -1,5 +1,6 @@
 use crate::audio::PlaySoundEvent;
 use crate::combat::types::{LaserTripwireBeam, Projectile, ProjectileType, SpawnProjectileEvent};
+use crate::interactivity::SafeDespawnExt;
 use crate::interactivity::types::ExplosionDamageEvent;
 pub use crate::player::types::*;
 use bevy::prelude::*;
@@ -255,7 +256,7 @@ pub fn handle_weapon_firing(
                     p_trans.translation,
                     7.0 * 20.0,
                 ));
-                commands.entity(entity).despawn_recursive();
+                commands.safe_despawn_recursive(entity);
             }
         }
         if detonated_any && player.current_weapon == WeaponType::HandRemote {
@@ -663,7 +664,7 @@ pub fn handle_weapon_firing(
                             p_trans.translation,
                             7.0 * 20.0,
                         ));
-                        commands.entity(entity).despawn_recursive();
+                        commands.safe_despawn_recursive(entity);
                     }
                 }
                 player.weapons[cur_idx].fire_timer = player.weapons[cur_idx].fire_delay;
@@ -770,7 +771,7 @@ pub fn update_laser_tripbombs(
                 attacker_id: bomb.owner_player_id,
                 excluded_entity: None,
             });
-            commands.entity(entity).despawn_recursive();
+            commands.safe_despawn_recursive(entity);
         }
     }
 }
@@ -966,7 +967,7 @@ pub fn detonate_player_pipebombs(
             attacker_id: None,
             excluded_entity: None,
         });
-        commands.entity(entity).despawn_recursive();
+        commands.safe_despawn_recursive(entity);
     }
     count
 }

@@ -1,4 +1,5 @@
 use crate::combat::types::*;
+use crate::interactivity::SafeDespawnExt;
 use crate::interactivity::types::ExplosionDamageEvent;
 use crate::player::types::PlayerController;
 use bevy::prelude::*;
@@ -452,7 +453,7 @@ pub fn update_projectiles(
         }
 
         if proj.lifetime <= 0.0 {
-            commands.entity(proj_entity).despawn_recursive();
+            commands.safe_despawn_recursive(proj_entity);
         }
     }
 }
