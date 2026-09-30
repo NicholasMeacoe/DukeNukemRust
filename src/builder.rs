@@ -593,9 +593,15 @@ impl<'a> MapMeshBuilder<'a> {
 
                     // 1. Upper Wall (Step down from ceiling)
                     let cur_sec = &self.map.sectors[sec_idx];
+                    let is_horizon_sky = next_sec.is_ceiling_parallax()
+                        && (next_sec.floorz == next_sec.ceilingz || next_sec.is_floor_parallax())
+                        && (wall.picnum == 0 || crate::sky::is_sky_tile(wall.picnum));
+                    let is_open_sky_portal = cur_sec.is_ceiling_parallax()
+                        && next_sec.is_ceiling_parallax()
+                        && (crate::sky::is_sky_tile(wall.picnum) || wall.yrepeat == 0 || is_horizon_sky);
+
                     if (next_ceil_y1 < cur_ceil_y1 - 0.001 || next_ceil_y2 < cur_ceil_y2 - 0.001)
-                        && !cur_sec.is_ceiling_parallax()
-                        && !next_sec.is_ceiling_parallax()
+                        && !is_open_sky_portal
                     {
                         self.spawn_wall_quad(
                             commands,
@@ -618,9 +624,15 @@ impl<'a> MapMeshBuilder<'a> {
 
                     // 2. Lower Wall (Step up from floor or drop down to abyss)
                     let cur_sec = &self.map.sectors[sec_idx];
+                    let is_horizon_floor = next_sec.is_floor_parallax()
+                        && (next_sec.floorz == next_sec.ceilingz || next_sec.is_ceiling_parallax())
+                        && (wall.picnum == 0 || crate::sky::is_sky_tile(wall.picnum));
+                    let is_open_floor_portal = cur_sec.is_floor_parallax()
+                        && next_sec.is_floor_parallax()
+                        && (crate::sky::is_sky_tile(wall.picnum) || wall.yrepeat == 0 || is_horizon_floor);
+
                     if (next_floor_y1 > cur_floor_y1 + 0.001 || next_floor_y2 > cur_floor_y2 + 0.001) 
-                        && !cur_sec.is_floor_parallax()
-                        && !next_sec.is_floor_parallax()
+                        && !is_open_floor_portal
                     {
                         let lower_picnum = if wall.bottoms_swapped() {
                             wall.picnum
@@ -785,7 +797,7 @@ impl<'a> MapMeshBuilder<'a> {
             [0, 2, 3],
         ];
 
-        let visibility = if wall.yrepeat == 0 || picnum == 79 || picnum == 89 || picnum == 97 {
+        let visibility = if wall.yrepeat == 0 || crate::sky::is_sky_tile(picnum) {
             Visibility::Hidden
         } else {
             Visibility::Inherited
@@ -1872,6 +1884,58 @@ mod tests {
                 let floor_y = sector.get_floor_y_at(&map.walls, map.posx, map.posy);
                 assert!((floor_y - 9.0625).abs() < 0.001);
                 assert_eq!(sector.floorstat, 100);
+            }
+        }
+    }
+
+    #[test]
+    fn test_e1l1_sky_and_upper_walls() {
+        if let Ok(grp) = crate::grp::Grp::open("dukenukem3d/duke3d.grp") {
+            if let Ok(map_data) = grp.read_file("E1L1.MAP") {
+                let map = Map::from_bytes(&map_data).unwrap();
+                println!("=== E1L1 SKY & WALL ANALYSIS ===");
+                let mut skipped_upper = 0;
+                let mut drawn_upper = 0;
+                for sector in &map.sectors {
+                    for i in 0..sector.wallnum {
+                        let w_idx = (sector.wallptr + i) as usize;
+                        let wall = &map.walls[w_idx];
+                        if !wall.is_portal() {
+                            continue;
+                        }
+                        let next_sec_idx = wall.nextsector as usize;
+                        if next_sec_idx >= map.sectors.len() {
+                            continue;
+                        }
+                        let next_wall_idx = wall.point2 as usize;
+                        let next_wall = &map.walls[next_wall_idx];
+                        let next_sec = &map.sectors[next_sec_idx];
+
+                        let cur_ceil_y1 = sector.get_ceiling_y_at(&map.walls, wall.x, wall.y);
+                        let cur_ceil_y2 = sector.get_ceiling_y_at(&map.walls, next_wall.x, next_wall.y);
+                        let next_ceil_y1 = next_sec.get_ceiling_y_at(&map.walls, wall.x, wall.y);
+                        let next_ceil_y2 = next_sec.get_ceiling_y_at(&map.walls, next_wall.x, next_wall.y);
+
+                        if next_ceil_y1 < cur_ceil_y1 - 0.001 || next_ceil_y2 < cur_ceil_y2 - 0.001 {
+                            let cur_sky = sector.is_ceiling_parallax();
+                            let next_sky = next_sec.is_ceiling_parallax();
+                            let is_horizon_sky = next_sky
+                                && (next_sec.floorz == next_sec.ceilingz || next_sec.is_floor_parallax())
+                                && (wall.picnum == 0 || crate::sky::is_sky_tile(wall.picnum));
+                            let is_open_sky_portal = cur_sky
+                                && next_sky
+                                && (crate::sky::is_sky_tile(wall.picnum) || wall.yrepeat == 0 || is_horizon_sky);
+
+                            if !is_open_sky_portal {
+                                drawn_upper += 1;
+                            } else {
+                                skipped_upper += 1;
+                            }
+                        }
+                    }
+                }
+                assert_eq!(drawn_upper, 270, "All 270 upper walls (including 31 building facades) must be drawn");
+                assert_eq!(skipped_upper, 4, "Only 4 outer boundary horizon sky portals should be skipped");
             }
         }
     }

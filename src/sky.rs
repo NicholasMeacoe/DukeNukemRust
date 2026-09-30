@@ -30,6 +30,11 @@ pub fn sky_tile_for_episode(episode: usize) -> i16 {
     }
 }
 
+/// Returns whether a tile index corresponds to a panoramic sky texture (tiles 79..=101).
+pub fn is_sky_tile(picnum: i16) -> bool {
+    (79..=101).contains(&picnum)
+}
+
 pub fn spawn_skybox(
     commands: &mut Commands,
     meshes: &mut Assets<Mesh>,
@@ -148,5 +153,21 @@ mod tests {
         assert_eq!(sky_tile_for_episode(3), crate::names::CITY_SKY);
         assert_eq!(sky_tile_for_episode(4), crate::names::REDSKY1);
         assert_eq!(sky_tile_for_episode(99), crate::names::LA_SKY);
+    }
+
+    #[test]
+    fn test_is_sky_tile() {
+        assert!(is_sky_tile(79)); // CLOUDYSKIES
+        assert!(is_sky_tile(80)); // MOONSKY1
+        assert!(is_sky_tile(84)); // BIGORBIT1 / CITY_SKY
+        assert!(is_sky_tile(89)); // LA_SKY
+        assert!(is_sky_tile(98)); // REDSKY1
+        assert!(is_sky_tile(101));
+        assert!(!is_sky_tile(0));
+        assert!(!is_sky_tile(78));
+        assert!(!is_sky_tile(102));
+        assert!(!is_sky_tile(723)); // Red brick building facade
+        assert!(!is_sky_tile(757)); // Office building facade
+        assert!(!is_sky_tile(342)); // Ventilation panel
     }
 }
