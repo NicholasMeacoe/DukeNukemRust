@@ -44,6 +44,7 @@ impl Plugin for InteractivityPlugin {
                 (
                     update_sector_effectors,
                     update_carrier_platform_momentum,
+                    update_teleporter_sector_effectors,
                     update_earthquake_camera_shake,
                     update_surveillance_monitors,
                     update_mirror_props,
@@ -68,6 +69,25 @@ pub fn apply_player_healing(
 }
 
 pub fn spawn_interactive_elements_from_map(commands: &mut Commands, map: &Map) {
+    // Pre-scan all SE 7 (Underwater / Shaft Teleport) sprites to pair mutual destinations by hitag
+    let mut se7_map: std::collections::HashMap<i16, Vec<(usize, usize, Vec3, f32)>> =
+        std::collections::HashMap::new();
+    for (idx, sprite) in map.sprites.iter().enumerate() {
+        if sprite.picnum == 1 && sprite.lotag == 7 {
+            let pos = Vec3::new(
+                sprite.x as f32 / 1024.0,
+                -(sprite.z as f32) / (1024.0 * 16.0),
+                sprite.y as f32 / 1024.0,
+            );
+            let yaw = -(sprite.ang as f32 / 2048.0) * std::f32::consts::TAU
+                + std::f32::consts::FRAC_PI_2;
+            se7_map
+                .entry(sprite.hitag)
+                .or_default()
+                .push((idx, sprite.sectnum as usize, pos, yaw));
+        }
+    }
+
     for (_idx, sprite) in map.sprites.iter().enumerate() {
         let pos = Vec3::new(
             sprite.x as f32 / 1024.0,
@@ -108,12 +128,33 @@ pub fn spawn_interactive_elements_from_map(commands: &mut Commands, map: &Map) {
                         is_at_top: false,
                         auto_return_timer: None,
                     },
-                    7 => EffectorKind::UnderwaterTeleport {
-                        target_sector: (sprite.hitag as usize)
-                            .min(map.sectors.len().saturating_sub(1)),
-                        target_pos: pos,
-                        is_submerged: false,
-                    },
+                    7 => {
+                        let paired = se7_map.get(&sprite.hitag).and_then(|list| {
+                            list.iter().find(|(s_idx, _, _, _)| *s_idx != _idx)
+                        });
+                        if let Some((_, target_sect, target_pos, target_yaw)) = paired {
+                            EffectorKind::UnderwaterTeleport {
+                                target_sector: *target_sect,
+                                target_pos: *target_pos,
+                                target_yaw: *target_yaw,
+                                trigger_height: pos.y,
+                                trigger_radius: 2.2,
+                                is_submerged: false,
+                                teleport_cooldown: 0.0,
+                            }
+                        } else {
+                            EffectorKind::UnderwaterTeleport {
+                                target_sector: (sprite.hitag as usize)
+                                    .min(map.sectors.len().saturating_sub(1)),
+                                target_pos: pos,
+                                target_yaw: ang_rad,
+                                trigger_height: pos.y,
+                                trigger_radius: 2.2,
+                                is_submerged: false,
+                                teleport_cooldown: 0.0,
+                            }
+                        }
+                    }
                     3 => EffectorKind::LightStrobe {
                         base_shade: 0,
                         min_shade: 0,

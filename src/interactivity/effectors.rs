@@ -779,6 +779,108 @@ pub fn update_carrier_platform_momentum(
     }
 }
 
+pub fn update_teleporter_sector_effectors(
+    time: Res<Time>,
+    mut effectors: Query<(&mut SectorEffectorComponent, &Transform), Without<crate::player::PlayerController>>,
+    mut players: Query<(
+        &mut Transform,
+        &mut crate::player::PlayerController,
+        &mut crate::sector_map::CurrentSector,
+    ), Without<SectorEffectorComponent>>,
+    mut sound_events: EventWriter<crate::audio::PlaySoundEvent>,
+) {
+    let dt = time.delta_seconds();
+
+    // 1. Tick down cooldowns on all teleporter effectors
+    for (mut effector, _) in effectors.iter_mut() {
+        if let EffectorKind::UnderwaterTeleport { teleport_cooldown, .. } = &mut effector.kind {
+            if *teleport_cooldown > 0.0 {
+                *teleport_cooldown = (*teleport_cooldown - dt).max(0.0);
+            }
+        }
+    }
+
+    // 2. Check for player entering teleporter trigger
+    for (mut player_trans, mut player_ctrl, mut current_sec) in players.iter_mut() {
+        let player_p = player_trans.translation;
+        let p_sec = current_sec.0;
+
+        let mut teleport_event = None;
+
+        for (mut effector, eff_trans) in effectors.iter_mut() {
+            let eff_sec = effector.sector_idx;
+            let eff_pos = eff_trans.translation;
+
+            if let EffectorKind::UnderwaterTeleport {
+                target_sector,
+                target_pos,
+                target_yaw,
+                trigger_height,
+                trigger_radius,
+                teleport_cooldown,
+                ..
+            } = &mut effector.kind
+            {
+                if *teleport_cooldown > 0.0 {
+                    continue;
+                }
+
+                // Check sector match or close proximity to effector
+                let sector_matches = p_sec >= 0 && (p_sec as usize == eff_sec);
+                let dist_xz = Vec2::new(player_p.x - eff_pos.x, player_p.z - eff_pos.z).length();
+                let in_radius = dist_xz <= *trigger_radius;
+
+                if !sector_matches && !in_radius {
+                    continue;
+                }
+
+                // Check vertical trigger threshold
+                // In Duke 3D, dropping down past the teleporter sprite height triggers the jump
+                let crosses_plane = player_p.y <= *trigger_height + 0.35 && player_p.y >= *trigger_height - 3.5;
+
+                if crosses_plane && in_radius {
+                    *teleport_cooldown = 1.0;
+                    teleport_event = Some((*target_sector, *target_pos, *target_yaw));
+                    break;
+                }
+            }
+        }
+
+        if let Some((target_sector, target_pos, target_yaw)) = teleport_event {
+            // Apply cooldown to destination sector effectors as well to prevent ping-pong bouncing
+            for (mut effector, _) in effectors.iter_mut() {
+                if effector.sector_idx == target_sector {
+                    if let EffectorKind::UnderwaterTeleport { teleport_cooldown, .. } = &mut effector.kind {
+                        *teleport_cooldown = 1.0;
+                    }
+                }
+            }
+
+            println!(
+                "SE 7 Teleport: from sector {} to sector {}, pos {:?} -> {:?}",
+                p_sec, target_sector, player_p, target_pos
+            );
+
+            // 1. Reposition player at target
+            player_trans.translation = target_pos;
+
+            // 2. Set player yaw to face out of the target
+            player_ctrl.yaw = target_yaw;
+
+            // 3. Update current sector
+            current_sec.0 = target_sector as i16;
+
+            // 4. Safe vertical velocity and gentle outward push
+            player_ctrl.velocity_y = -1.5; // Gentle downward float, resets deadly fall speed!
+            let push_dir = Vec2::new(-target_yaw.sin(), -target_yaw.cos()).normalize_or_zero();
+            player_ctrl.velocity_xz = push_dir * 3.0;
+
+            // 5. Play teleporter / whoosh sound
+            sound_events.send(crate::audio::PlaySoundEvent { sound_id: 11 });
+        }
+    }
+}
+
 pub fn update_earthquake_camera_shake(
     _time: Res<Time>,
     effectors: Query<&SectorEffectorComponent>,
@@ -1452,6 +1554,111 @@ mod tests {
             } else {
                 panic!("Mesh missing ATTRIBUTE_COLOR");
             }
+        }
+    }
+
+    #[test]
+    fn test_se7_teleporter_shaft_to_alley_execution() {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins);
+        app.add_event::<crate::audio::PlaySoundEvent>();
+
+        let source_pos = Vec3::new(-25.24, 2.1875, 14.43);
+        let dest_pos = Vec3::new(8.99, 4.3125, 40.615);
+        let dest_yaw = -0.343f32;
+
+        // Spawn source teleporter (Sector 269 - rooftop vent shaft)
+        let source_entity = app
+            .world_mut()
+            .spawn((
+                SectorEffectorComponent {
+                    sector_idx: 269,
+                    lotag: 7,
+                    hitag: 252,
+                    kind: EffectorKind::UnderwaterTeleport {
+                        target_sector: 256,
+                        target_pos: dest_pos,
+                        target_yaw: dest_yaw,
+                        trigger_height: source_pos.y,
+                        trigger_radius: 2.2,
+                        is_submerged: false,
+                        teleport_cooldown: 0.0,
+                    },
+                    active: false,
+                },
+                TransformBundle::from_transform(Transform::from_translation(source_pos)),
+            ))
+            .id();
+
+        // Spawn destination teleporter (Sector 256 - cinema alley)
+        let dest_entity = app
+            .world_mut()
+            .spawn((
+                SectorEffectorComponent {
+                    sector_idx: 256,
+                    lotag: 7,
+                    hitag: 252,
+                    kind: EffectorKind::UnderwaterTeleport {
+                        target_sector: 269,
+                        target_pos: source_pos,
+                        target_yaw: 0.0,
+                        trigger_height: dest_pos.y,
+                        trigger_radius: 2.2,
+                        is_submerged: false,
+                        teleport_cooldown: 0.0,
+                    },
+                    active: false,
+                },
+                TransformBundle::from_transform(Transform::from_translation(dest_pos)),
+            ))
+            .id();
+
+        // Spawn player falling into the shaft at lethal terminal velocity (-18.0 m/s)
+        let _player_entity = app
+            .world_mut()
+            .spawn((
+                TransformBundle::from_transform(Transform::from_translation(Vec3::new(
+                    -25.24, 2.15, 14.43,
+                ))),
+                crate::player::PlayerController {
+                    velocity_y: -18.0,
+                    yaw: 1.57,
+                    ..default()
+                },
+                crate::sector_map::CurrentSector(269),
+            ))
+            .id();
+
+        app.add_systems(Update, update_teleporter_sector_effectors);
+        app.update();
+
+        // Verify player is teleported to destination in Sector 256
+        let p_trans = app.world().entity(_player_entity).get::<Transform>().unwrap();
+        let p_ctrl = app.world().entity(_player_entity).get::<crate::player::PlayerController>().unwrap();
+        let p_sec = app.world().entity(_player_entity).get::<crate::sector_map::CurrentSector>().unwrap();
+
+        assert_eq!(p_sec.0, 256);
+        assert!((p_trans.translation.x - dest_pos.x).abs() < 1e-3);
+        assert!((p_trans.translation.y - dest_pos.y).abs() < 1e-3);
+        assert!((p_trans.translation.z - dest_pos.z).abs() < 1e-3);
+        assert_eq!(p_ctrl.yaw, dest_yaw);
+        // Lethal fall speed was reset to gentle exit velocity (-1.5)
+        assert_eq!(p_ctrl.velocity_y, -1.5);
+        assert!(p_ctrl.velocity_xz.length() > 0.0);
+
+        // Verify cooldown was applied to both effectors
+        let src_eff = app.world().entity(source_entity).get::<SectorEffectorComponent>().unwrap();
+        if let EffectorKind::UnderwaterTeleport { teleport_cooldown, .. } = &src_eff.kind {
+            assert!(*teleport_cooldown > 0.0);
+        } else {
+            panic!("Expected UnderwaterTeleport");
+        }
+
+        let dst_eff = app.world().entity(dest_entity).get::<SectorEffectorComponent>().unwrap();
+        if let EffectorKind::UnderwaterTeleport { teleport_cooldown, .. } = &dst_eff.kind {
+            assert!(*teleport_cooldown > 0.0);
+        } else {
+            panic!("Expected UnderwaterTeleport");
         }
     }
 }

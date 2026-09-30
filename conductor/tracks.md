@@ -24,3 +24,7 @@
 - [ ] **Track: ECS Test Rigor and Integration Coverage**
   *Link: [./tracks/ecs_test_rigor_and_integration_coverage_20260929/index.md](./tracks/ecs_test_rigor_and_integration_coverage_20260929/index.md)*
 
+---
+- [x] **Track: Rooftop Ventilation Shaft Teleport (SE 7) and Viewmodel Alignment**
+  *Link: [./tracks/rooftop_vent_teleport_and_viewmodel_alignment_20260930/index.md](./tracks/rooftop_vent_teleport_and_viewmodel_alignment_20260930/index.md)*
+

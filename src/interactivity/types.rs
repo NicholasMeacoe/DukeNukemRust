@@ -37,7 +37,11 @@ pub enum EffectorKind {
     UnderwaterTeleport {
         target_sector: usize,
         target_pos: Vec3,
+        target_yaw: f32,
+        trigger_height: f32,
+        trigger_radius: f32,
         is_submerged: bool,
+        teleport_cooldown: f32,
     },
     /// SE 3: Light Strobe / Flicker
     LightStrobe {

@@ -401,13 +401,24 @@ mod tests {
     use super::*;
 
     #[test]
-    fn dump_sprites() {
-        let grp = crate::grp::Grp::open("dukenukem3d/duke3d.grp").unwrap();
-        let map_data = grp.read_file("E1L1.MAP").unwrap();
-        let map = crate::map::Map::from_bytes(&map_data).unwrap();
-        for s in &map.sprites {
-            if s.picnum == 913 {
-                println!("FENCE 913: x={}, y={}, z={}, ang={}, cstat={}, xrepeat={}, yrepeat={}", s.x, s.y, s.z, s.ang, s.cstat, s.xrepeat, s.yrepeat);
+    fn test_e1l1_se7_paired_teleporters() {
+        if let Ok(grp) = crate::grp::Grp::open("dukenukem3d/duke3d.grp") {
+            if let Ok(map_data) = grp.read_file("E1L1.MAP") {
+                let map = crate::map::Map::from_bytes(&map_data).unwrap();
+                let se7_sprites: Vec<_> = map
+                    .sprites
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, s)| s.picnum == 1 && s.lotag == 7)
+                    .collect();
+                assert_eq!(se7_sprites.len(), 2);
+                let (_, s1) = se7_sprites[0];
+                let (_, s2) = se7_sprites[1];
+                assert_eq!(s1.hitag, 252);
+                assert_eq!(s2.hitag, 252);
+                let sectors = [s1.sectnum, s2.sectnum];
+                assert!(sectors.contains(&256));
+                assert!(sectors.contains(&269));
             }
         }
     }

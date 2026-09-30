@@ -720,11 +720,12 @@ fn sync_first_person_viewmodel(
         .unwrap_or((320, 200));
 
     let base_height = match vm.current_weapon {
-        crate::player::WeaponType::Shotgun => 450.0,
-        crate::player::WeaponType::Chaingun => 460.0,
-        crate::player::WeaponType::Rpg => 480.0,
-        crate::player::WeaponType::Knee => 500.0,
-        _ => 420.0,
+        crate::player::WeaponType::Pistol => 275.0,
+        crate::player::WeaponType::Shotgun => 310.0,
+        crate::player::WeaponType::Chaingun => 320.0,
+        crate::player::WeaponType::Rpg => 330.0,
+        crate::player::WeaponType::Knee => 360.0,
+        _ => 280.0,
     };
 
     let aspect = if tile_h > 0 {
@@ -736,7 +737,7 @@ fn sync_first_person_viewmodel(
     style.height = Val::Px(base_height);
     style.width = Val::Px(base_height * aspect);
 
-    // 3. View bobbing and recoil offset
+    // 3. View bobbing, recoil offset, and iron sight aim alignment
     let view_bobbing = game_config.as_ref().map_or(true, |c| c.controls.view_bobbing);
     let (bob_x, bob_y) = if view_bobbing && player.speed > 0.1 {
         (
@@ -760,8 +761,17 @@ fn sync_first_person_viewmodel(
         0.0
     };
 
+    // Horizontal sight alignment with the center crosshair
+    let aim_offset_x = match vm.current_weapon {
+        crate::player::WeaponType::Pistol => 89.0,
+        crate::player::WeaponType::Shotgun => 85.0,
+        crate::player::WeaponType::Chaingun => 40.0,
+        crate::player::WeaponType::Rpg => 30.0,
+        _ => 0.0,
+    };
+
     style.margin.bottom = Val::Px(bob_y + recoil_y);
-    style.margin.left = Val::Px(bob_x);
+    style.margin.left = Val::Px(bob_x + aim_offset_x);
 }
 
 pub fn cursor_grab(
@@ -1072,5 +1082,77 @@ mod main_tests {
         let player = app.world().entity(player_entity).get::<Player>().unwrap();
         assert!((player.yaw - (-0.04)).abs() < 1e-4);
         assert!((player.pitch - 0.08).abs() < 1e-4);
+    }
+
+    #[test]
+    fn test_viewmodel_scaling_and_sight_aim_alignment() {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins);
+        app.add_plugins(bevy::state::app::StatesPlugin);
+        app.init_state::<game_flow::GamePhase>();
+
+        let mut tile_sizes = std::collections::HashMap::new();
+        tile_sizes.insert(2524, (72, 80)); // Pistol FIRSTGUN
+        tile_sizes.insert(2613, (102, 84)); // Shotgun
+
+        app.insert_resource(GameAssets {
+            tile_textures: std::collections::HashMap::new(),
+            tile_sizes,
+            picanm_map: std::collections::HashMap::new(),
+            default_material: Handle::default(),
+            spark_material: Handle::default(),
+            spark_mesh: Handle::default(),
+            grp_path: String::new(),
+        });
+
+        let player_entity = app
+            .world_mut()
+            .spawn((
+                Player {
+                    speed: 0.0,
+                    ..default()
+                },
+                crate::player::weapons::FirstPersonViewModel {
+                    current_weapon: crate::player::WeaponType::Pistol,
+                    current_tile: 2524,
+                    ..default()
+                },
+            ))
+            .id();
+
+        let ui_entity = app
+            .world_mut()
+            .spawn((
+                UiImage::default(),
+                Style::default(),
+                FirstPersonWeapon,
+            ))
+            .id();
+
+        app.add_systems(Update, sync_first_person_viewmodel);
+
+        // Advance into Playing state
+        app.world_mut()
+            .resource_mut::<NextState<game_flow::GamePhase>>()
+            .set(game_flow::GamePhase::Playing);
+        app.update();
+
+        let style = app.world().entity(ui_entity).get::<Style>().unwrap();
+        assert_eq!(style.height, Val::Px(275.0));
+        assert_eq!(style.width, Val::Px(275.0 * (72.0 / 80.0)));
+        assert_eq!(style.margin.left, Val::Px(89.0));
+
+        // Switch to Shotgun and verify updated scaling and offset
+        {
+            let mut p = app.world_mut().entity_mut(player_entity);
+            let mut vm = p.get_mut::<crate::player::weapons::FirstPersonViewModel>().unwrap();
+            vm.current_weapon = crate::player::WeaponType::Shotgun;
+            vm.current_tile = 2613;
+        }
+        app.update();
+
+        let style_shotgun = app.world().entity(ui_entity).get::<Style>().unwrap();
+        assert_eq!(style_shotgun.height, Val::Px(310.0));
+        assert_eq!(style_shotgun.margin.left, Val::Px(85.0));
     }
 }

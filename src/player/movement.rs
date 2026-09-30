@@ -250,12 +250,6 @@ pub fn update_player_movement(
                             crate::interactivity::EffectorKind::ConveyorBelt { direction, speed } => {
                                 conveyor_drift += Vec3::new(direction.x, 0.0, direction.y) * (*speed * dt);
                             }
-                            crate::interactivity::EffectorKind::UnderwaterTeleport { target_pos, .. } => {
-                                if is_swimming && trans.translation.distance_squared(*target_pos) > 9.0 {
-                                    trans.translation = *target_pos;
-                                    sound_events.send(PlaySoundEvent { sound_id: 11 }); // TELEPORTER
-                                }
-                            }
                             _ => {}
                         }
                     }

@@ -257,6 +257,42 @@ mod tests {
     }
 
     #[test]
+    fn test_pistol_viewmodel_sight_geometry() {
+        if let Ok(grp) = crate::grp::Grp::open("dukenukem3d/duke3d.grp") {
+            if let Ok(pal_bytes) = grp.read_file("PALETTE.DAT") {
+                if let Ok(pal) = crate::palette::Palette::from_bytes(&pal_bytes) {
+                    for entry in &grp.entries {
+                        if entry.name.to_uppercase().starts_with("TILES") && entry.name.to_uppercase().ends_with(".ART") {
+                            if let Ok(art_data) = grp.read_file(&entry.name) {
+                                if let Ok(art) = crate::art::Art::from_bytes(&art_data) {
+                                    if let Some((w, h, rgba)) = art.get_tile_rgba(2524, &pal.colors) {
+                                        assert_eq!(w, 72);
+                                        assert_eq!(h, 80);
+                                        let mut min_y = h;
+                                        let mut sight_x = 0;
+                                        for y in 0..h {
+                                            for x in 0..w {
+                                                let alpha = rgba[((y * w + x) * 4 + 3) as usize];
+                                                if alpha > 0 && y < min_y {
+                                                    min_y = y;
+                                                    sight_x = x;
+                                                }
+                                            }
+                                        }
+                                        // Front sight post is at column x=10 (26px left of center 36)
+                                        assert_eq!(sight_x, 10);
+                                        assert_eq!(min_y, 0);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
     fn test_weapon_priority_auto_switch() {
         let mut player = PlayerController::default();
         player.current_weapon = WeaponType::Shotgun;
